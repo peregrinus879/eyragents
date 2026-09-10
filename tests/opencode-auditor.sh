@@ -5,8 +5,10 @@ set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
-mkdir -p "$TMP/home" "$TMP/data"
-export HOME="$TMP/home" XDG_DATA_HOME="$TMP/data" TMPDIR="$TMP"
+mkdir -p "$TMP/home"
+# This root is a policy subject only, never accessed. Keeping it outside the
+# caller's TMPDIR prevents /tmp/opencode's allow from masking native defaults.
+export HOME="$TMP/home" XDG_DATA_HOME=/fixture-opencode-data TMPDIR="$TMP"
 env -i PATH="$PATH" HOME="$HOME" XDG_DATA_HOME="$XDG_DATA_HOME" TMPDIR="$TMPDIR" node --input-type=module - "$ROOT" "$TMP" <<'JS'
 import assert from "node:assert/strict"
 import { readFile, writeFile } from "node:fs/promises"

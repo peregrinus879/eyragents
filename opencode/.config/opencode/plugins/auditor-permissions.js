@@ -17,8 +17,8 @@ function matches(tool, pattern) {
   return new RegExp("^" + expression + "$", process.platform === "win32" ? "si" : "s").test(tool)
 }
 
-function flatten(permission, tool, fallback) {
-  const rules = new Map([["*", fallback]])
+function flatten(permission, tool, fallback, inherited = []) {
+  const rules = new Map([["*", fallback], ...inherited])
   const config = typeof permission === "string" ? { "*": permission } : permission
   if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("invalid policy")
   for (const [name, value] of Object.entries(config)) {
@@ -99,7 +99,11 @@ export const AuditorPermissions = async () => {
             // to the read adapter. A wholly missing policy remains denied.
             const fallback = tool === "glob" ? "allow" :
               tool === "external_directory" && cfg.permission?.external_directory ? "ask" : "deny"
-            rules = intersect(flatten(cfg.permission ?? {}, tool, fallback), flatten(caps, tool, "allow"))
+            // Native agent defaults include this location before user rules.
+            // Seed it before flattening so an explicit catch-all or narrower
+            // rule can override it, even when the redundant * ask is omitted.
+            const inherited = tool === "external_directory" && cfg.permission?.external_directory ? [[truncation, "allow"]] : []
+            rules = intersect(flatten(cfg.permission ?? {}, tool, fallback, inherited), flatten(caps, tool, "allow"))
           } catch {
             rules = new Map([["*", "deny"]])
             console.warn(`auditor-permissions: ${tool} restricted to deny; unsupported policy intersection`)
