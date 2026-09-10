@@ -274,7 +274,9 @@ read_rules = opencode["permission"]["read"]
 edit_rules = opencode["permission"]["edit"]
 external_rules = opencode["permission"]["external_directory"]
 require(read_rules["*"] == "allow" and edit_rules["*"] == "allow", "OpenCode workspace autonomy drifted")
-require(external_rules["*"] == "ask", "OpenCode external directories no longer ask")
+require("*" not in external_rules, "OpenCode read adapter cannot distinguish explicit asks from a copied fallback")
+require(evaluate("external_directory", "/unlisted/location/*", opencode["permission"]) == "ask", "OpenCode native external fallback no longer asks")
+require((ROOT / "opencode/.config/opencode/plugins/read-permissions.js").is_file(), "OpenCode read adapter is missing")
 # Read and edit subjects are worktree-relative; external subjects are the parent
 # directory plus /*, so an external rule that names a file can never match and
 # file stores are denied by **/ rules in read and edit, while directory stores

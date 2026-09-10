@@ -172,7 +172,6 @@
       "**/.agents/hooks/**": "deny"
     },
     "external_directory": {
-      "*": "ask",
       "/tmp/opencode/*": "allow",
       "~/Projects/scratch/**": "allow",
       "~/Projects/quarry/**": "allow",

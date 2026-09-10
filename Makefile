@@ -106,6 +106,7 @@ test:
 	bash tests/spar-bridges.sh
 	bash tests/commit-gate.sh
 	bash tests/opencode-auditor.sh
+	bash tests/opencode-read.sh
 	bash tests/opencode-scratch.sh
 	bash tests/canary.sh
 	bash tests/publish-clip.sh

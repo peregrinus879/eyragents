@@ -94,9 +94,12 @@ export const AuditorPermissions = async () => {
         for (const tool of ["read", "glob", "external_directory"]) {
           let rules
           try {
-            // Glob's native fallback is allow. Missing read/external policy
-            // is conservatively denied rather than inventing vendor grants.
-            rules = intersect(flatten(cfg.permission ?? {}, tool, tool === "glob" ? "allow" : "deny"), flatten(caps, tool, "allow"))
+            // Native external fallback is ask. A present external map can
+            // omit that redundant leaf so explicit project asks stay visible
+            // to the read adapter. A wholly missing policy remains denied.
+            const fallback = tool === "glob" ? "allow" :
+              tool === "external_directory" && cfg.permission?.external_directory ? "ask" : "deny"
+            rules = intersect(flatten(cfg.permission ?? {}, tool, fallback), flatten(caps, tool, "allow"))
           } catch {
             rules = new Map([["*", "deny"]])
             console.warn(`auditor-permissions: ${tool} restricted to deny; unsupported policy intersection`)
@@ -111,6 +114,13 @@ export const AuditorPermissions = async () => {
             next[tool] = Object.fromEntries([[truncation, "deny"], ...[...rules].map(([key, value]) => [key === truncation ? alternate : key, value])])
           } else next[tool] = Object.fromEntries(rules)
         }
+        // Non-enumerable runtime provenance for the read-only adapter. It may
+        // distinguish inherited defaults from explicit caps only while this
+        // exact derived map is intact; it grants no additional capability.
+        Object.defineProperty(auditor, Symbol.for("eyragents.auditor.original-caps"), {
+          value: Object.freeze({ caps: JSON.stringify(caps), derived: JSON.stringify(next),
+            map: next, external: next.external_directory }), configurable: true,
+        })
         auditor.permission = next
         configured = auditor
       } catch {

@@ -14,6 +14,7 @@ These are **configured baseline capabilities, not permission to use them**. They
 | Ask | The tool requests native approval for the applicable subject; retained decisions and bypass modes remain tool-specific. |
 | Block | A native deny or baseline sandbox restriction applies to the described surface, not necessarily every other tool surface. |
 | Guarded | The managed OpenCode scratch plugin permits supported native edits only after its policy/filesystem checks. |
+| Adapt | The managed OpenCode read adapter can answer an eligible native external-directory fallback ask once, after call, path and policy checks. Explicit restrictions and unsupported cases remain native. |
 | M | OpenCode's native [move-destination exception](#move-destinations): a destination can miss the edit permission check. |
 
 Read and write remain separate even when equal. Filesystem tables describe Claude Code's native file tools, Codex's sandboxed local filesystem operations, and OpenCode's native Read/Edit/Write/Apply Patch. **Do not apply their cells to arbitrary shell scripts, search results, MCP calls, or client-internal reads.** The tool-call matrix describes those differences. Credential and protected-path exceptions override ordinary-location cells.
@@ -28,10 +29,12 @@ External columns are outside the active workspace. A sibling is not a writable w
 | Claude Code | Write | Allow, except protected | Review | Review | Review | Review | Review | Block |
 | [Codex](#codex) | Read | Allow | Allow | Allow | Allow | Block, except named grants | Allow | Block |
 | Codex | Write | Allow, except protected | Block | Block | Block | Block | Block | Block |
-| [OpenCode](#opencode) | Read | Allow | Ask | Allow | Allow | Ask | Allow | Block |
+| [OpenCode](#opencode) | Read | Allow | Adapt | Allow | Allow | Adapt for ordinary config/software; Ask otherwise | Allow | Block |
 | OpenCode | Write (M) | Allow, except protected | Ask | Ask | Ask | Ask | Ask | Block |
 | [Hermes Agent](#hermes-agent) | Read | Allow | Allow | Allow | Allow | Ask outside standing roots | Allow | Block |
 | Hermes Agent | Write | Allow, except protected | Ask | Ask | Ask | Ask | Block through deployed path | Block |
+
+OpenCode's adapted categories include ordinary XDG configuration/data/cache, local executables and dotfile-based application configuration/dependencies. Credential-bearing profiles, protected stores and session histories are excluded. This is per-request native Read/Glob handling, not a read-only filesystem mount or a blanket home-directory grant. [Implementation and limits](#read-approval-adapter) define the exact boundary.
 
 Codex also reads specifically named harness files, `~/.config/opencode`, `~/.local/bin`, and `~/.local/share/mise`; its [template](../templates/codex/config.toml) is the exact inventory. It has no model-facing read grant on `~/.codex/config.toml`. The client loading its own configuration or authentication is not permission for the agent to display it. All four can execute authorized skill scripts through their ordinary shell controls; a filesystem read grant does not mean a script is harmless or read-only when executed.
 
@@ -45,7 +48,7 @@ Quarry is the shared reference-clone root for H and skills, not scratch to disca
 | Claude Code | Write | Review | Review | Review | Review | Review | Review |
 | Codex | Read | Allow | Allow | Allow | Allow | Allow | Block |
 | Codex | Write | Block | Block | Block | Block | Block | Block |
-| OpenCode | Read | Allow | Ask | Ask | Ask | Allow | Ask |
+| OpenCode | Read | Allow | Adapt | Adapt | Adapt | Allow | Ask |
 | OpenCode | Write (M) | Ask | Ask | Ask | Ask | Ask | Ask |
 | Hermes Agent | Read | Allow | Allow | Allow | Allow | Allow | Ask |
 | Hermes Agent | Write | Ask | Ask | Ask | Ask | Ask | Ask |
@@ -62,7 +65,7 @@ These cells describe ordinary non-secret files, not permission to inspect anothe
 | Claude Code | Write | Review | Review | Containing-path rule | Block | Review |
 | Codex | Read | Allow | Allow | Allow when set | Block | Block |
 | Codex | Write | Allow | Block unless also writable temp/workspace | Allow when set | Block | Block |
-| OpenCode | Read | Ask | Ask | Containing-path rule | Allow | Block |
+| OpenCode | Read | Adapt | Adapt | Containing-path rule | Allow | Block |
 | OpenCode | Write (M) | Ask | Ask | Containing-path rule | Guarded | Block |
 | Hermes Agent | Read | Allow | Allow | Containing-path rule | Block | Block |
 | Hermes Agent | Write | Ask outside workspace | Ask outside workspace | Containing-path rule | Block | Block |
@@ -96,7 +99,7 @@ Filesystem reads and writes above are only one axis. Tool availability, local ex
 | --- | --- | --- | --- | --- |
 | Claude Code | Read path rules and mode | Best-effort Read-policy coverage; checks resolved search directory | `Edit(path)` covers Edit, Write, NotebookEdit; matching Read denies also block Edit/Write | Read-only built-ins/narrow allows, otherwise Review; file/redirect checks have version-dependent coverage pending ledger revalidation; arbitrary subprocess I/O is not contained |
 | Codex | Local filesystem profile where supported | Local searches run under the sandbox profile | Writable-root/profile checks, protected metadata and approval boundary | Allow inside the sandbox; eligible boundary crossings go to auto-review, not a universal per-command review |
-| OpenCode | `read` subject plus external-directory check | Pattern and directory checks, **no per-result Read filtering** | Shared `edit` permission plus external-directory check, except move-destination edit gap (M); managed scratch adds preflight | `bash.* = allow` with named asks/denies; recognized file commands check directories, not per-file Read/Edit; arbitrary scripts are unconfined |
+| OpenCode | `read` rules plus external-directory check; eligible fallback asks adapted once | Glob can use the adapter; grep retains native directory checks, **no per-result Read filtering** | Shared `edit` permission plus external-directory check, except move-destination edit gap (M); managed scratch adds preflight | `bash.* = allow` with named asks/denies; recognized file commands check directories, not per-file Read/Edit; arbitrary scripts are unconfined |
 | Hermes Agent | Managed task-aware path checks plus native guards | Root checks and additive native result-path filtering, after backend traversal | Every parsed native target checked; task-relative operands normalized before dispatch | Native smart review plus terminal commit gate; arbitrary Python/scripts and process stdin remain outside lexical enforcement |
 
 | Tool | Hosted Web Reads | Shell Network Reads / Writes | MCP, Apps, Browser, Plugins | In-Tool Auditor | Sharing / Remote Control |
@@ -175,6 +178,16 @@ Last matching rule wins. Read/edit subjects are relative to the Git worktree; ex
 
 Native edits outside a non-root Git worktree match `../* = ask`; persistent scratch and quarry get no edit exception. **When a non-Git project uses worktree `/`, that rule does not match.** The external-directory check still applies outside the launch directory, but preapproved locations can then lack the additional edit ask. The guarded scratch plugin checks supported targets before native work, rejects existing symlink/hardlink escapes and Move-to patches, and does not prove session ownership or prevent filesystem races.
 
+### Read Approval Adapter
+
+[`read-permissions.js`](../opencode/.config/opencode/plugins/read-permissions.js) handles ordinary Read/Glob fallback prompts without granting their directories to write or shell tools. Its portable categories cover the standing Projects/temp/system roots, XDG configuration/data/cache, local executables, and dotfile-based application configuration/dependencies. Known credential-bearing profiles, protected stores and other tools' session histories remain excluded, including relocated or symlinked XDG stores. File contents are not classified for secrecy; guidance still forbids credential access beyond the finite path inventory.
+
+The plugin records a native call, validates the exact `permission.asked` identity/operand/parent pattern, checks the requesting message's agent and session policies, and sends only an exact-request `once` reply. It checks both lexical and resolved targets. Explicit global/project/agent/session restrictions remain; the redundant managed `external_directory["*"]` leaf is absent so a project restating that ask is distinguishable from native fallback. The auditor shares non-enumerable original-cap provenance valid only while its generated policy objects and content are intact.
+
+No retained `always` decision or external-directory allow is added. Write/shell/MCP and content-grep requests retain their existing handling. Glob discovers names; it does not acquire per-result Read filtering. Unknown events, broad/unexpected parent patterns, failed lookups and changed layouts retain native prompting. Call records are bounded and expire. Policy lookups are cancellable; an already-submitted exact once-reply completes without that cancellation signal, because native Replied is published before the waiting tool is released. The adapter bounds its wait rather than interrupting that completion. Trusted native tools and reviewed plugins are prerequisites: names are not implementation attestation, and this is not an OS sandbox or an atomic filesystem/policy check.
+
+The source contract was checked against OpenCode **1.18.30**: [native requests](https://github.com/anomalyco/opencode/blob/v1.18.30/packages/opencode/src/tool/external-directory.ts), [permission and once-reply semantics](https://github.com/anomalyco/opencode/blob/v1.18.30/packages/opencode/src/permission/index.ts), [call identity](https://github.com/anomalyco/opencode/blob/v1.18.30/packages/opencode/src/session/tools.ts), [plugin event delivery](https://github.com/anomalyco/opencode/blob/v1.18.30/packages/opencode/src/plugin/index.ts), and [supplied legacy SDK](https://github.com/anomalyco/opencode/blob/v1.18.30/packages/sdk/js/src/gen/sdk.gen.ts). Native read/write splitting remains absent; [issue #5395](https://github.com/anomalyco/opencode/issues/5395) and [unmerged PR #5841](https://github.com/anomalyco/opencode/pull/5841) describe the limitation. [Operations](operations.md#opencode-read-approvals) owns activation and acceptance; the ledger tracks outstanding live evidence.
+
 ### Move Destinations
 
 **M qualifies every OpenCode write row:** the cell describes a target submitted to the relevant permission check, not a guarantee about every native move destination. In [Apply Patch 1.18.29](https://github.com/anomalyco/opencode/blob/v1.18.29/packages/opencode/src/tool/apply_patch.ts), `Move to` checks the destination's external directory but submits only the source path to `edit`. Consequently, a destination under preapproved persistent scratch can miss the additional edit Ask even in a normal Git worktree; destination-only credential or `.git` edit denies can also be missed. Directory denies still apply where the external check encounters them. This is a native dispatch gap, separate from arbitrary-shell limitations.
@@ -204,7 +217,7 @@ Parity means preserving the same authorized work and safety intent where each to
 | Area | Decision And Rationale | Implementation / Current Difference | Status |
 | --- | --- | --- | --- |
 | Ordinary editing | Autonomous work inside the requested repository; explicit target authorization outside it | Workspace writes permitted, with tool-specific protected files; Codex reviewer rejects external writes even if separately authorized | Shared intent; enforcement differs |
-| Reference reads | Standing non-secret reads under Projects, temp, and named OS trees reduce routine interruptions | Claude Read allows and Codex read-only grants; OpenCode preapproves quarry but keeps other Projects and mutable system/general-temp locations at Ask because its grants are not read-only | Deliberate difference |
+| Reference/configuration reads | Ordinary non-secret reference, configuration and installed-software reads should not require app/version-specific approval | Tool capabilities differ; OpenCode uses a checked per-call Read/Glob adapter for native fallback asks rather than widening location grants | Shared intent; bounded adapter |
 | Established OpenCode references | Preapprove `/usr`, Pacman metadata and `~/Projects/quarry` for diagnostics, research and skill dependencies without granting every external location | Named location exceptions alongside skill and scratch roots; neither native grants nor OS ownership are a complete read-only guard | Deliberate tradeoff |
 | Quarry maintenance | Needed routine fetch/fast-forward refreshes of existing declared reference clones are authorized with preservation checks, not handed back merely because the root is external | Family updater dry-run must exclude unapproved clone creation/remote changes; Claude/OpenCode retain command controls and Codex's network/write restriction remains | Authorized workflow; enforcement differs |
 | Home and scratch | Other home context needs H's direction; only session-owned scratch may be modified without a named external-edit request | Claude auto reads and Codex temp writes exceed that authorization; persistent scratch has no special write grant | Guidance narrower than capability |

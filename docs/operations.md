@@ -33,6 +33,14 @@ Restart Hermes after deployment. `SOUL.md` and project instruction files are sub
 
 Use [commit](../agents/.agents/skills/commit/SKILL.md), [publish](../agents/.agents/skills/publish/SKILL.md), and [spar](../agents/.agents/skills/spar/SKILL.md) for their canonical procedures. [eyrsync](../.agents/skills/eyrsync/SKILL.md) owns upstream/reference reconciliation. The [workstream rule](../agents/.agents/shared-guidance.md#workstream-checkpoints) owns local checkpoints and cross-host handoffs.
 
+## OpenCode Read Approvals
+
+After `make restow verify`, quit and restart OpenCode. The read adapter handles eligible **Read and Glob** requests for ordinary configuration, installed software/dependencies, and standing reference roots. It grants only the current request; write/shell prompts and explicit project/agent/session restrictions retain their existing meaning. Credential-bearing files and session stores remain excluded. The [access policy](access.md#read-approval-adapter) explains the boundary.
+
+For post-restart acceptance, read one known non-secret application config and one installed package source file, then perform a filename Glob in the same source directory. Confirm they complete without your approval. In an owned disposable fixture, separately confirm an external native write still asks and leave it unapproved. Verify an explicit read restriction also remains effective. Test both a Git project and the usual non-Git family-directory launch. These are live acceptance checks, not reasons to inspect credentials or existing session history.
+
+Unexpected or overly broad parent patterns stay interactive. Report the tool, non-secret target, and displayed pattern rather than approving an entire home/data tree. `opencode run` can reject outstanding requests before asynchronous adaptation completes; the headless canary's external-temp case remains skipped. The normal interactive workflow is the live acceptance target.
+
 ## Verify
 
 After changing managed payloads:
