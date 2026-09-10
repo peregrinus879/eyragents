@@ -42,6 +42,26 @@ OpenCode's scratch plugin restores native edits under the real `/tmp/opencode` w
 
 Guidance and skills live once, under `~/.agents`, the home of the Agent Skills format. Three tools use native global-instruction symlinks to neutral `shared-guidance.md`: Claude Code's `CLAUDE.md`, Codex's `AGENTS.md`, and OpenCode's `~/.config/opencode/AGENTS.md`. OpenCode does not append the same guidance through explicit `instructions`; native global discovery avoids duplicate loading without disabling project `CLAUDE.md` fallback. Claude's project import remains. Skill executables stay in each skill's standard `scripts/` directory; tool-specific discovery adapters do not transfer ownership out of EyrAgents.
 
+## Configuration Ownership
+
+The package directories mirror deployed paths, but not every managed endpoint is a leaf symlink:
+
+| Component | Ownership and deployment |
+| --- | --- |
+| Shared guidance and skills | `agents/.agents/` is canonical. Each skill directory is linked whole for Codex discovery; other clients use their native adapters. |
+| Claude Code | `claude-code/.claude/` supplies linked instructions, settings, skills, auditor, and status line. |
+| Codex | `codex/.codex/` supplies linked instructions. `templates/codex/config.toml` supplies managed values for a private regular host file. |
+| OpenCode | `opencode/.config/opencode/` supplies linked instructions, configuration, commands, and plugins. |
+| Hermes Agent | `hermes/.hermes/plugins/eyragents/` supplies the linked native adapter. `templates/hermes/config.yaml` supplies managed leaves for a private regular host file. |
+| Commit gate | `templates/hooks/commit-gate` is copied to a checked regular file at `~/.agents/hooks/commit-gate`, outside editable workspaces. |
+| Project instructions | Root `AGENTS.md` and `.agents/skills/eyrsync/` apply to this repository; they are not global Stow payloads. |
+
+Client-owned identity, learning, and session state remain outside the source packages. Hermes preserves `SOUL.md`, local `memories/` and `skills/`, optional `profiles/`, and its session/log/database state. Only the default profile is managed. Credentials and schedules retain their separate authorization boundaries; a package does not install accounts or recurring jobs.
+
+## Documentation Ownership
+
+The README is the overview and navigation entry point. [Setup](setup.md) owns installation, deployment, migration, and adaptation; [operations](operations.md) owns daily use and verification. This guide explains architecture and rationale; [access](access.md) owns the security comparison and restricted launches. Skills own executable workflow procedures, `AGENTS.md` owns agent invariants, and the [maintenance ledger](maintenance.md) holds only unresolved work and live revalidation evidence. Link to those owners instead of copying their detailed procedures into the README.
+
 ## Reference coverage
 
 The same maintenance questions apply to every tool, but their evidence is not interchangeable. Codex, OpenCode and Hermes publish client source; Claude Code's official public repository supplies versioned release/plugin/support material, not its proprietary CLI engine. Keeping all four declared references makes omissions and release changes visible without pretending equal implementation visibility. Version-matched source, official interface documentation, changelogs and controlled runtime observations answer different questions; disagreements remain explicit rather than being resolved by assumption. Hosted behavior and model internals are not proved by a client clone.
