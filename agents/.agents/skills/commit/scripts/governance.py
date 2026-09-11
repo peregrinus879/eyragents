@@ -1,4 +1,4 @@
-"""Exact-candidate and publication receipts for the four shell entrypoints.
+"""Exact-candidate and publication receipts for the skill entrypoints.
 
 Private immutable JSON receipts are SHA-256 addressed; mutable status is separate.
 A common-Git-directory flock serializes cooperating operations across worktrees.
@@ -34,6 +34,7 @@ LIMIT = 1024 * 1024
 CLOSE_LIMIT = 5 * LIMIT
 DIAGNOSTIC_LIMIT = 8192
 OBSERVE_TIMEOUT = 30
+PUSH_TIMEOUT = 300
 NOREPLY = re.compile(r"[^\s<>@]+@users\.noreply\.github\.com")
 # Bind routing, executable selection, config roots/overrides, and TLS policy.
 # SSH_AUTH_SOCK/SSH_AGENT_PID are authentication handles, not destination or
@@ -122,6 +123,14 @@ def record_exists(path):
     return True
 
 
+def sync_directory(path):
+    directory = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
 def atomic(path, data, immutable=False, staging=None):
     if staging is None:
         fd, name = tempfile.mkstemp(prefix=".write-", dir=path.parent)
@@ -143,6 +152,7 @@ def atomic(path, data, immutable=False, staging=None):
             os.link(name, path)
         else:
             os.replace(name, path)
+        sync_directory(path.parent)
     finally:
         # Close-out staging is exact-ID-addressed and recovered on retry, even
         # after termination before any bytes reach disk. Other writers are unchanged.
@@ -165,6 +175,35 @@ def candidate_commit(value, raw):
                and [line for line in fields if line.startswith(b"tree ")] == [b"tree " + value["tree"].encode()]
                and parents == [value["parent"]] and message == value["message"].encode() and same_identity)
     return parents, bool(matches)
+
+
+def publication_status(source):
+    """Validate execution evidence independently of endpoint verification.
+
+    Legacy ready/rejected/verified records have no execution evidence. An
+    executing marker is intentionally not closeable, even after observation.
+    """
+    state = source.get("state")
+    require(state in ("ready", "rejected", "executing", "attempted", "verified"),
+            "active or unknown publication status; preserve state for H")
+    fields = {"id", "state"} | ({"commit"} if state == "verified" else set())
+    if "execution" in source or state in ("executing", "attempted"):
+        fields.add("execution")
+        execution = source.get("execution")
+        require(state in ("executing", "attempted", "verified") and isinstance(execution, dict),
+                "invalid publication execution evidence; preserve state for H")
+        outcome = execution.get("outcome")
+        require(outcome in ("unknown", "exited", "timeout", "interrupted", "not-started"),
+                "unknown publication execution outcome")
+        expected = {"outcome", "cleanup"} | ({"returncode"} if outcome == "exited" else set())
+        require(set(execution) == expected and type(execution["cleanup"]) is bool
+                and (outcome != "exited" or type(execution["returncode"]) is int),
+                "invalid publication execution fields")
+        require((state == "executing" and execution == {"outcome": "unknown", "cleanup": False})
+                or (state != "executing" and execution["cleanup"]),
+                "unresolved publication process cleanup; preserve state for H")
+    require(set(source) == fields, "unknown or incomplete publication status fields")
+    return source
 
 
 class Records:
@@ -203,7 +242,7 @@ class Records:
         if state is not None:
             atomic(path, encoded({"id": receipt_id, "state": state, **extra}))
         value = json.loads(read_private(path, CLOSE_LIMIT))
-        require(value["id"] == receipt_id, "status does not match receipt")
+        require(isinstance(value, dict) and value.get("id") == receipt_id, "status does not match receipt")
         return value
 
     def create(self, kind, value):
@@ -250,12 +289,15 @@ class Records:
         require(value.get("toplevel") == self.top, "close-out receipt belongs to another worktree")
         require(isinstance(source, dict) and source.get("id") == receipt_id, "status does not match receipt")
         state = source.get("state")
-        require(state in ("ready", "rejected", "committed", "verified"),
+        require(state in ("ready", "rejected", "committed", "verified", "attempted"),
                 "active or unknown receipt status; close-out refused")
         require(not {"created", "reflog_action"}.intersection(source),
                 "ambiguous commit-recovery evidence; preserve the receipt for H")
-        fields = {"id", "state", "commit"} if state in ("committed", "verified") else {"id", "state"}
-        require(set(source) == fields, "unknown or incomplete close-out status fields")
+        if value["kind"] == "publish":
+            publication_status(source)
+        else:
+            fields = {"id", "state", "commit"} if state == "committed" else {"id", "state"}
+            require(set(source) == fields and state != "attempted", "unknown or incomplete close-out status fields")
         require(state not in ("committed", "verified") or
                 value["kind"] == ("candidate" if state == "committed" else "publish"),
                 "receipt kind/status mismatch")
@@ -324,7 +366,7 @@ class Records:
             if value["kind"] == "publish":
                 if state == "verified":
                     outcome = "verified"
-                elif state == "ready" or (state == "rejected" and accept_unverified and not closing):
+                elif state in ("ready", "attempted") or (state == "rejected" and accept_unverified and not closing):
                     require(accept_unverified, f"{receipt_id}: publication is unverified; explicit --accept-unverified required")
                     outcome = "UNVERIFIED"
                 elif closing and entry["outcome"] == "UNVERIFIED":
@@ -806,6 +848,17 @@ def transport_fingerprint(endpoint):
     return environment, executables
 
 
+def check_http_redirects(endpoint):
+    if endpoint.startswith("https://"):
+        # remote-curl passes a slash-terminated base URL to http_init. A matching
+        # URL-scoped setting can outrank even our command-line global override.
+        base = endpoint if endpoint.endswith("/") else endpoint + "/"
+        result = git("-c", "http.followRedirects=false", "config", "--type=bool",
+                     "--get-urlmatch", "http.followRedirects", base, check=False)
+        require(result.returncode == 0 and result.stdout == b"false\n",
+                "HTTPS redirect policy must resolve to false for the bound URL; review URL-scoped configuration")
+
+
 def destination(remote):
     require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", remote), "unsupported remote name")
     require(not config("remotes." + remote), "remote-group collision; destination is ambiguous")
@@ -847,6 +900,7 @@ def destination(remote):
     for key in ("mirror", "receivepack", "vcs"):
         values = config(f"remote.{remote}.{key}")
         require(not values or (key == "mirror" and all(v.lower() in ("false", "no", "off", "0") for v in values)), "remote has scope-expanding or unsupported push configuration")
+    check_http_redirects(endpoint)
     hook_state = pre_push_hook()
     keys = r"^(remote\.|remotes\.|url\.|push\.|branch\.|core\.(hookspath|sshcommand|gitproxy|askpass)|ssh\.|protocol\.|http\.|credential\.)"
     settings = git("config", "--null", "--get-regexp", keys, check=False)
@@ -857,8 +911,11 @@ def destination(remote):
     return endpoint, fingerprint, hook_state
 
 
-def check_binding(records, receipt_id):
-    value = records.read(receipt_id, "publish")
+def check_binding(records, receipt_id, observing=False):
+    value = records.read(receipt_id, "publish", ready=not observing)
+    source = publication_status(records.status(receipt_id))
+    require(not observing or source["state"] in ("ready", "executing", "attempted"),
+            "publication is already verified or rejected")
     try:
         endpoint, fingerprint, hook = destination(value["remote"])
         previous = value["fingerprint"]
@@ -873,7 +930,10 @@ def check_binding(records, receipt_id):
         require(not changed, "binding " + "; ".join(changed) + "; rebind and review")
         require(endpoint == value["endpoint"] and hook == value["pre_push_hook"], "binding scope changed; rebind and review")
     except Refused:
-        records.status(receipt_id, "rejected")
+        if source["state"] == "ready":
+            records.status(receipt_id, "rejected")
+        # Drift after an attempt says nothing about whether publication landed.
+        # Keep all execution evidence, including an unresolved pre-spawn marker.
         raise
     return value
 
@@ -987,28 +1047,34 @@ def bind(records, args):
     print("CI status: unknown; separate verification required")
     if not ids:
         print("tracking baseline equals reviewed commit; remote state is not yet observed")
-    checker = SCRIPTS / "../../publish/scripts/publish-bind"
-    command = ["git", "-C", records.top, "-c", "push.followTags=false", "-c", "push.recurseSubmodules=no",
-               "-c", "http.followRedirects=false",
-               "push", "--no-follow-tags", "--recurse-submodules=no", "--verify",
-               f"--force-with-lease=refs/heads/{branch}:{base}", "--", remote, f"{reviewed}:refs/heads/{branch}"]
-    preflight = ["env", "EYRAGENTS_RECORD_ROOT=" + str(records.path.parent),
-                 str(checker.resolve()), "--check", receipt_id]
-    print("== command\n(cd " + shlex.quote(records.top) + " && "
-          + shlex.join(preflight) + ") && " + shlex.join(command))
+    print("== push argv (review only; execute through publish-apply ID)\n" + shlex.join(push_argv(records, value)))
+    print("execution context: repository=" + json.dumps(records.top)
+          + "; EYRAGENTS_RECORD_ROOT=" + json.dumps(str(records.path.parent)))
+    executor = SCRIPTS / "../../publish/scripts/publish-apply"
+    print("== command\n" + shlex.join([str(executor.resolve()), receipt_id]))
 
 
-def observe_remote(endpoint, branch):
+def push_argv(records, value):
+    return ["git", "--no-replace-objects", "-C", records.top,
+            "-c", "push.followTags=false", "-c", "push.recurseSubmodules=no",
+            "-c", "http.followRedirects=false", "-c", "credential.interactive=false",
+            "push", "--no-follow-tags", "--recurse-submodules=no", "--verify",
+            f"--force-with-lease=refs/heads/{value['branch']}:{value['base']}",
+            "--", value["remote"], f"{value['reviewed']}:refs/heads/{value['branch']}"]
+
+
+def noninteractive_env(endpoint, purpose):
+    check_http_redirects(endpoint)
     env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="/bin/false",
                SSH_ASKPASS="/bin/false", SSH_ASKPASS_REQUIRE="never", GCM_INTERACTIVE="never")
     is_ssh = endpoint.startswith("ssh://") or (not endpoint.startswith(("https://", "/")) and ":" in endpoint)
     if is_ssh:
         argv = ssh_arguments()
-        require(argv, "remote observation unknown: cannot make this SSH shell command noninteractive without changing transport")
+        require(argv, purpose + ": cannot make this SSH shell command noninteractive without changing transport")
         variants = config("ssh.variant")
         variant = os.environ.get("GIT_SSH_VARIANT", variants[-1] if variants else "auto")
         require(argv and (variant == "ssh" or (variant == "auto" and Path(argv[0]).name in ("ssh", "ssh.exe"))),
-                "remote observation unknown: unsupported noninteractive SSH transport variant; transport not substituted")
+                purpose + ": unsupported noninteractive SSH transport variant; transport not substituted")
         # OpenSSH uses the first obtained value. Put noninteractive options
         # before the original arguments, retaining the chosen executable and
         # its routing/config arguments. Host-key checks are tightened, not skipped.
@@ -1017,6 +1083,92 @@ def observe_remote(endpoint, branch):
                    "-oAddKeysToAgent=no", "-oControlMaster=no", "-oControlPersist=no"]
         env["GIT_SSH_COMMAND"] = shlex.join([argv[0], *options, *argv[1:]])
         env["GIT_SSH_VARIANT"] = "ssh"
+    return env
+
+
+def stop_group(process):
+    # Kill any transport/hook descendants too, even if Git has already exited.
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    process.wait(timeout=2)
+
+
+def publish_apply(records, args):
+    require(len(args) == 1, "usage: publish-apply ID", 64)
+    receipt_id = args[0]
+    value = check_binding(records, receipt_id)
+    command = push_argv(records, value)
+    env = noninteractive_env(value["endpoint"], "publication execution unavailable")
+    # Native host-side execution authority must already have been obtained by
+    # the caller. Receipts bind scope, never conversational approval or grants.
+    process = None
+    cancelled = []
+
+    def cancel(signum, _frame):
+        # Defer handling across Popen's launch/return gap and status persistence.
+        # No exception can lose the child handle before process-group cleanup.
+        cancelled[:] = [signum]
+
+    handlers = {sig: signal.signal(sig, cancel) for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)}
+    execution = {"outcome": "unknown", "cleanup": False}
+    try:
+        records.status(receipt_id, "executing", execution=execution)
+        # Persist newly created store/root directory entries too. Records only
+        # creates these two levels; their parent must already exist.
+        sync_directory(records.path.parent)
+        sync_directory(records.path.parent.parent)
+        # The marker's file and directory have been fsynced before any launch.
+        # A crash here is deliberately indistinguishable from a lost result.
+        try:
+            if not cancelled:
+                process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                           stderr=subprocess.DEVNULL, env=env, start_new_session=True)
+                deadline = time.monotonic() + PUSH_TIMEOUT
+                while not cancelled:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        execution = {"outcome": "timeout", "cleanup": False}
+                        break
+                    try:
+                        code = process.wait(timeout=min(0.1, remaining))
+                        execution = {"outcome": "exited", "returncode": code, "cleanup": False}
+                        break
+                    except subprocess.TimeoutExpired:
+                        pass
+            if process is None:
+                execution = {"outcome": "not-started", "cleanup": False}
+            elif cancelled:
+                execution = {"outcome": "interrupted", "cleanup": False}
+        except OSError:
+            execution = {"outcome": "not-started" if process is None else "unknown", "cleanup": False}
+        except BaseException:
+            execution = {"outcome": "interrupted", "cleanup": False}
+        finally:
+            try:
+                if process is not None:
+                    stop_group(process)
+                execution["cleanup"] = True
+            except (OSError, subprocess.TimeoutExpired):
+                raise Refused("publication process cleanup unconfirmed; executing evidence preserved; push outcome unknown; do not retry", 3) from None
+        if cancelled:
+            execution = {"outcome": "interrupted", "cleanup": True}
+        try:
+            records.status(receipt_id, "attempted", execution=execution)
+        except BaseException:
+            raise Refused("publication status persistence failed; preserve evidence; push outcome unknown; do not retry", 3) from None
+    finally:
+        for sig, handler in handlers.items():
+            signal.signal(sig, handler)
+    print(f"binding-id={receipt_id}\nexecution=" + json.dumps(execution, sort_keys=True))
+    require(not cancelled and execution.get("returncode") == 0 and execution["outcome"] == "exited",
+            "publication attempt did not report success; push outcome unknown; observe this exact ID, never replay it", 3)
+    print("Git reported success; bound-endpoint verification remains required; this ID cannot execute again")
+
+
+def observe_remote(endpoint, branch):
+    env = noninteractive_env(endpoint, "remote observation unknown")
     command = ["git", "--no-replace-objects", "-c", "http.followRedirects=false", "-c", "credential.interactive=false",
                "ls-remote", "--exit-code", "--refs", "--", endpoint, "refs/heads/" + branch]
     try:
@@ -1065,11 +1217,14 @@ def observe_remote(endpoint, branch):
 def verify(records, args):
     require(len(args) == 1, "usage: publish-verify ID", 64)
     receipt_id = args[0]
-    value = check_binding(records, receipt_id)
+    value = check_binding(records, receipt_id, observing=True)
+    source = records.status(receipt_id)
     rows = observe_remote(value["endpoint"], value["branch"]).decode("utf-8").splitlines()
     expected = value["reviewed"] + "\trefs/heads/" + value["branch"]
     require(rows == [expected], "bound destination does not currently equal the reviewed commit; point-in-time observation, not proof the push never landed")
     print(f"remote observed: {value['reviewed']} at bound push destination (point in time)")
+    require(source["state"] != "executing",
+            "endpoint observed but execution/cleanup remains unresolved; executing evidence preserved for H", 3)
     tracking = git("rev-parse", "--verify", value["tracking"], check=False).stdout.decode().strip() or "absent"
     print(f"local tracking: {tracking}; informational only, no fetch performed")
     report_inspection(value)
@@ -1087,14 +1242,15 @@ def verify(records, args):
         require(result.returncode == 0, "published verification failed", 4)
     else:
         print("published verification: none defined; remote observed without deployment verification")
-    records.status(receipt_id, "verified", commit=value["reviewed"])
+    extra = {"execution": source["execution"]} if "execution" in source else {}
+    records.status(receipt_id, "verified", commit=value["reviewed"], **extra)
     print("ok: publish verified")
 
 
 def main():
     try:
         require(len(sys.argv) >= 2, "entrypoint required", 64)
-        operation = {"candidate": candidate, "apply": apply, "bind": bind, "verify": verify}[sys.argv[1]]
+        operation = {"candidate": candidate, "apply": apply, "bind": bind, "publish_apply": publish_apply, "verify": verify}[sys.argv[1]]
         args = candidate_options(sys.argv[2:]) if operation is candidate else sys.argv[2:]
         records = Records(create=not (operation is candidate and args.close is not None))
         os.chdir(records.top)

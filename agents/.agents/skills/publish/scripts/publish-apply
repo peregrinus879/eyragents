@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Execute one exact, contemporaneously H-approved publication binding.
+# Usage: publish-apply ID
+# Obtain necessary native execution authority before invoking. One bounded
+# attempt, normal hooks, no replay; verification is a separate operation.
+set -euo pipefail
+[[ $# == 1 && $1 =~ ^[a-f0-9]{64}$ ]] || { printf 'usage: publish-apply ID\n' >&2; exit 64; }
+exec python3 -I "$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")/../../commit/scripts/governance.py" publish_apply "$1"

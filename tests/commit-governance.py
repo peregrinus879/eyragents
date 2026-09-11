@@ -11,6 +11,7 @@ import re
 import runpy
 import shlex
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -36,6 +37,8 @@ class Governance(unittest.TestCase):
         home = self.root / "home"
         home.mkdir()
         self.env = {"PATH": os.environ["PATH"], "HOME": str(home), "USER": "fixture",
+                    "XDG_CONFIG_HOME": str(home / ".config"), "XDG_DATA_HOME": str(home / ".local/share"),
+                    "XDG_CACHE_HOME": str(home / ".cache"), "XDG_STATE_HOME": str(home / ".local/state"),
                     "TMPDIR": str(self.root), "GIT_CONFIG_GLOBAL": str(self.root / "gitconfig"),
                     "GIT_CONFIG_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C",
                     "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z", "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z",
@@ -103,11 +106,18 @@ class Governance(unittest.TestCase):
         self.script("commit-apply", candidate_id)
         return remote
 
-    def binding(self):
-        result = self.script("publish-bind")
+    def binding(self, env=None):
+        result = self.script("publish-bind", env=env)
         receipt_id = re.search(r"^binding-id=([a-f0-9]{64})$", result.stdout, re.M)[1]
         command = result.stdout.split("== command\n", 1)[1].strip()
         return receipt_id, command
+
+    def injected_publish(self, receipt_id, setup, **kwargs):
+        runner = ('import os, runpy, sys; m=runpy.run_path(sys.argv[1]); '
+                  'g=m["publish_apply"].__globals__; ' + setup + '; '
+                  'sys.argv=[sys.argv[1], "publish_apply", sys.argv[2]]; sys.exit(m["main"]())')
+        return self.run_command([sys.executable, "-I", "-c", runner,
+                                 str(SKILLS / "commit/scripts/governance.py"), receipt_id], **kwargs)
 
     def close_bundle(self, verified=True):
         self.outbound()
@@ -793,11 +803,15 @@ sys.exit(runtime["main"]())
         self.script("commit-candidate", "--close", candidate, publication)
         self.assertEqual(before["lock"], self.snapshot(store)["lock"])
 
-    def test_printed_command_carries_its_private_record_root(self):
+    def test_printed_invocation_has_only_id_and_context_is_explicit(self):
         self.outbound()
-        receipt_id, command = self.binding()
-        terminal_env = {k: v for k, v in self.env.items() if k != "EYRAGENTS_RECORD_ROOT"}
-        self.run_command(["bash", "--noprofile", "--norc", "-c", command], env=terminal_env, cwd=self.root)
+        result = self.script("publish-bind")
+        receipt_id = re.search(r"^binding-id=([a-f0-9]{64})$", result.stdout, re.M)[1]
+        command = result.stdout.split("== command\n", 1)[1].strip()
+        self.assertEqual(shlex.split(command), [str(SKILLS / "publish/scripts/publish-apply"), receipt_id])
+        self.assertIn(json.dumps(str(self.repo)), result.stdout)
+        self.assertIn(json.dumps(self.env["EYRAGENTS_RECORD_ROOT"]), result.stdout)
+        self.run_command(shlex.split(command))
         self.script("publish-verify", receipt_id)
 
     def test_environment_binding_ignores_session_and_auth_handles(self):
@@ -1268,6 +1282,314 @@ sys.exit(runtime["main"]())
         self.assertTrue(validated.exists())
         self.assertEqual(self.status(receipt_id)["state"], "ready")
 
+    def test_publish_apply_pins_sha_named_hook_tracking_and_only_bound_ref(self):
+        remote = self.outbound()
+        self.git("remote", "rename", "origin", "reviewed-name")
+        self.git("config", "remote.reviewed-name.push", "refs/heads/main:refs/heads/unreviewed")
+        self.git("config", "push.followTags", "true")
+        self.git("tag", "-a", "v1", "-m", "fixture tag")
+        marker = self.root / "hook-arguments"
+        self.hook("pre-push", f'printf "%s\\n" "$1" "$2" >"{marker}"\ncat >>"{marker}"')
+        receipt_id, _ = self.binding()
+        value = json.loads(self.receipt(receipt_id).read_text())
+        self.write("later.txt", "unreviewed later commit\n")
+        self.git("add", "later.txt")
+        self.git("commit", "-q", "-m", "chore: later work")
+        result = self.script("publish-apply", receipt_id)
+        self.assertNotIn("publish verified", result.stdout)
+        self.assertEqual(self.status(receipt_id), {"id": receipt_id, "state": "attempted",
+                         "execution": {"outcome": "exited", "returncode": 0, "cleanup": True}})
+        lines = marker.read_text().splitlines()
+        self.assertEqual(lines[:2], ["reviewed-name", str(remote)])
+        self.assertEqual(lines[2].split(), [value["reviewed"], value["reviewed"], "refs/heads/main", self.parent])
+        self.assertEqual(self.git("rev-parse", "refs/remotes/reviewed-name/main").stdout.strip(), value["reviewed"])
+        self.assertEqual(self.git("--git-dir=" + str(remote), "for-each-ref", "--format=%(objectname) %(refname)").stdout.strip(),
+                         value["reviewed"] + " refs/heads/main")
+        before = self.snapshot(self.receipt(receipt_id).parent)
+        self.script("publish-apply", receipt_id, ok=False)
+        self.assertEqual(before, self.snapshot(self.receipt(receipt_id).parent))
+        execution = self.status(receipt_id)["execution"]
+        self.script("publish-verify", receipt_id)
+        self.assertEqual(self.status(receipt_id)["execution"], execution)
+        self.assertEqual(self.status(receipt_id)["state"], "verified")
+        self.script("publish-apply", receipt_id, ok=False)
+
+    def test_publish_apply_only_exact_id_and_wrong_worktree_corruption_refuse(self):
+        remote = self.outbound()
+        receipt_id, _ = self.binding()
+        store = self.receipt(receipt_id).parent
+        before = self.snapshot(store)
+        for args in ([], ["latest"], [receipt_id, "--force"], [receipt_id, receipt_id], [receipt_id + ";true"], ["--", receipt_id]):
+            self.script("publish-apply", *args, ok=False)
+            self.assertEqual(before, self.snapshot(store))
+        other = self.root / "other-worktree"
+        self.git("worktree", "add", "-q", "-b", "other", str(other))
+        self.assertIn("worktree", self.script("publish-apply", receipt_id, cwd=other, ok=False).stderr)
+        self.assertEqual(before, self.snapshot(store))
+        path = self.receipt(receipt_id)
+        path.chmod(0o600)
+        path.write_bytes(path.read_bytes() + b" ")
+        before = self.snapshot(store)
+        self.assertIn("digest mismatch", self.script("publish-apply", receipt_id, ok=False).stderr)
+        self.assertEqual(before, self.snapshot(store))
+        self.assertEqual(self.git("--git-dir=" + str(remote), "rev-parse", "main").stdout.strip(), self.parent)
+
+    def test_publish_unknown_status_or_unconfirmed_cleanup_is_preserved(self):
+        self.outbound()
+        receipt_id, _ = self.binding()
+        for state, extra in (("ready", {"unrecognized": True}), ("executing", {}),
+                             ("attempted", {"execution": {"outcome": "exited", "returncode": 0, "cleanup": False}}),
+                             ("attempted", {"execution": {"outcome": "exited", "returncode": True, "cleanup": True}}),
+                             ("attempted", {"execution": {"outcome": "unknown", "cleanup": True, "unrecognized": True}})):
+            with self.subTest(state=state, extra=extra):
+                self.set_status(receipt_id, state, **extra)
+                before = self.snapshot(self.receipt(receipt_id).parent)
+                self.script("publish-apply", receipt_id, ok=False)
+                self.script("publish-verify", receipt_id, ok=False)
+                self.script("commit-candidate", "--close", receipt_id, "--accept-unverified", ok=False)
+                self.assertEqual(before, self.snapshot(self.receipt(receipt_id).parent))
+
+    def test_publish_launch_failure_is_consumed_and_marker_is_durable_before_popen(self):
+        remote = self.outbound()
+        receipt_id, _ = self.binding()
+        status_path = str(self.receipt(receipt_id).with_suffix(".status"))
+        setup = f'''original = g["subprocess"].Popen
+synced = []
+original_sync = g["sync_directory"]
+def sync_directory(path):
+    original_sync(path)
+    synced.append(str(path))
+def popen(command, *args, **kwargs):
+    if "push" in command:
+        import json
+        assert json.loads(open({status_path!r}).read())["state"] == "executing"
+        assert os.path.dirname({status_path!r}) in synced
+        assert os.path.dirname(os.path.dirname({status_path!r})) in synced
+        raise OSError("fixture launch failure")
+    return original(command, *args, **kwargs)
+g["sync_directory"] = sync_directory
+g["subprocess"].Popen = popen
+'''
+        result = self.injected_publish(receipt_id, f'exec({setup!r})', ok=False)
+        self.assertEqual(result.returncode, 3)
+        self.assertEqual(self.status(receipt_id)["execution"], {"outcome": "not-started", "cleanup": True})
+        self.assertEqual(self.git("--git-dir=" + str(remote), "rev-parse", "main").stdout.strip(), self.parent)
+        self.script("publish-apply", receipt_id, ok=False)
+
+    def test_publish_apply_pre_spawn_marker_lock_and_handled_signals_stop_group(self):
+        remote = self.outbound()
+        entered, escaped = self.root / "entered", self.root / "escaped"
+        self.hook("pre-push", f'touch "{entered}"\n(sleep 2; touch "{escaped}") &\nwait')
+        for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+            with self.subTest(signal=sig):
+                entered.unlink(missing_ok=True)
+                receipt_id, _ = self.binding()
+                process = subprocess.Popen([str(SKILLS / "publish/scripts/publish-apply"), receipt_id],
+                                           cwd=self.repo, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                try:
+                    deadline = time.monotonic() + 8
+                    while not entered.exists() and time.monotonic() < deadline:
+                        time.sleep(0.02)
+                    self.assertTrue(entered.exists())
+                    self.assertEqual(self.status(receipt_id), {"id": receipt_id, "state": "executing",
+                                     "execution": {"outcome": "unknown", "cleanup": False}})
+                    for helper, args in (("publish-apply", [receipt_id]), ("publish-verify", [receipt_id]),
+                                         ("commit-candidate", ["--close", receipt_id, "--accept-unverified"])):
+                        self.assertIn("another governance operation is active", self.script(helper, *args, ok=False).stderr)
+                    process.send_signal(sig)
+                    stdout, stderr = process.communicate(timeout=5)
+                    self.assertEqual(process.returncode, 3, stdout + stderr)
+                    self.assertIn("outcome unknown", stderr)
+                    self.assertEqual(self.status(receipt_id)["execution"], {"outcome": "interrupted", "cleanup": True})
+                    self.script("publish-apply", receipt_id, ok=False)
+                finally:
+                    if process.poll() is None:
+                        process.send_signal(signal.SIGTERM)
+                        process.communicate(timeout=5)
+        time.sleep(2.1)
+        self.assertFalse(escaped.exists())
+        self.assertEqual(self.git("--git-dir=" + str(remote), "rev-parse", "main").stdout.strip(), self.parent)
+
+    def test_publish_apply_timeout_suppresses_output_and_prompts_preserves_socket(self):
+        self.outbound()
+        validated, escaped = self.root / "validated", self.root / "escaped"
+        env = self.git_shim('case " $* " in *" push "*)\n'
+                            'test "$GIT_TERMINAL_PROMPT" = 0 || exit 91\n'
+                            'test "$GIT_ASKPASS" = /bin/false || exit 92\n'
+                            'test "$SSH_ASKPASS_REQUIRE" = never || exit 93\n'
+                            'test "$GCM_INTERACTIVE" = never || exit 94\n'
+                            'test "$SSH_AUTH_SOCK" = /fixture/agent.sock || exit 95\n'
+                            'if read -r input; then exit 96; fi\n'
+                            f'touch "{validated}"\n(sleep 2; touch "{escaped}") &\n'
+                            'while :; do printf "private-output-marker\\n"; printf "private-error-marker\\n" >&2; done\n;; esac')
+        env.update(SSH_AUTH_SOCK="/fixture/agent.sock")
+        receipt_id, _ = self.binding(env)
+        result = self.injected_publish(receipt_id, 'g["PUSH_TIMEOUT"]=0.25', env=env, ok=False)
+        self.assertIn("outcome unknown", result.stderr)
+        self.assertLess(len(result.stdout + result.stderr), 1024)
+        self.assertNotIn("private-output-marker", result.stdout + result.stderr)
+        self.assertNotIn("private-error-marker", result.stdout + result.stderr)
+        self.assertTrue(validated.exists())
+        self.assertEqual(self.status(receipt_id)["execution"], {"outcome": "timeout", "cleanup": True})
+        self.script("publish-apply", receipt_id, env=env, ok=False)
+        time.sleep(2.1)
+        self.assertFalse(escaped.exists())
+
+    def test_publish_apply_failure_after_remote_update_then_independent_observation(self):
+        remote = self.outbound()
+        env = self.git_shim('case " $* " in *" push "*)\n'
+                            + shlex.quote(shutil.which("git")) + ' "$@" || exit $?\n'
+                            'printf "private-after-update-error\\n" >&2\nexit 71\n;; esac')
+        receipt_id, _ = self.binding(env)
+        value = json.loads(self.receipt(receipt_id).read_text())
+        result = self.script("publish-apply", receipt_id, env=env, ok=False)
+        self.assertIn("outcome unknown", result.stderr)
+        self.assertNotIn("private-after-update-error", result.stdout + result.stderr)
+        self.assertEqual(self.git("--git-dir=" + str(remote), "rev-parse", "main").stdout.strip(), value["reviewed"])
+        execution = {"outcome": "exited", "returncode": 71, "cleanup": True}
+        self.assertEqual(self.status(receipt_id)["execution"], execution)
+        self.script("publish-apply", receipt_id, env=env, ok=False)
+        self.script("publish-verify", receipt_id, env=env)
+        self.assertEqual(self.status(receipt_id)["state"], "verified")
+        self.assertEqual(self.status(receipt_id)["execution"], execution)
+
+    def test_publish_attempt_drift_preserves_evidence_and_close_requires_acceptance(self):
+        candidate, publication = self.close_bundle(verified=False)
+        self.script("publish-apply", publication)
+        before = self.snapshot(self.receipt(publication).parent)
+        self.git("config", "push.followTags", "true")
+        self.script("publish-verify", publication, ok=False)
+        self.assertEqual(before, self.snapshot(self.receipt(publication).parent))
+        self.script("publish-apply", publication, ok=False)
+        self.script("commit-candidate", "--close", publication, candidate, ok=False)
+        self.assertEqual(before, self.snapshot(self.receipt(publication).parent))
+        result = self.script("commit-candidate", "--close", publication, candidate, "--accept-unverified", "--dry-run")
+        self.assertEqual(result.stdout.count("outcome=UNVERIFIED"), 2)
+        self.assertEqual(before, self.snapshot(self.receipt(publication).parent))
+        self.interrupt_close((candidate, publication), "json", publication, "--accept-unverified")
+        self.script("commit-candidate", "--close", publication, candidate, ok=False)
+        result = self.script("commit-candidate", "--close", publication, candidate, "--accept-unverified")
+        self.assertNotIn("outcome=verified", result.stdout)
+
+    def test_publish_status_persistence_before_and_after_launch_is_conservative(self):
+        remote = self.outbound()
+        for phase in ("marker", "before-result", "after-result"):
+            with self.subTest(phase=phase):
+                receipt_id, _ = self.binding()
+                setup = '''original = g["Records"].status
+def status(self, receipt_id, state=None, **extra):
+    if state == "attempted" and phase == "before-result":
+        raise OSError("private-persistence-marker")
+    result = original(self, receipt_id, state, **extra)
+    if (state == "executing" and phase == "marker") or (state == "attempted" and phase == "after-result"):
+        raise OSError("private-persistence-marker")
+    return result
+g["Records"].status = status
+'''
+                result = self.injected_publish(receipt_id, f'phase={phase!r}; exec({setup!r})', ok=False)
+                self.assertNotIn("private-persistence-marker", result.stdout + result.stderr)
+                self.script("publish-apply", receipt_id, ok=False)
+                self.script("commit-candidate", "--close", receipt_id, ok=False)
+                if phase == "marker":
+                    self.assertEqual(self.git("--git-dir=" + str(remote), "rev-parse", "main").stdout.strip(), self.parent)
+                else:
+                    self.assertIn("push outcome unknown", result.stderr)
+                if phase != "after-result":
+                    self.assertEqual(self.status(receipt_id)["state"], "executing")
+                    self.script("commit-candidate", "--close", receipt_id, "--accept-unverified", ok=False)
+                    self.script("publish-verify", receipt_id, ok=False)
+                    self.assertEqual(self.status(receipt_id)["state"], "executing")
+                else:
+                    self.assertEqual(self.status(receipt_id)["state"], "attempted")
+                    self.script("publish-verify", receipt_id)
+
+    def test_publish_apply_refuses_opaque_transport_before_attempt_creation(self):
+        self.outbound()
+        self.git("config", "remote.origin.pushurl", "ssh://fixture.invalid/repository")
+        env = {**self.env, "GIT_SSH_COMMAND": "ssh $PRIVATE_ROUTING_MARKER"}
+        receipt_id, _ = self.binding(env)
+        before = self.snapshot(self.receipt(receipt_id).parent)
+        result = self.script("publish-apply", receipt_id, env=env, ok=False)
+        self.assertIn("without changing transport", result.stderr)
+        self.assertNotIn("PRIVATE_ROUTING_MARKER", result.stdout + result.stderr)
+        self.assertEqual(before, self.snapshot(self.receipt(receipt_id).parent))
+
+    def test_publish_apply_selected_ssh_transport_and_strict_trust(self):
+        remote = self.outbound()
+        transport, argv_log = self.root / "chosen-ssh", self.root / "ssh-arguments"
+        transport.write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" >"{argv_log}"\n'
+                             f'exec {shlex.quote(shutil.which("git-receive-pack"))} {shlex.quote(str(remote))}\n')
+        transport.chmod(0o755)
+        self.git("config", "remote.origin.pushurl", "ssh://fixture.invalid/repository")
+        env = {**self.env, "GIT_SSH_COMMAND": shlex.join([str(transport), "-F", "fixture-config"]), "GIT_SSH_VARIANT": "ssh"}
+        receipt_id, _ = self.binding(env)
+        self.script("publish-apply", receipt_id, env=env)
+        args = argv_log.read_text().splitlines()
+        self.assertEqual(args[0], "-oBatchMode=yes")
+        for option in ("-oStrictHostKeyChecking=yes", "-oUpdateHostKeys=no", "-oAddKeysToAgent=no", "-F", "fixture-config"):
+            self.assertIn(option, args)
+        self.assertEqual(self.git("--git-dir=" + str(remote), "rev-parse", "main").stdout.strip(),
+                         json.loads(self.receipt(receipt_id).read_text())["reviewed"])
+
+    def test_https_redirect_policy_uses_urlmatch_before_binding_and_observation(self):
+        self.outbound()
+        endpoint = "https://fixture.invalid/owner/repository.git"
+        self.git("config", "remote.origin.pushurl", endpoint)
+        contacted = self.root / "contacted"
+        env = self.git_shim('case " $* " in\n*" ls-remote "*)\ncase " $* " in *" --get-url "*) ;; *)\n'
+                            f'touch "{contacted}"\nexit 97\n;; esac\n;; esac')
+        runner = '''import runpy, sys
+runtime = runpy.run_path(sys.argv[1])
+try:
+    runtime["observe_remote"](sys.argv[2], "main")
+except runtime["Refused"] as error:
+    print(str(error), file=sys.stderr)
+    sys.exit(error.code)
+'''
+        for scope in ("https://fixture.invalid/", endpoint + "/"):
+            key = f"http.{scope}.followRedirects"
+            for value in ("true", "initial", "invalid-redirect-policy"):
+                with self.subTest(scope=scope, value=value):
+                    self.git("config", key, value)
+                    effective = self.git("-c", "http.followRedirects=false", "config",
+                                         "--get-urlmatch", "http.followRedirects", endpoint + "/")
+                    self.assertEqual(effective.stdout.strip(), value)
+                    before = self.snapshot(self.root / "records")
+                    result = self.script("publish-bind", env=env, ok=False)
+                    self.assertIn("HTTPS redirect policy", result.stderr)
+                    self.assertNotIn("invalid-redirect-policy", result.stderr)
+                    self.assertEqual(before, self.snapshot(self.root / "records"))
+                    result = self.run_command([sys.executable, "-I", "-c", runner,
+                                               str(SKILLS / "commit/scripts/governance.py"), endpoint],
+                                              env=env, ok=False)
+                    self.assertIn("HTTPS redirect policy", result.stderr)
+                    self.assertNotIn("invalid-redirect-policy", result.stderr)
+                    self.assertFalse(contacted.exists())
+            self.git("config", "--unset", key)
+        # Unrelated scopes and a global true are overridden; matching native
+        # false spellings and the most-specific safe URL policy remain usable.
+        self.git("config", "http.followRedirects", "true")
+        self.git("config", "http.https://elsewhere.invalid/.followRedirects", "true")
+        self.binding(env)
+        self.git("config", "http.https://fixture.invalid/.followRedirects", "true")
+        self.git("config", f"http.{endpoint}/.followRedirects", "off")
+        self.binding(env)
+        self.assertFalse(contacted.exists())
+
+    def test_https_redirect_override_refuses_before_execution_marker(self):
+        self.outbound()
+        endpoint = "https://fixture.invalid/owner/repository.git"
+        self.git("config", "remote.origin.pushurl", endpoint)
+        contacted = self.root / "contacted"
+        env = self.git_shim('case " $* " in *" push "*)\n'
+                            f'touch "{contacted}"\nexit 97\n;; esac')
+        receipt_id, _ = self.binding(env)
+        self.git("config", f"http.{endpoint}/.followRedirects", "true")
+        result = self.script("publish-apply", receipt_id, env=env, ok=False)
+        self.assertIn("HTTPS redirect policy", result.stderr)
+        self.assertEqual(self.status(receipt_id), {"id": receipt_id, "state": "rejected"})
+        self.assertFalse(contacted.exists())
+
     def test_remote_observation_output_is_bounded_and_not_echoed(self):
         self.outbound()
         env = self.git_shim('case " $* " in\n*" ls-remote "*)\ncase " $* " in *" --get-url "*) ;; *)\n'
@@ -1378,13 +1700,15 @@ sys.exit(runtime["main"]())
         receipt_id, command = self.binding()
         bound = json.loads(self.receipt(receipt_id).read_text())
         self.assertEqual(bound["endpoint"], str(remote))
-        self.assertIn("-- origin ", command)
-        self.assertNotIn(str(remote), command)
-        self.assertIn("--no-follow-tags", command)
-        self.assertIn("--recurse-submodules=no", command)
+        runtime = runpy.run_path(str(SKILLS / "commit/scripts/governance.py"))
+        argv = runtime["push_argv"](mock.Mock(top=str(self.repo)), bound)
+        self.assertEqual(argv[-2], "origin")
+        self.assertNotIn(str(remote), argv)
+        self.assertIn("--no-follow-tags", argv)
+        self.assertIn("--recurse-submodules=no", argv)
         self.script("publish-verify", ok=False)
         self.script("publish-verify", receipt_id, ok=False)
-        self.run_command(["bash", "-c", command], cwd=self.root)
+        self.run_command(["bash", "-c", command])
         self.assertEqual(self.git("rev-parse", "refs/remotes/origin/main").stdout.strip(), bound["reviewed"])
         self.git("update-ref", "refs/remotes/origin/main", self.parent)
         out = self.script("publish-verify", receipt_id).stdout
@@ -1399,7 +1723,7 @@ sys.exit(runtime["main"]())
         first_id, first_command = self.binding()
         first = json.loads(self.receipt(first_id).read_text())
         self.assertEqual(first["base"], self.parent)
-        self.run_command(["bash", "-c", first_command], cwd=self.root)
+        self.run_command(["bash", "-c", first_command])
         self.assertEqual(self.git("rev-parse", "refs/remotes/origin/main").stdout.strip(), first["reviewed"])
         self.script("publish-verify", first_id)
         self.write("next.txt", "next commit\n")
@@ -1409,7 +1733,7 @@ sys.exit(runtime["main"]())
         second = json.loads(self.receipt(second_id).read_text())
         self.assertEqual(second["base"], first["reviewed"])
         self.assertNotEqual(second["reviewed"], first["reviewed"])
-        self.run_command(["bash", "-c", second_command], cwd=self.root)
+        self.run_command(["bash", "-c", second_command])
         self.assertEqual(self.git("rev-parse", "refs/remotes/origin/main").stdout.strip(), second["reviewed"])
         self.assertEqual(self.git("--git-dir=" + str(remote), "rev-parse", "main").stdout.strip(), second["reviewed"])
         self.assertEqual(self.git("--git-dir=" + str(remote), "for-each-ref", "--format=%(refname)").stdout.splitlines(), ["refs/heads/main"])
@@ -1427,7 +1751,7 @@ sys.exit(runtime["main"]())
         self.assertEqual(self.git("--git-dir=" + str(remote), "tag").stdout, "")
         self.script("publish-verify", fresh)
         # The original reviewed base cannot be substituted with a newer tip.
-        _, command = self.binding()
+        raced_id, command = self.binding()
         reviewed = self.git("rev-parse", "HEAD").stdout.strip()
         tree = self.git("rev-parse", "HEAD^{tree}").stdout.strip()
         other = self.git("--git-dir=" + str(remote), "-c", "user.name=Test", "-c",
@@ -1435,6 +1759,13 @@ sys.exit(runtime["main"]())
                          "-p", reviewed, data="chore: another actor\n").stdout.strip()
         self.git("--git-dir=" + str(remote), "update-ref", "refs/heads/main", other)
         self.run_command(["bash", "-c", command], ok=False)
+        self.assertEqual(self.status(raced_id)["state"], "attempted")
+        self.assertNotEqual(self.status(raced_id)["execution"]["returncode"], 0)
+        before = self.snapshot(self.receipt(raced_id).parent)
+        self.script("publish-apply", raced_id, ok=False)
+        self.script("publish-verify", raced_id, ok=False)
+        self.assertEqual(before, self.snapshot(self.receipt(raced_id).parent))
+        self.assertEqual(self.git("--git-dir=" + str(remote), "rev-parse", "main").stdout.strip(), other)
 
     def test_destination_change_and_rewrites_require_review(self):
         self.outbound()
@@ -1477,7 +1808,7 @@ sys.exit(runtime["main"]())
         self.git("clone", "-q", "--bare", str(remote), str(destination))
         self.git("config", "remote.origin.pushurl", str(destination))
         receipt_id, command = self.binding()
-        self.run_command(["bash", "-c", command], cwd=self.root)
+        self.run_command(["bash", "-c", command])
         self.script("publish-verify", receipt_id)
         hook_dir = self.root / "custom-hooks"
         hook_dir.mkdir()
@@ -1516,8 +1847,8 @@ sys.exit(runtime["main"]())
         self.assertNotIn("printf", result.stdout + result.stderr)
         self.assertFalse(marker.exists())
         command = result.stdout.split("== command\n", 1)[1].strip()
-        self.assertIn("--verify", command)
-        self.run_command(["bash", "-c", command], cwd=self.root)
+        self.assertIn("--verify", result.stdout.split("== command\n", 1)[0])
+        self.run_command(["bash", "-c", command])
         self.assertEqual(marker.read_text(), "origin\n")
         self.assertIn("fingerprint unchanged", self.script("publish-verify", receipt_id).stdout)
 
@@ -1541,7 +1872,7 @@ sys.exit(runtime["main"]())
         self.run_command(["bash", "-c", command])
         hook.chmod(0o700)
         self.script("publish-verify", fresh, ok=False)
-        self.assertEqual(self.status(fresh)["state"], "rejected")
+        self.assertEqual(self.status(fresh)["state"], "attempted")
 
     def test_unsafe_sensitive_or_unreadable_hook_targets_block(self):
         self.outbound()

@@ -184,6 +184,8 @@ class HermesTests(unittest.TestCase):
         shutil.copy2(ROOT / "templates/hooks/commit-gate", gate)
         with patch.dict(os.environ, self.env):
             self.assertIsNone(policy.pre_tool_call(tool_name="terminal", args={"command": "git status"}))
+            self.assertIsNone(policy.pre_tool_call(tool_name="terminal", args={
+                "command": "~/.agents/skills/publish/scripts/publish-apply " + "a" * 64}))
             for command in ("git commit -m fixture", "git push", "sudo true", "git stash drop"):
                 self.assertEqual(policy.pre_tool_call(tool_name="terminal", args={"command": command})["action"], "block")
             gate.unlink()

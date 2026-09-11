@@ -8,7 +8,7 @@ This is a personal harness. Omarchy owns desktop client installation and EyrWSL 
 
 - One source for shared guidance and reusable [Agent Skills](https://agentskills.io).
 - Tool-specific access controls, with their differences documented in the [access policy](docs/access.md).
-- Exact-candidate commit approval, user-run publication, and optional read-only review.
+- Exact-candidate commit approval, exact-approved agent publication, and optional read-only review.
 - Repeatable deployment checks and opt-in live smoke tests.
 
 ## Tools And Layout
@@ -51,7 +51,7 @@ Start an installed client in the project you want to work on. The [operations gu
 | Obtain a second opinion | [spar](agents/.agents/skills/spar/SKILL.md) |
 | Reconcile the harness with upstream tools | [eyrsync](.agents/skills/eyrsync/SKILL.md) |
 
-Ordinary authorized implementation proceeds autonomously. H approves the exact commit candidate and runs the reviewed push command. The skills own the detailed procedures.
+Ordinary authorized implementation proceeds autonomously. H separately approves the exact commit candidate and exact publication binding. The agent runs one guarded `publish-apply ID` attempt, then verifies the bound endpoint and published state separately. Host-local authentication, normally `gh`/HTTPS for GitHub, supplies capability, not approval; [setup](docs/setup.md) links the host-owned onboarding. The skills own the detailed procedures.
 
 ## Verify
 

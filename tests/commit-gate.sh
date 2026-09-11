@@ -44,7 +44,7 @@ for denied in 'git commit -q -F -' 'git commit --dry-run; git commit -m x' 'comm
   [[ $(gate "$denied") == 2 ]] || fail "gate allowed: $denied"
 done
 # shellcheck disable=SC2016
-for allowed in 'git status' 'git log --grep commit' 'commit-apply abc' 'git st' 'git merge --ff-only origin/main' \
+for allowed in 'git status' 'git log --grep commit' 'commit-apply abc' 'publish-apply abc' 'git st' 'git merge --ff-only origin/main' \
   'git pull --ff-only' 'git fetch' 'git rev-parse HEAD^{commit}' 'git log --oneline' 'git stash list' \
   'git stash show -p' 'git write-tree' 'git diff --stat' 'echo "$commit"' 'git -C "$ROOT" diff --binary "$empty_tree" -- x' \
   'git diff --stat $ref' 'git -C "$ROOT" log -1 $sha' 'git pull --no-rebase --ff-only origin main' \
@@ -83,6 +83,7 @@ for (const command of ["git commit -m x", "git ci -m x", "git cherry-pick abc", 
   if (!denied) { console.error(`plugin allowed: ${command}`); process.exit(1); }
 }
 await before({ tool: "bash" }, { args: { command: "git status" } });
+await before({ tool: "bash" }, { args: { command: "~/.agents/skills/publish/scripts/publish-apply " + "a".repeat(64) } });
 await before({ tool: "read" }, { args: { filePath: "git commit" } });
 ' "$TMP/plugin.mjs" "$repo" || fail 'OpenCode plugin did not enforce the gate'
 

@@ -487,8 +487,11 @@ require(any(command.endswith(".agents/hooks/commit-gate") for command in codex_g
 require(edit_rules.get("**/.agents/hooks/**") == "deny", "OpenCode file tools may edit the installed commit gate")
 require(external_rules.get("~/.agents/hooks/**") == "deny", "OpenCode may reach the installed commit gate")
 require((ROOT / "opencode/.config/opencode/plugins/commit-gate.js").is_file(), "OpenCode commit-gate plugin is missing")
-for skill, script in (("commit", "commit-candidate"), ("commit", "commit-apply"), ("publish", "publish-bind"), ("publish", "publish-verify")):
+for skill, script in (("commit", "commit-candidate"), ("commit", "commit-apply"), ("publish", "publish-bind"), ("publish", "publish-apply"), ("publish", "publish-verify")):
     require(os.access(ROOT / "agents/.agents/skills" / skill / "scripts" / script, os.X_OK), f"skill script missing or not executable: {skill}/scripts/{script}")
+    link = ROOT / "claude-code/.claude/skills" / skill / "scripts" / script
+    require(link.is_symlink() and link.resolve() == (ROOT / "agents/.agents/skills" / skill / "scripts" / script).resolve(),
+            f"Claude wrapper link missing or drifted: {script}")
 require(os.access(ROOT / "templates/hooks/commit-gate", os.X_OK), "templates/hooks/commit-gate is missing or not executable")
 
 # The sync workflow maintains role-appropriate references for every tool.

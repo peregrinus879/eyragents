@@ -19,6 +19,7 @@ fail() {
 make_clone() {
   local repo=$1
   mkdir -p "$repo/agents/.agents/skills/commit/scripts" "$repo/claude-code/.claude/skills/commit/scripts" \
+    "$repo/agents/.agents/skills/publish/scripts" "$repo/claude-code/.claude/skills/publish/scripts" \
     "$repo/claude-code/.claude/skills/spar/scripts" \
     "$repo/agents/.agents/skills/spar/scripts" "$repo/codex/.codex" \
     "$repo/opencode/.config/opencode" \
@@ -30,6 +31,9 @@ make_clone() {
   ln -s ../../agents/.agents/shared-guidance.md "$repo/claude-code/.claude/CLAUDE.md"
   ln -s ../../../../agents/.agents/skills/commit/SKILL.md "$repo/claude-code/.claude/skills/commit/SKILL.md"
   ln -s ../../../../../agents/.agents/skills/commit/scripts/commit-apply "$repo/claude-code/.claude/skills/commit/scripts/commit-apply"
+  printf 'skill\n' >"$repo/agents/.agents/skills/publish/SKILL.md"
+  cp -- "$ROOT/agents/.agents/skills/publish/scripts/publish-apply" "$repo/agents/.agents/skills/publish/scripts/publish-apply"
+  ln -s ../../../../../agents/.agents/skills/publish/scripts/publish-apply "$repo/claude-code/.claude/skills/publish/scripts/publish-apply"
   printf 'tracked\n' >"$repo/agents/.agents/skills/spar/scripts/spar-claude"
   printf 'tracked\n' >"$repo/codex/.codex/config.toml"
   ln -s ../../agents/.agents/shared-guidance.md "$repo/codex/.codex/AGENTS.md"
@@ -115,10 +119,10 @@ case_no_folding() {
   ln -s ../../eyragents/opencode/.config/opencode "$home/.config/opencode"
   prepare "$home" "$repo"
   deploy "$home" "$repo" >/dev/null 2>&1 || fail "restow could not replace folded links"
-  for path in .claude .claude/skills/commit .claude/skills/commit/scripts .codex .agents .agents/skills .claude/skills/spar/scripts .config/opencode; do
+  for path in .claude .claude/skills/commit .claude/skills/commit/scripts .claude/skills/publish/scripts .codex .agents .agents/skills .claude/skills/spar/scripts .config/opencode; do
     [[ -d $home/$path && ! -L $home/$path ]] || fail "$path is not a real directory after no-folding stow"
   done
-  for name in commit spar; do
+  for name in commit publish spar; do
     [[ -L $home/.agents/skills/$name && $(readlink -f -- "$home/.agents/skills/$name") == "$repo/agents/.agents/skills/$name" ]] ||
       fail "skill directory $name is not one link into the clone"
   done
@@ -132,6 +136,9 @@ case_no_folding() {
     fail "Claude skill symlink did not deploy"
   [[ $(readlink -f -- "$home/.claude/skills/commit/scripts/commit-apply") == "$repo/agents/.agents/skills/commit/scripts/commit-apply" ]] ||
     fail "Claude skill scripts symlink did not deploy"
+  [[ -x $home/.agents/skills/publish/scripts/publish-apply &&
+     $(readlink -f -- "$home/.claude/skills/publish/scripts/publish-apply") == "$repo/agents/.agents/skills/publish/scripts/publish-apply" ]] ||
+    fail "exact-publication wrapper did not deploy through both skill paths"
   for tool in review-brief spar-claude spar-codex spar-payload-scan; do
     [[ $(readlink -f -- "$home/.claude/skills/spar/scripts/$tool") == "$repo/agents/.agents/skills/spar/scripts/$tool" ]] ||
       fail "Claude spar link for $tool does not reach its own source"

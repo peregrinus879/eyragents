@@ -177,7 +177,7 @@ def command_denial(command: str, cwd: Path, home: Path) -> str | None:
     if re.search(r"(?:^|[\s;&|()])(?:\S*/)?(?:sudo|doas|pkexec|su)(?:\s|$)", normalized):
         return "privilege escalation is H-run"
     if re.search(r"\bgit\s+(?:(?:-[Cc]\s+\S+|--\S+)\s+)*(?:push|clean)\b", normalized):
-        return "push and clean are H-run operations"
+        return "raw push and clean are blocked; publication requires H's exact-approved publish-apply ID workflow"
     return None
 
 

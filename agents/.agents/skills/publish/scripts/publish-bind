@@ -2,7 +2,7 @@
 # Review reachable outbound content and bind one resolved push destination.
 # Usage: publish-bind [--remote REMOTE --branch BRANCH] [REF]
 #        publish-bind --check ID
-# Prints an H-run command, never executes a push. --check rejects a drifted ID
+# Prints the reviewed argv and exact-ID apply invocation, never pushes. --check rejects a drifted ready ID
 # in the private record store; it never mutates Git or contacts the remote.
 set -euo pipefail
 exec python3 -I "$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")/../../commit/scripts/governance.py" bind "$@"
