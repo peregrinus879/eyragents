@@ -51,6 +51,16 @@ GitHub normally uses HTTPS with the standard host-local `gh` credential helper. 
 
 The client's noninteractive options do not control an independent credential provider's UI. A locked store or expired login is an H-local recovery condition, not routine Push authorization. The publication timeout bounds its Git/transport process group, not provider-owned dialogs. Report timeout/unknown outcomes honestly, preserve the binding and never replay a push automatically. A public `ls-remote` result can be anonymous; combine it with API/account and helper checks, while retaining actual approved-push evidence as a separate requirement.
 
+## CI Reruns
+
+Once H has approved the commits and their publication, necessary failed-CI reruns for those exact published repositories/commits are part of the authorized follow-up. The agent follows the [publish skill's CI rerun procedure](../agents/.agents/skills/publish/SKILL.md#ci-reruns): verify run/job ownership and the full SHA, inspect the failure, establish a retryable cause, retry the smallest affected job scope, and verify the new attempt. No additional approval prompt is needed for that same-scope retry.
+
+For paired repositories, a twin job can fetch the earlier peer between sequential pushes. Confirm that both approved tips are now published before rerunning the failed twin job, then inspect the actual pair in the successful log. This does not call for another push or a new workflow dispatch. Repeated unchanged failures return to diagnosis; source fixes and additional deployment effects require their own approval.
+
+OpenCode permits `gh run rerun`; the native wildcard rule enables the command, while the publication procedure supplies the approval/scope checks. Claude's classifier recognizes the same exception. Hermes keeps native review, and Codex's command-network restriction still requires the existing handoff. See [the access comparison](access.md#ci-reruns-after-publication) for these limits.
+
+After deploying this permission change, quit and restart/resume OpenCode. A read-only `gh run rerun --help` checks that the old blanket deny is gone without creating a GitHub run. Exercise the real rerun only when an actual failed job satisfies the approved-publication conditions; do not create or replay work merely for a smoke test. Record pending activation or host evidence in [maintenance](maintenance.md#publication-access).
+
 ## OpenCode Read Approvals
 
 After `make restow verify`, quit and restart OpenCode. The read adapter handles eligible **Read and Glob** requests for ordinary configuration, installed software/dependencies, and standing reference roots. It grants only the current request; write/shell prompts and explicit project/agent/session restrictions retain their existing meaning. Credential-bearing files and session stores remain excluded. The [access policy](access.md#read-approval-adapter) explains the boundary.

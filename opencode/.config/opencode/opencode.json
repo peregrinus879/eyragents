@@ -59,7 +59,7 @@
       "gh repo create*": "deny",
       "gh repo delete*": "deny",
       "gh run cancel*": "deny",
-      "gh run rerun*": "deny",
+      "gh run rerun*": "allow",
       "gh secret *": "deny",
       "gh ssh-key *": "deny",
       "gh variable *": "deny",

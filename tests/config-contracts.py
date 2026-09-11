@@ -186,6 +186,8 @@ for command in APPROVAL_GIT:
 soft_denies = " ".join(claude["autoMode"]["soft_deny"])
 for phrase in ("git reset", "git remote", "gh auth", "startup files"):
     require(phrase in soft_denies, f"Claude classifier rule missing for: {phrase}")
+require(not any(rule.startswith("Bash(") and wildcard("gh run rerun 123 --repo owner/repo --job 456", rule[5:-1])
+                for rule in claude_deny), "Claude hard-denies publication CI reruns before classifier review")
 for path in (*CREDENTIAL_DIRECTORIES, *CREDENTIAL_FILES):
     require(covered(claude_deny, "Read", path), f"Claude credential store readable: {path}")
     require(covered(claude_deny, "Edit", path), f"Claude credential store writable: {path}")
@@ -270,6 +272,22 @@ for command in (*HARD_DENIED_GIT, *PRIVILEGE, *REPOSITORY_HOST, *REPOSITORY_HOST
     require(bash.get(command) == "deny", f"OpenCode Bash deny missing: {command}")
 for command in (*APPROVAL_GIT, "git remote set-url *", "git config core.hooksPath*", "git config credential*"):
     require(bash.get(command) == "ask", f"OpenCode Bash approval missing: {command}")
+# Native capability only: the publish workflow checks conversational approval,
+# the exact published repo/SHA, failed-job ownership, cause and repeated effects.
+# A static wildcard matcher cannot establish those semantic conditions.
+for command in (
+    "gh run rerun 123 --repo owner/repo --job 456",
+    "gh run rerun 123 --repo owner/repo --failed",
+    "gh run rerun --help",
+):
+    require(evaluate("bash", command, opencode["permission"]) == "allow", f"OpenCode blocks CI rerun capability: {command}")
+for command in (
+    "gh run cancel 123 --repo owner/repo",
+    "gh workflow run test.yml --repo owner/repo",
+    "gh api repos/owner/repo/actions/runs/123/rerun -X POST",
+    "git push origin main",
+):
+    require(evaluate("bash", command, opencode["permission"]) == "deny", f"CI rerun exception reopened another mutation: {command}")
 read_rules = opencode["permission"]["read"]
 edit_rules = opencode["permission"]["edit"]
 external_rules = opencode["permission"]["external_directory"]
