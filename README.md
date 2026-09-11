@@ -51,7 +51,7 @@ Start an installed client in the project you want to work on. The [operations gu
 | Obtain a second opinion | [spar](agents/.agents/skills/spar/SKILL.md) |
 | Reconcile the harness with upstream tools | [eyrsync](.agents/skills/eyrsync/SKILL.md) |
 
-Ordinary authorized implementation proceeds autonomously. H separately approves the exact commit candidate and exact publication binding. The agent runs one guarded `publish-apply ID` attempt, then verifies the bound endpoint and published state separately. Host-local authentication, normally `gh`/HTTPS for GitHub, supplies capability, not approval; [setup](docs/setup.md) links the host-owned onboarding. The skills own the detailed procedures.
+Ordinary authorized implementation proceeds autonomously. H reviews and approves each atomic commit individually, then approves the listed pushes together in one compact summary. The agent executes and verifies each exact binding separately, stopping on failure; grouping approval preserves the individual commits and their diffs. Full technical records are available on request. Host-local authentication, normally `gh`/HTTPS for GitHub, supplies capability, not approval; [setup](docs/setup.md) links the host-owned onboarding. The skills own the detailed procedures.
 
 ## Verify
 
