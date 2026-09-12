@@ -5,6 +5,19 @@ description: Stage, review, and commit one exact atomic change with H's approval
 
 # Commit
 
+## Start commit preparation
+
+When implementation is verified, affected docs are current, and intended uncommitted changes remain, check whether H has already directed the Git workflow. A clear request to prepare commits, commit, finish the Git workflow or publish, a clear yes to a preparation question, or an existing `Commit and resume` direction means proceed without asking again. A vague acknowledgment of a completion summary is not that direction.
+
+Otherwise, present a concise completion summary naming the changes, repositories and verification, immediately followed by a **Next step** selector:
+
+1. **Prepare commit reviews**: perform the normal preflight, remaining gates and staging of the intended atomic candidates, then present each exact commit card and its approval selector.
+2. **Pause here**: leave the implementation uncommitted and the index untouched; report that state and close out unneeded execution artifacts under the normal lifecycle.
+
+Use the harness's native question/selection tool when available; otherwise offer the same labeled choices in chat. Ask once for the completed workstream, not once per repository or candidate. Do not insert it into an ongoing commit/publication workflow or repeat it after resume/compaction when H's direction is already clear. Discussion-only, audit-only, plan-only, no-change and explicitly paused requests do not need this implementation-completion selector.
+
+This is a next-step choice, not approval of a commit, push or expanded repository/change scope. The exact Commit and Publish selectors remain mandatory. Keep the atomic map and reusable gate evidence while the preparation choice is pending; re-read and validate that evidence under Before staging rather than rerunning or assuming checks merely because the interaction moved to a new turn. If H pauses, retain only artifacts needed for a concrete handoff and dispose of the rest through their owning workflows.
+
 ## Message format
 
 ```

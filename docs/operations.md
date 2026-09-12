@@ -35,6 +35,8 @@ Use [commit](../agents/.agents/skills/commit/SKILL.md), [publish](../agents/.age
 
 ### Review Briefs
 
+After verified implementation, if commit preparation has not already been requested, the **Next step** selector offers **Prepare commit reviews** or **Pause here**. Preparation runs the normal preflight/gates and stages the intended candidates for individual review; it does not approve a commit or push. A clear existing direction, including a yes to a preparation question or Commit and resume, skips this extra question. The [commit skill](../agents/.agents/skills/commit/SKILL.md#start-commit-preparation) owns the selector, fallback and evidence-retention procedure.
+
 Commits are reviewed one at a time: one compact card with the change, file/hunk scope, full proposed message, checks and short candidate reference, immediately followed by its selector. Review the staged diff for that candidate before approving it. Pushes use one consolidated summary of the fixed ordered set, with destinations/audiences, reviewed commits, effects, checks and binding references, followed by one selector for the set. Grouping push approval preserves the separate commit history and diffs.
 
 Full IDs, hashes, raw argv, execution context and detailed gate/scan evidence are available on request. Short references identify exact immutable records, not latest entries. Material exceptions and required inspections stay visible in the normal brief. Asking for details or copying a command is not approval. The skills own the exact fields and selector behavior, including individual push review when needed.
