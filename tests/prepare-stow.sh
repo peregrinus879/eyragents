@@ -22,7 +22,7 @@ make_clone() {
     "$repo/agents/.agents/skills/publish/scripts" "$repo/claude-code/.claude/skills/publish/scripts" \
     "$repo/claude-code/.claude/skills/spar/scripts" \
     "$repo/agents/.agents/skills/spar/scripts" "$repo/codex/.codex" \
-    "$repo/opencode/.config/opencode" \
+    "$repo/opencode/.config/opencode" "$repo/opencode/.config/mise/conf.d" \
     "$repo/scripts" "$repo/templates/codex" "$repo/templates/hooks" "$repo/templates/hermes"
   printf 'tracked\n' >"$repo/claude-code/.claude/settings.json"
   printf 'guidance\n' >"$repo/agents/.agents/shared-guidance.md"
@@ -44,6 +44,7 @@ make_clone() {
     ln -s "../../../../../agents/.agents/skills/spar/scripts/$tool" "$repo/claude-code/.claude/skills/spar/scripts/$tool"
   done
   printf '{}\n' >"$repo/opencode/.config/opencode/opencode.json"
+  cp -- "$ROOT/opencode/.config/mise/conf.d/eyragents-opencode.toml" "$repo/opencode/.config/mise/conf.d/"
   cp -- "$ROOT/scripts/prepare-stow.sh" "$repo/scripts/prepare-stow.sh"
   cp -- "$ROOT/scripts/reconcile-codex-config.py" "$repo/scripts/reconcile-codex-config.py"
   cp -- "$ROOT/scripts/reconcile-hermes-config.py" "$repo/scripts/reconcile-hermes-config.py"
@@ -119,7 +120,7 @@ case_no_folding() {
   ln -s ../../eyragents/opencode/.config/opencode "$home/.config/opencode"
   prepare "$home" "$repo"
   deploy "$home" "$repo" >/dev/null 2>&1 || fail "restow could not replace folded links"
-  for path in .claude .claude/skills/commit .claude/skills/commit/scripts .claude/skills/publish/scripts .codex .agents .agents/skills .claude/skills/spar/scripts .config/opencode; do
+  for path in .claude .claude/skills/commit .claude/skills/commit/scripts .claude/skills/publish/scripts .codex .agents .agents/skills .claude/skills/spar/scripts .config/opencode .config/mise/conf.d; do
     [[ -d $home/$path && ! -L $home/$path ]] || fail "$path is not a real directory after no-folding stow"
   done
   for name in commit publish spar; do

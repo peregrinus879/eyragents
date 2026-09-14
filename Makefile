@@ -16,7 +16,7 @@ SHELLCHECK_FILES := claude-code/.claude/statusline.sh \
   $(filter-out %/spar-payload-scan %.py,$(wildcard agents/.agents/skills/*/scripts/*)) \
   $(wildcard scripts/*.sh tests/*.sh)
 
-.PHONY: help stow unstow dry-run restow require-clone check-skills install-gate migrate-codex-config migrate-hermes-config lint test check verify-deploy verify canary clean
+.PHONY: help stow unstow dry-run restow require-clone check-skills install-gate migrate-codex-config migrate-hermes-config lint test check verify-deploy verify canary clean refs agent-guide
 
 # Deployment goals and their guards must never race, including `make -j clean restow`.
 .NOTPARALLEL:
@@ -37,6 +37,8 @@ help:
 	@echo "  verify-deploy  Check every package file resolves to its deployed target"
 	@echo "  verify         lint, check, and verify-deploy"
 	@echo "  canary         Up to six live calls per tool; interactive-only OpenCode checks reported separately (not a gate)"
+	@echo "  refs           Refresh existing clones declared by this repository (preview with scripts/update-references.sh --dry-run)"
+	@echo "  agent-guide    Rebuild the standalone offline AI-client guide"
 	@echo "  clean          Remove dangling links that point into this repository's packages"
 
 stow: clean
@@ -89,14 +91,17 @@ migrate-hermes-config: require-clone
 lint:
 	shellcheck -s bash $(SHELLCHECK_FILES)
 	python3 -I -c 'import sys; [compile(open(p, "rb").read(), p, "exec") for p in sys.argv[1:]]' \
-	  agents/.agents/skills/spar/scripts/spar-payload-scan scripts/reconcile-codex-config.py scripts/reconcile-hermes-config.py \
+	  agents/.agents/skills/spar/scripts/spar-payload-scan scripts/reconcile-codex-config.py scripts/reconcile-hermes-config.py scripts/update-references.py tests/reference-migration.py \
 	  hermes/.hermes/plugins/eyragents/__init__.py tests/hermes.py tests/hermes-runtime.py tests/hermes-live.py tests/hermes-live-fixtures.py tests/config-contracts.py \
-	  agents/.agents/skills/commit/scripts/governance.py tests/commit-governance.py
+	  agents/.agents/skills/commit/scripts/governance.py tests/commit-governance.py docs/agent-guide-src/build.py
 	@set -e; for plugin in opencode/.config/opencode/plugins/*.js; do node --check "$$plugin"; done
 	@echo "ok:   lint"
 
 test:
 	python3 tests/config-contracts.py
+	bash tests/mise-env.sh
+	bash tests/update-references.sh
+	python3 tests/reference-migration.py
 	python3 tests/hermes.py
 	python3 tests/hermes-live-fixtures.py
 	bash tests/statusline.sh
@@ -113,6 +118,7 @@ test:
 	@echo "ok:   test"
 
 check:
+	python3 docs/agent-guide-src/build.py --check
 	@fail=0; \
 	while IFS= read -r -d '' link; do \
 	  echo "FAIL: package symlink does not resolve: $$link"; fail=1; \
@@ -199,6 +205,12 @@ verify: lint check verify-deploy
 # throwaway repository. Run after make restow.
 canary:
 	bash scripts/canary.sh
+
+refs:
+	bash scripts/update-references.sh
+
+agent-guide:
+	python3 docs/agent-guide-src/build.py
 
 clean: check-skills
 	bash scripts/prepare-stow.sh

@@ -1,9 +1,10 @@
 # Official references used by eyrsync under ~/Projects/quarry.
-# One per line: <directory> <git URL>. Roles and evidence limits live in
-# .agents/skills/eyrsync/SKILL.md. The sibling updater refreshes existing family
-# references and reports/keeps unlisted clones. It creates missing entries only
-# from its own repository's manifest; eyrsync owns EyrAgents bootstrap preflight.
-claude-code https://github.com/anthropics/claude-code.git
-codex https://github.com/openai/codex.git
-opencode https://github.com/anomalyco/opencode.git
-hermes-agent https://github.com/NousResearch/hermes-agent.git
+# One per line: <directory> <git URL> github:<reviewed repository node ID>.
+# IDs identify the project across verified URL moves; they are never auto-replaced.
+# Non-GitHub references use only the first two fields. Roles and evidence live in
+# .agents/skills/eyrsync/SKILL.md. scripts/update-references.sh reads only this
+# manifest and refreshes existing clones. Bootstrap requires explicit approval.
+claude-code https://github.com/anthropics/claude-code.git github:R_kgDON91aYw
+codex https://github.com/openai/codex.git github:R_kgDOOYsS4Q
+opencode https://github.com/anomalyco/opencode.git github:R_kgDOOiiGLw
+hermes-agent https://github.com/NousResearch/hermes-agent.git github:R_kgDOPRF1Gw

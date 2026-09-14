@@ -1,0 +1,5 @@
+# OpenCode startup defaults, applied by mise activation, shims and `mise exec`.
+# Explicit caller values remain authoritative. No host-dotfiles repo is needed.
+[env]
+OPENCODE_DISABLE_CLAUDE_CODE_SKILLS = "{{ env.OPENCODE_DISABLE_CLAUDE_CODE_SKILLS | default(value='1') }}"
+OPENCODE_ENABLE_EXA = "{{ env.OPENCODE_ENABLE_EXA | default(value='1') }}"

@@ -67,22 +67,9 @@ Any change to content, message, audience, or scratch disposition after approval 
 
 ## Review cheat sheet
 
-Reference on request, not repeated in normal packets. In a separate Neovim pane, open a file or select a Neo-tree item in the candidate's repository. The family Neovim configuration resolves the Git-review mappings from that context without a manual directory change; stock configurations may still require launching `nvim .` from the repository root. Review the staged changes, not merely the mixed working file:
+Reference on request, not repeated in normal packets. Use any Git viewer to inspect the candidate's staged changes, not merely the mixed working file. Editor-specific mappings belong to that editor's configuration.
 
-| Keys | Action |
-|---|---|
-| `<Space>gd` | open tracked staged and unstaged hunks |
-| `<Space>gs` | open Git Status for intended untracked files |
-| `<M-w>` | cycle the input, hunk list, and preview panes |
-| `<C-n>` `<C-p>` or arrows | move between hunks; the preview follows |
-| `<M-p>` | toggle the preview |
-| `<M-m>` | maximize or restore the active pane |
-| `<Enter>` | open the selected file and close the picker |
-| `<Space>sR` | resume the picker after opening a file |
-| `<Esc>` | close without opening |
-| avoid `<Tab>` and `<C-r>` | they stage and restore |
-
-Terminal fallback: `git -C "/path/to/candidate-repository" diff --cached --stat`, `git -C "/path/to/candidate-repository" diff --cached`, and `git -C "/path/to/candidate-repository" diff --cached -- path/to/file`. Replace the quoted repository path with the exact candidate root. These commands do not change the editor or shell cwd.
+Portable commands: `git -C "/path/to/candidate-repository" diff --cached --stat`, `git -C "/path/to/candidate-repository" diff --cached`, and `git -C "/path/to/candidate-repository" diff --cached -- path/to/file`. Replace the quoted repository path with the exact candidate root. These commands do not change the editor or shell cwd.
 
 ## Commit
 

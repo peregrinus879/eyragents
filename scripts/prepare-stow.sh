@@ -47,7 +47,7 @@ repository_root=$(realpath -e -- "$script_dir/..") || abort 'cannot resolve repo
 HOME=$(realpath -e -- "$HOME") || abort 'cannot resolve HOME'
 [[ $HOME != / ]] || abort 'HOME must name an existing non-root directory'
 PACKAGES=(agents claude-code codex opencode hermes)
-TARGET_ROOTS=("$HOME/.claude" "$HOME/.codex" "$HOME/.agents" "$HOME/.local/bin" "$HOME/.config/opencode" "$HOME/.hermes/plugins")
+TARGET_ROOTS=("$HOME/.claude" "$HOME/.codex" "$HOME/.agents" "$HOME/.local/bin" "$HOME/.config/opencode" "$HOME/.config/mise/conf.d" "$HOME/.hermes/plugins")
 # Package entries that once existed: links into them are still ours to clean.
 RETIRED_ENTRIES=(agents/.local codex/.agents claude-code/.claude/rules opencode/.config/opencode/skills)
 

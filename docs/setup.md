@@ -5,29 +5,35 @@
 ## Prerequisites
 
 - Git, GNU Make, and GNU Stow
-- jq, Python with PyYAML, and Node.js (required for EyrAgents verification, not the EyrWSL baseline)
+- jq, Python with PyYAML, Node.js, and mise
 - ShellCheck 0.11.0 or newer
 - GNU coreutils and util-linux (`flock`, `setsid`)
-- Claude Code, Codex, OpenCode, and Hermes Agent installed through [mise](https://mise.jdx.dev) under `~/.local/share/mise`, where the Codex sandbox can execute them: Omarchy's own wrappers on the desktop, EyrWSL's `mise` package on WSL. Hermes uses a private Python 3.13 runtime; provider sign-in remains interactive.
+- Claude Code, Codex, OpenCode, and Hermes Agent installed through [mise](https://mise.jdx.dev) under `~/.local/share/mise`, where the Codex sandbox can execute them. Hermes uses a private Python 3.13 runtime; provider sign-in remains interactive.
 
 On Arch Linux:
 
 ```bash
-sudo pacman -Syu --needed git make stow jq python python-yaml nodejs shellcheck util-linux
+sudo pacman -Syu --needed git make stow jq python python-yaml nodejs shellcheck util-linux mise
 ```
 
 ### WSL Account Check
 
-On WSL, run `id -u` as the normal Linux user before deploying this harness. The current Codex profile names `/tmp/claude-1000` literally and therefore assumes UID **1000**. If the result differs, stop for a harness-policy review; do not renumber an existing account or weaken permissions to proceed. This restriction belongs to the current EyrAgents profile, not EyrWSL itself. The [WSL host pass](maintenance.md#wsl-host-pass) owns the remaining checks.
+On WSL, run `id -u` as the normal Linux user before deploying this harness. The current Codex profile names `/tmp/claude-1000` literally and therefore assumes UID **1000**. If the result differs, stop for a harness-policy review; do not renumber an existing account or weaken permissions to proceed. The [WSL host pass](maintenance.md#wsl-host-pass) owns the remaining checks.
 
 ## Client Installation And Sign-In
 
-Install the clients before harness deployment:
+Install the clients before harness deployment. Existing mise installations can be used directly; no other dotfiles checkout or wrapper is required.
 
-- **Omarchy:** use the upstream-owned client installers and wrappers, with [host installation notes](https://github.com/peregrinus879/eyrarchy/blob/main/docs/setup.md#ai-clients).
-- **WSL:** follow [EyrWSL's wrapper bootstrap](https://github.com/peregrinus879/eyrwsl/blob/main/docs/setup.md#9-stow).
+```bash
+mise use --global claude@latest codex@latest opencode@latest uv@latest gh@latest
+mise use --global --fuzzy 'pipx:hermes-agent[extras=all,uvx_args="--python 3.13",pipx_args="--python 3.13"]'
+```
 
-The tools themselves are installed through [mise](https://mise.jdx.dev). Hermes uses the pipx backend with a private Python 3.13 runtime and uv. Follow Omarchy's PyPI release channel, with Hermes 0.19.0 as this harness's compatibility baseline, rather than substituting a newer Git checkout.
+Hermes uses the PyPI/pipx channel with a private Python 3.13 runtime and uv; 0.19.0 is the compatibility baseline. A newer Git checkout is a separate compatibility decision. Keep existing mise trust and release-cooldown preferences; this setup does not lower them.
+
+Follow [mise activation](https://mise.jdx.dev/getting-started.html#activate-mise) for your shell, or use mise shims. Non-interactive launchers can run `mise exec -- claude`, `mise exec -- codex`, `mise exec -- opencode`, or `mise exec -- hermes` with normal client arguments. Only trust project mise configuration you have reviewed.
+
+The OpenCode package stows `~/.config/mise/conf.d/eyragents-opencode.toml`. Mise supplies its skill-discovery and web-search startup defaults without host shell exports, preserving explicit caller values. A direct binary launched outside mise activation/shims does not receive that fragment; use `mise exec` for that launch.
 
 Claude Code, Codex, and OpenCode use their native interactive sign-in flows. For Hermes, run `hermes model` and choose **ChatGPT or Codex Subscription**, then Astra if the account catalog offers it. Client support for a model ID does not establish account entitlement. Keep provider credentials outside the repository and complete a successful live reply separately from installation checks.
 
@@ -59,7 +65,20 @@ For later updates, use `make restow verify`. `make unstow` removes package links
 
 The publication skill deploys executable `publish-bind`, `publish-apply`, `publish-verify` and `publish-clip` under `~/.agents/skills/publish/scripts`, with Claude's matching leaf symlinks. `make verify` checks those executables and deployed paths. Codex keeps its protected-file and network restrictions and follows the [separate-primary publication handoff](../agents/.agents/skills/publish/SKILL.md). Restart clients to load changed skills; source edits do not replace a running session's loaded instructions. Deployment does not establish authenticated publication.
 
-GitHub authentication setup belongs to the host repositories: follow [EyrArcHy](https://github.com/peregrinus879/eyrarchy/blob/main/docs/setup.md#github-access) or [EyrWSL](https://github.com/peregrinus879/eyrwsl/blob/main/docs/setup.md#github-access) for standard `gh` login, host-local helper configuration and HTTPS origins. H performs login, storage selection and recovery locally. Complete the appropriate fresh-client and reboot checks before claiming routine readiness. Credential inspection and global-auth configuration are not part of harness deployment. The [maintenance ledger](maintenance.md#publication-access) owns pending evidence; [operations](operations.md#exact-approved-publication) owns usage.
+### GitHub Access
+
+H handles login, storage selection and recovery locally. For GitHub, use HTTPS and the host-local gh credential helper; existing working authentication needs no replacement.
+
+```bash
+gh auth login --hostname github.com --git-protocol https
+gh auth setup-git
+```
+
+These are interactive onboarding steps, separate from Stow and agent publication approval. Configure a GitHub no-reply commit identity through your ordinary Git setup. Existing remotes are not changed automatically. Follow the [GitHub CLI documentation](https://cli.github.com/manual/gh_auth_login) for storage and recovery; never print or copy credentials into this repository. [Operations](operations.md#exact-approved-publication) owns publication usage and its evidence boundaries.
+
+### Reference Clones
+
+`references.txt` declares this repository's references. GitHub rows contain `<directory> <URL> github:<reviewed-node-id>`; other endpoints use the first two fields. Bootstrap missing clones only after approving each URL/destination under `~/Projects/quarry` and recording identity from official GitHub metadata. Existing GitHub refreshes require `gh` metadata access. Preview with `bash scripts/update-references.sh --dry-run`; run `make refs`, or pass the same declared names. The updater preserves local work and tags and reconciles verified same-project canonical URL moves in origin and this manifest. It retains explicit push destinations and stops on unknown identity or unsafe inputs. New/different projects and destructive resolution remain separate decisions; [eyrsync](../.agents/skills/eyrsync/SKILL.md#reference-lifecycle) owns the complete procedure.
 
 ## Hermes Configuration
 
@@ -70,7 +89,7 @@ GitHub authentication setup belongs to the host repositories: follow [EyrArcHy](
 The harness is personal, and forking it means replacing a few facts rather than the structure:
 
 - The addressee. The guidance and skills speak to `H`; the commit skill's identity check expects a GitHub no-reply address.
-- The hosts. Omarchy and WSL are named in the guidance, the Makefile guards, and the ledger's host pass items; the `require-host` guards in the sibling repositories encode which machine runs which targets.
+- The platforms. Omarchy and Arch WSL are the checked environments. Review filesystem, runtime and native-permission assumptions before adding another platform; the deployed-clone guard is independent of checkout location.
 - The models. Review Claude Code settings, the Codex template, OpenCode's primary/small-model settings, and the Hermes template. Update the corresponding model contracts in `tests/config-contracts.py` and `tests/hermes.py` when deliberately choosing different defaults.
 - The packages. `PACKAGES` in the Makefile names what Stow deploys. A new client may need links, a native plugin, or private configuration reconciliation; use its supported loading mechanism rather than assuming every adapter is a symlink tree.
 - The credential list. It lives in the native configurations, Hermes guard, bridges and scanner. Configuration and Hermes tests check the relevant path boundaries.

@@ -1,0 +1,1011 @@
+{
+  "title": "AI Guide",
+  "reviewed": "2026-09-14",
+  "scope": "Standalone reference for Claude Code, Codex, OpenCode and Hermes Agent. Source baselines qualify each control; installed client help and configuration determine actual behavior.",
+  "items": [
+    {
+      "id": "ai-claude-code-help",
+      "app": "claude",
+      "category": "Claude Code",
+      "title": "Discover commands and shortcuts",
+      "keys": [
+        "/help",
+        "?"
+      ],
+      "source": "claude",
+      "detail": "Use ? on an empty prompt for shortcuts; /help for available commands.",
+      "mode": "Claude Code prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-claude-code-new",
+      "app": "claude",
+      "category": "Claude Code",
+      "title": "Start fresh or resume a conversation",
+      "keys": [
+        "/clear",
+        "/resume"
+      ],
+      "source": "claude",
+      "detail": "Clear/new conversation or choose a saved conversation in the same pane. This does not create a Herdr workspace.",
+      "mode": "Claude Code prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-claude-code-model",
+      "app": "claude",
+      "category": "Claude Code",
+      "title": "Inspect or choose model and effort",
+      "keys": [
+        "/model",
+        "/effort"
+      ],
+      "source": "claude",
+      "detail": "Model and reasoning controls. Check whether a choice persists or is session-only; EyrAgents owns the baseline.",
+      "mode": "Claude Code prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-claude-code-plan",
+      "app": "claude",
+      "category": "Claude Code",
+      "title": "Enter planning or request a review",
+      "keys": [
+        "/plan",
+        "/code-review"
+      ],
+      "source": "claude",
+      "detail": "Plan before implementation, or review the diff. Review options such as --fix and --comment have additional editing/publication effects.",
+      "mode": "Claude Code prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-claude-code-context",
+      "app": "claude",
+      "category": "Claude Code",
+      "title": "Inspect or compact context",
+      "keys": [
+        "/context",
+        "/compact"
+      ],
+      "source": "claude",
+      "detail": "Inspect context usage, or summarize prior conversation to free context.",
+      "mode": "Claude Code prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-claude-code-files",
+      "app": "claude",
+      "category": "Claude Code",
+      "title": "Reference a file or run a shell command",
+      "keys": [
+        "@path/to/file",
+        "!command"
+      ],
+      "source": "claude",
+      "detail": "Mention a file; ! runs a shell command and adds its output to the conversation.",
+      "mode": "Claude Code prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-claude-code-skills",
+      "app": "claude",
+      "category": "Claude Code",
+      "title": "Discover installed skills",
+      "keys": [
+        "/skills"
+      ],
+      "source": "claude",
+      "detail": "List native and installed workflows. Shared EyrAgents skills include /commit, /publish and /spar.",
+      "mode": "Claude Code prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-claude-code-exit",
+      "app": "claude",
+      "category": "Claude Code",
+      "title": "Exit the client",
+      "keys": [
+        "/exit"
+      ],
+      "source": "claude",
+      "detail": "Leave Claude Code; the Herdr pane/layout is a separate layer.",
+      "mode": "Claude Code prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-codex-help",
+      "app": "codex",
+      "category": "Codex",
+      "title": "Discover commands and shortcuts",
+      "keys": [
+        "/",
+        "?"
+      ],
+      "source": "codex",
+      "detail": "Slash opens available commands; ? shows keyboard help. Use these for installed-release differences.",
+      "mode": "Codex prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-codex-new",
+      "app": "codex",
+      "category": "Codex",
+      "title": "Start, resume or fork a conversation",
+      "keys": [
+        "/new",
+        "/resume",
+        "/fork"
+      ],
+      "source": "codex",
+      "detail": "Manage AI conversation state in the current pane, separate from Herdr workspaces.",
+      "mode": "Codex prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-codex-model",
+      "app": "codex",
+      "category": "Codex",
+      "title": "Choose model and effort",
+      "keys": [
+        "/model"
+      ],
+      "source": "codex",
+      "detail": "Choose the model and supported reasoning effort; /status shows session information.",
+      "mode": "Codex prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-codex-plan",
+      "app": "codex",
+      "category": "Codex",
+      "title": "Plan or review changes",
+      "keys": [
+        "/plan",
+        "/review",
+        "/diff"
+      ],
+      "source": "codex",
+      "detail": "Planning mode, code review, or diff display. Review the chosen target.",
+      "mode": "Codex prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-codex-context",
+      "app": "codex",
+      "category": "Codex",
+      "title": "Inspect or compact context",
+      "keys": [
+        "/status",
+        "/compact"
+      ],
+      "source": "codex",
+      "detail": "Inspect session/context state or compact the conversation.",
+      "mode": "Codex prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-codex-files",
+      "app": "codex",
+      "category": "Codex",
+      "title": "Reference files or skills",
+      "keys": [
+        "@path/to/file",
+        "$skill-name",
+        "/skills"
+      ],
+      "source": "codex",
+      "detail": "Use file mentions, named skill mentions, or the skill picker. Shared skills: commit, publish and spar.",
+      "mode": "Codex prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-codex-shell",
+      "app": "codex",
+      "category": "Codex",
+      "title": "Run a shell command in the conversation",
+      "keys": [
+        "!command"
+      ],
+      "source": "codex",
+      "detail": "Run a command from the composer. It executes in the current tool context.",
+      "mode": "Codex prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-codex-exit",
+      "app": "codex",
+      "category": "Codex",
+      "title": "Exit the client",
+      "keys": [
+        "/quit"
+      ],
+      "source": "codex",
+      "detail": "Also /exit. This ends the client, not the Herdr session.",
+      "mode": "Codex prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-opencode-help",
+      "app": "opencode",
+      "category": "OpenCode",
+      "title": "Discover commands and help",
+      "keys": [
+        "/help",
+        "Ctrl+p"
+      ],
+      "source": "opencode-tui",
+      "detail": "Open help or the command palette. EyrAgents does not remap the native TUI keys.",
+      "mode": "OpenCode prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-opencode-new",
+      "app": "opencode",
+      "category": "OpenCode",
+      "title": "Start fresh or choose a session",
+      "keys": [
+        "/new",
+        "/sessions"
+      ],
+      "source": "opencode-tui",
+      "detail": "Also Ctrl+X then n/l. These operate inside the existing pane.",
+      "mode": "OpenCode prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-opencode-model",
+      "app": "opencode",
+      "category": "OpenCode",
+      "title": "Choose model or reasoning variant",
+      "keys": [
+        "/models",
+        "/variants"
+      ],
+      "source": "opencode-tui",
+      "detail": "Ctrl+T cycles variants. Under EyrAgents, Default retains configured xhigh; it does not mean medium.",
+      "mode": "OpenCode prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-opencode-plan",
+      "app": "opencode",
+      "category": "OpenCode",
+      "title": "Choose Build, Plan or a subagent",
+      "keys": [
+        "/agents",
+        "@auditor"
+      ],
+      "source": "opencode-tui",
+      "detail": "Tab cycles primary agents. @auditor invokes the configured read-only auditor. Agent mode and permissions are distinct settings.",
+      "mode": "OpenCode prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-opencode-context",
+      "app": "opencode",
+      "category": "OpenCode",
+      "title": "Compact the conversation",
+      "keys": [
+        "/compact"
+      ],
+      "source": "opencode-tui",
+      "detail": "Summarize prior conversation; Ctrl+X then c is the native shortcut.",
+      "mode": "OpenCode prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-opencode-files",
+      "app": "opencode",
+      "category": "OpenCode",
+      "title": "Reference files or run a shell command",
+      "keys": [
+        "@path/to/file",
+        "!command"
+      ],
+      "source": "opencode-tui",
+      "detail": "File mentions and shell output become conversation context.",
+      "mode": "OpenCode prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-opencode-skills",
+      "app": "opencode",
+      "category": "OpenCode",
+      "title": "Select a workflow",
+      "keys": [
+        "/skills",
+        "/commit",
+        "/publish",
+        "/spar"
+      ],
+      "source": "opencode-tui",
+      "detail": "Commit, publish and spar wrappers use Build; commit and publication retain their separate approval boundaries.",
+      "mode": "OpenCode prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [
+        "agents"
+      ],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-opencode-undo",
+      "app": "opencode",
+      "category": "OpenCode",
+      "title": "Undo or redo a conversation step and its edits",
+      "keys": [
+        "/undo",
+        "/redo"
+      ],
+      "source": "opencode-tui",
+      "detail": "These also revert or restore file changes, using Git. They are not display-only transcript navigation.",
+      "mode": "OpenCode prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-opencode-exit",
+      "app": "opencode",
+      "category": "OpenCode",
+      "title": "Exit the client",
+      "keys": [
+        "/exit"
+      ],
+      "source": "opencode-tui",
+      "detail": "Aliases /quit and /q are also available.",
+      "mode": "OpenCode prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-hermes-help",
+      "app": "hermes",
+      "category": "Hermes",
+      "title": "Discover the installed command set",
+      "keys": [
+        "/help",
+        "/version"
+      ],
+      "source": "hermes",
+      "detail": "PyPI 0.19.0 is the checked baseline. Current website commands can differ from this installed release.",
+      "mode": "Hermes prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-hermes-new",
+      "app": "hermes",
+      "category": "Hermes",
+      "title": "Start fresh or choose a conversation",
+      "keys": [
+        "/new",
+        "/resume",
+        "/sessions"
+      ],
+      "source": "hermes",
+      "detail": "Saved-session continuation can restore its recorded working directory. Check /status after resuming.",
+      "mode": "Hermes prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-hermes-model",
+      "app": "hermes",
+      "category": "Hermes",
+      "title": "Choose model or reasoning effort",
+      "keys": [
+        "/model",
+        "/reasoning"
+      ],
+      "source": "hermes",
+      "detail": "Model choices are session-scoped unless persisted explicitly. EyrAgents owns configured defaults.",
+      "mode": "Hermes prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-hermes-context",
+      "app": "hermes",
+      "category": "Hermes",
+      "title": "Inspect or compress context",
+      "keys": [
+        "/status",
+        "/compress"
+      ],
+      "source": "hermes",
+      "detail": "The checked 0.19.0 registry uses /status and /compress (alias /compact). Do not assume the website’s newer /context command exists.",
+      "mode": "Hermes prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-hermes-files",
+      "app": "hermes",
+      "category": "Hermes",
+      "title": "Attach a local image",
+      "keys": [
+        "/image path/to/image.png"
+      ],
+      "source": "hermes",
+      "detail": "Attach an image for the next prompt. For text files, give the path and ask Hermes to read it.",
+      "mode": "Hermes prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-hermes-steer",
+      "app": "hermes",
+      "category": "Hermes",
+      "title": "Queue or steer while working",
+      "keys": [
+        "/queue your next task",
+        "/steer your correction",
+        "/busy status"
+      ],
+      "source": "hermes",
+      "detail": "Queue a later turn or inject a correction after the next tool call. /busy reports the Enter-while-working policy.",
+      "mode": "Hermes prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-hermes-skills",
+      "app": "hermes",
+      "category": "Hermes",
+      "title": "Inspect skills or learn a workflow",
+      "keys": [
+        "/skills",
+        "/learn what to learn",
+        "/curator status"
+      ],
+      "source": "hermes",
+      "detail": "Skills includes management/online operations; /learn authors a reusable skill. Curator status inspects background skill maintenance.",
+      "mode": "Hermes prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-hermes-history",
+      "app": "hermes",
+      "category": "Hermes",
+      "title": "Inspect the conversation or copy a response",
+      "keys": [
+        "/history",
+        "/copy"
+      ],
+      "source": "hermes",
+      "detail": "Show history or copy the last assistant response, when clipboard delivery is supported.",
+      "mode": "Hermes prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-hermes-plan",
+      "app": "hermes",
+      "category": "Hermes",
+      "title": "Ask for a plan or an audit",
+      "keys": [
+        "Ask in natural language"
+      ],
+      "source": "hermes",
+      "detail": "Request a plan or review explicitly. /plan and /review are absent from the checked 0.19.0 built-in registry; a same-named skill may be installed separately.",
+      "mode": "Hermes prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-hermes-exit",
+      "app": "hermes",
+      "category": "Hermes",
+      "title": "Exit the client",
+      "keys": [
+        "/quit"
+      ],
+      "source": "hermes",
+      "detail": "Also /exit. The short /q means queue in Hermes, unlike OpenCode.",
+      "mode": "Hermes prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-cc-newline",
+      "app": "claude",
+      "category": "Claude Code",
+      "title": "Write a multiline prompt",
+      "keys": [
+        "Ctrl+j",
+        "Ctrl+g"
+      ],
+      "source": "claude",
+      "detail": "Ctrl+J inserts a newline. Ctrl+G opens an external editor for longer prompts.",
+      "mode": "Claude Code prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "ai-cc-stop",
+      "app": "claude",
+      "category": "Claude Code",
+      "title": "Interrupt or inspect a response",
+      "keys": [
+        "Esc",
+        "Ctrl+o"
+      ],
+      "source": "claude",
+      "detail": "Esc interrupts; Ctrl+O opens the transcript viewer. Ctrl+T toggles the task checklist.",
+      "mode": "Claude Code prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "ai-cx-newline",
+      "app": "codex",
+      "category": "Codex",
+      "title": "Write a multiline prompt",
+      "keys": [
+        "Ctrl+j",
+        "Ctrl+g"
+      ],
+      "source": "codex",
+      "detail": "Ctrl+J inserts a newline; Ctrl+G opens an external editor. Herdr consumes Alt+Enter.",
+      "mode": "Codex prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "ai-cx-stop",
+      "app": "codex",
+      "category": "Codex",
+      "title": "Interrupt, queue or inspect",
+      "keys": [
+        "Esc",
+        "Tab",
+        "Ctrl+t"
+      ],
+      "source": "codex",
+      "detail": "Esc interrupts. While working, Tab queues a message. Ctrl+T opens the transcript.",
+      "mode": "Codex prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "ai-oc-newline",
+      "app": "opencode",
+      "category": "OpenCode",
+      "title": "Write a multiline prompt",
+      "keys": [
+        "Ctrl+j",
+        "Ctrl+x > e"
+      ],
+      "source": "opencode",
+      "detail": "Ctrl+J inserts a newline. Ctrl+X, release, then e opens the external editor, also /editor.",
+      "mode": "OpenCode prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "ai-oc-stop",
+      "app": "opencode",
+      "category": "OpenCode",
+      "title": "Interrupt the active response",
+      "keys": [
+        "Esc > Esc"
+      ],
+      "source": "opencode-tui",
+      "detail": "The checked prompt implementation requires two Esc presses to abort. Follow the on-screen interrupt hint on newer builds.",
+      "mode": "OpenCode prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "ai-ha-newline",
+      "app": "hermes",
+      "category": "Hermes",
+      "title": "Compose a long prompt in an editor",
+      "keys": [
+        "Ctrl+g"
+      ],
+      "source": "hermes",
+      "detail": "Reliable classic-CLI path inside Herdr. Ctrl+J can submit on local Linux, but inserts a newline in WSL/WT/SSH contexts in the inspected 0.19.0 code. Do not treat it as portable.",
+      "mode": "Hermes prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "ai-ha-stop",
+      "app": "hermes",
+      "category": "Hermes",
+      "title": "Interrupt the current work",
+      "keys": [
+        "Ctrl+c"
+      ],
+      "source": "hermes",
+      "detail": "Classic CLI interrupt; a rapid second press can force exit. Prefer one press and read the prompt.",
+      "mode": "Hermes prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "keys"
+    }
+  ],
+  "apps": {
+    "claude": {
+      "name": "Claude Code",
+      "sub": "Client controls and workflows"
+    },
+    "codex": {
+      "name": "Codex",
+      "sub": "Client controls and workflows"
+    },
+    "opencode": {
+      "name": "OpenCode",
+      "sub": "Client controls and workflows"
+    },
+    "hermes": {
+      "name": "Hermes",
+      "sub": "Client controls and workflows"
+    }
+  },
+  "sources": {
+    "hermes": {
+      "title": "Hermes commands",
+      "label": "Hermes commands",
+      "url": "https://hermes-agent.nousresearch.com/docs/reference/slash-commands",
+      "scope": "Rows checked against installed PyPI hermes-agent 0.19.0 hermes_cli/commands.py and cli.py. Website may describe newer commands; /help is authoritative. Classic CLI and optional TUI can differ."
+    },
+    "agents": {
+      "title": "EyrAgents operations",
+      "label": "EyrAgents operations",
+      "url": "https://github.com/peregrinus879/eyragents/blob/main/docs/operations.md",
+      "scope": "Managed workflows and command wrappers reviewed 2026-09-14. Native client controls retain their own evidence baselines; current session status wins over a resumed model preference."
+    },
+    "claude": {
+      "title": "Claude Code controls",
+      "label": "Claude Code controls",
+      "url": "https://code.claude.com/docs/en/interactive-mode",
+      "scope": "Official interactive documentation reviewed 2026-09-12; see live /help for installed behavior."
+    },
+    "claude-commands": {
+      "title": "Claude Code commands",
+      "label": "Claude Code commands",
+      "url": "https://code.claude.com/docs/en/commands",
+      "scope": "Official command catalog reviewed 2026-09-12."
+    },
+    "codex": {
+      "title": "Codex TUI source",
+      "label": "Codex TUI source",
+      "url": "https://github.com/openai/codex/tree/5ecb3afd1bf405149e2159bfda50093b0c1b5fab/codex-rs/tui/src",
+      "scope": "Upstream source snapshot 2026-09-07, not installed-release-matched. / and ? show available controls."
+    },
+    "opencode": {
+      "title": "OpenCode controls",
+      "label": "OpenCode controls",
+      "url": "https://opencode.ai/docs/keybinds/",
+      "scope": "Official keys reviewed 2026-09-12; EyrAgents has no TUI key remaps."
+    },
+    "opencode-tui": {
+      "title": "OpenCode TUI source",
+      "label": "OpenCode TUI source",
+      "url": "https://github.com/anomalyco/opencode/tree/b578b7261fc9ec4917fe272df5cc4bd8a056cd5d/packages/tui/src",
+      "scope": "Source snapshot 2026-09-03, not installed-release-matched; checked prompt abort, commands and leader bindings."
+    }
+  },
+  "profiles": {
+    "eyragents": {
+      "name": "EyrAgents",
+      "host": "AI clients",
+      "terminal": "Your terminal",
+      "open": "Open docs/agent-guide.html from this checkout in a browser.",
+      "notes": [
+        "Global client configuration and shared skills apply in every project. A project needs no EyrAgents-specific import.",
+        "Terminal and multiplexer interception can affect key delivery. Use the client-specific newline/editor controls and current on-screen help.",
+        "Native conversation continuation and working-directory restoration are client-specific. Check the target directory before changing live configuration.",
+        "Saved keys are browser-local. Import an exported saved-keys file to transfer recognized AI action IDs; no browser profile is read or migrated automatically."
+      ]
+    }
+  },
+  "recipes": [],
+  "workflows": [
+    {
+      "title": "Shared workflows",
+      "text": "Use commit after verified implementation for preparation, exact-candidate review and approval; when preparation has not already been directed, it offers Prepare commit reviews or Pause here. Publish owns review and approval of the exact publication set. Spar provides a read-only second opinion. Use the installed skill picker or name the relevant skill; procedures live in the skills, not this guide.",
+      "sources": [
+        "agents"
+      ]
+    },
+    {
+      "title": "Evidence and live help",
+      "text": "The source register distinguishes reviewed documentation, source snapshots and installed-release evidence. A documented shortcut is not proof of effective model, effort, permissions or session state.",
+      "sources": [
+        "claude",
+        "codex",
+        "opencode-tui",
+        "hermes"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "app": "AI clients",
+      "command": "claude --version\ncodex --version\nopencode --version\nhermes --version",
+      "text": "Check each tool from a shell. Use Claude/OpenCode/Hermes /help and Codex / or ?. Model/effort/session overrides are client state, not fixed by the launcher."
+    }
+  ]
+}

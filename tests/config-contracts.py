@@ -518,15 +518,17 @@ for line in (ROOT / "references.txt").read_text(encoding="utf-8").splitlines():
     fields = line.split("#", 1)[0].split()
     if not fields:
         continue
-    require(len(fields) == 2, "reference manifest entry must name one directory and URL")
+    require(len(fields) == 3, "managed GitHub reference must name directory, URL and reviewed object ID")
     require(fields[0] not in references, "duplicate reference manifest entry")
-    references[fields[0]] = fields[1]
+    require(re.fullmatch(r"https://github\.com/[A-Za-z0-9-]+/[A-Za-z0-9_.-]+\.git", fields[1]),
+            "reference URL is not a canonical GitHub HTTPS endpoint")
+    references[fields[0]] = fields[2]
 require(references == {
-    "claude-code": "https://github.com/anthropics/claude-code.git",
-    "codex": "https://github.com/openai/codex.git",
-    "opencode": "https://github.com/anomalyco/opencode.git",
-    "hermes-agent": "https://github.com/NousResearch/hermes-agent.git",
-}, "harness reference inventory differs from the reviewed four-tool set")
+    "claude-code": "github:R_kgDON91aYw",
+    "codex": "github:R_kgDOOYsS4Q",
+    "opencode": "github:R_kgDOOiiGLw",
+    "hermes-agent": "github:R_kgDOPRF1Gw",
+}, "harness reference identities differ from the reviewed four-tool set")
 
 # Skills stay portable: the name matches the directory and only standard frontmatter fields appear.
 STANDARD_SKILL_FIELDS = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
