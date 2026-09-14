@@ -24,6 +24,9 @@ metadata-shaped name and a bounded, complete, flat literal collection of
 recognized path/glob descriptors qualify for that exception. Unknown, computed,
 nested, commented or incomplete collections still refuse; no source is executed.
 Provider/key detectors continue scanning the entire payload independently.
+Equality comparisons accept bounded literals, constants, and environment lookups;
+bounded lookahead must establish termination, not merely a physical line end.
+Diff EOF/omissions are not source EOF; ambiguous continuations still refuse.
 """
 
 from __future__ import annotations
@@ -42,6 +45,10 @@ REQUEST_MAX = 256 * 1024
 ARTIFACT_MAX = 512 * 1024
 TOTAL_MAX = 1024 * 1024
 FINDING_REPORT_MAX = 8
+COMPARISON_MAX_CHARS = 16384
+COMPARISON_MAX_LINES = 128
+COMPARISON_MAX_TOKENS = 256
+COMPARISON_MAX_DEPTH = 8
 
 PATTERN_ENVELOPE = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----")
 PATTERN_PROVIDER_A = re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b")
@@ -113,6 +120,159 @@ def safe_code_value(value: str) -> bool:
         PATTERN_SAFE_VALUE.fullmatch(literal) or PATTERN_HARMLESS_LITERAL.fullmatch(literal)
         for _, literal in PATTERN_QUOTED_LITERAL.findall(value)
     )
+
+
+def comparison_atom(value: str) -> str | None:
+    """Consume one bounded atom, returning its tail, never decode source.
+
+    Escapes are deliberately unsupported. In particular, an escaped quote must
+    not expose an apparent semicolon/comment that is still inside the string.
+    This stricter literal recognizer is local to the comparison exception.
+    """
+    literal = re.match(r'''(["'])((?:(?!\1)[^\\\r\n])*)\1''', value)
+    if literal is not None:
+        if (len(literal.group(2)) > 128
+                or PATTERN_HARMLESS_LITERAL.fullmatch(literal.group(2)) is None):
+            return None
+        return value[literal.end():].strip(" \t")
+    atom = re.match(r"(?:(?i:none|null|nil|true|false)|process\.env\.[A-Za-z_]\w{0,127})(?![\w.])", value)
+    return None if atom is None else value[atom.end():].strip(" \t")
+
+
+def safe_comparison_value(text: str, match: re.Match, in_diff: bool) -> bool:
+    # The assignment matcher consumes the first '=' of '==' or '===' too.
+    # This exception belongs to that source match, not to colon assignments,
+    # quoted scalar values, or URL passwords that happen to begin with '='.
+    prefix = text[match.start():match.start(1)]
+    if not prefix.endswith("="):
+        return False
+    # As with path collections, bound both characters and physical lines and
+    # preserve diff markers before skipping blanks/comments. A patch's final
+    # addition does not establish source EOF, even at a file/hunk transition.
+    marker = prefix.lstrip(" \t")[:1]
+    marker = marker if marker in ("+", "-") else "+" if in_diff else None
+    start = match.start(1)
+    snippet = text[start:start + COMPARISON_MAX_CHARS + 1]
+    lines = snippet.split("\n")
+    truncated = start + len(snippet) < len(text)
+    consumed = 0
+    closed = False
+    # Restricted grammar, implemented with a bounded expectation stack:
+    #   initial RHS: atom [ ? branch : branch ]
+    #   branch: atom | identifier (== | ===) atom ? branch : branch
+    # Only a comparison-led conditional can nest. Bare identifiers, calls,
+    # computed values and literal-truthiness conditionals are not branches.
+    # Every atom retains comparison_atom's literal/constant/env checks.
+    expected = ["end", "optional-conditional", "atom"]
+    depth = 0
+    tokens = 0
+
+    def charge(count: int = 1) -> bool:
+        nonlocal tokens
+        tokens += count
+        return tokens <= COMPARISON_MAX_TOKENS
+
+    for number, line in enumerate(lines):
+        consumed += len(line) + (number < len(lines) - 1)
+        if number >= COMPARISON_MAX_LINES or consumed > COMPARISON_MAX_CHARS:
+            return False
+        if number == len(lines) - 1 and truncated:
+            return False
+        # Permit ordinary CRLF, never a control separator hidden inside a line
+        # or comment. Split only on LF, as the assignment matcher does.
+        if number < len(lines) - 1:
+            line = line.removesuffix("\r")
+        if re.search(r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029]", line):
+            return False
+        if number and marker:
+            if not line.startswith((marker, " ")):
+                return False
+            line = line[1:]
+        if not number:
+            comparison = re.match(r"={1,2}(?!=)", line)
+            if comparison is None or not charge():
+                return False
+            line = line[comparison.end():]
+        following = line.strip(" \t")
+        if not following or following.startswith(("#", "//")):
+            continue
+        if number and not closed and expected[-1] in ("end", "optional-conditional") and re.match(
+            r"(?:[A-Za-z_]\w*[ \t]*=(?!=)|(?:const|let|var|return|throw|class|function|def|import|from|pass|raise)\b)",
+            following,
+        ):
+            # A visible next declaration/statement is termination evidence,
+            # never an exemption from scanning that statement independently.
+            return True
+        # Bare parentheses alone are not termination: `)\n+ value` can still
+        # continue. A visible closing block also terminates a semicolonless
+        # return/expression. Every terminator must occupy the entire line tail;
+        # same-line statements, calls, properties and casts still refuse.
+        while True:
+            state = expected[-1]
+            if state == "finish-conditional":
+                expected.pop()
+                depth -= 1
+                continue
+            if not following or following.startswith(("#", "//")):
+                break
+            if state in ("atom", "branch"):
+                tail = comparison_atom(following)
+                if tail is None:
+                    # An ordinary identifier is accepted only as the left
+                    # side of another complete bounded comparison/conditional.
+                    reference = re.match(r"[A-Za-z_]\w{0,127}", following) if state == "branch" else None
+                    if reference is None or not charge():
+                        return False
+                    following = following[reference.end():].strip(" \t")
+                    expected.pop()
+                    expected.extend(["required-conditional", "atom", "equality"])
+                    continue
+                if not charge():
+                    return False
+                following = tail
+                expected.pop()
+                continue
+            if state == "equality":
+                equality = re.match(r"={2,3}(?!=)", following)
+                if equality is None or not charge():
+                    return False
+                following = following[equality.end():].strip(" \t")
+                expected.pop()
+                continue
+            if state == ":":
+                if not following.startswith(":") or not charge():
+                    return False
+                expected.pop()
+                following = following[1:].strip(" \t")
+                continue
+            closers = re.match(r"\)(?:[ \t]*\))*", following) if state in ("end", "optional-conditional") else None
+            if closers:
+                if not charge(closers.group().count(")")):
+                    return False
+                closed = True
+                following = following[closers.end():].strip(" \t")
+                continue
+            if state in ("optional-conditional", "required-conditional"):
+                if following.startswith("?") and not following.startswith(("??", "?.")):
+                    if depth >= COMPARISON_MAX_DEPTH or not charge():
+                        return False
+                    following = following[1:].strip(" \t")
+                    expected.pop()
+                    depth += 1
+                    expected.extend(["finish-conditional", "branch", ":", "branch"])
+                    continue
+                if state == "required-conditional":
+                    return False
+                expected.pop()
+                continue
+            if re.fullmatch(r";[ \t]*(?://[^\r\n]*)?", following):
+                return charge()
+            if closed and re.fullmatch(r"\{[ \t]*(?://[^\r\n]*)?", following):
+                return charge()
+            if re.fullmatch(r"}(?:[ \t]*})*[ \t]*(?://[^\r\n]*)?", following):
+                return charge(following.split("//", 1)[0].count("}"))
+            return False
+    return expected in (["end"], ["end", "optional-conditional"]) and marker is None and not truncated
 
 
 def safe_assignment_value(value: str) -> bool:
@@ -324,11 +484,34 @@ def safe_path_collection(text: str, match: re.Match) -> bool:
     return False
 
 
-def content_findings(label: str, text: str, check_paths: bool) -> list[Finding]:
+def content_findings(label: str, text: str, check_paths: bool, comparison_source: str | None = None) -> list[Finding]:
     newline_offsets = [match.start() for match in re.finditer("\n", text)]
+    # Outbound/reply may contain patches too. A context-line comparison after
+    # a patch header must not regain raw-source EOF privileges. No patch-end
+    # inference is made for subsequent prose or fragments.
+    patch_header = re.search(r"(?m)^(?:diff --(?:git|cc|combined) |@@|--- |\+\+\+ )", text)
 
     def line_number(offset: int) -> int:
         return bisect.bisect_left(newline_offsets, offset) + 1
+
+    # Addition-only scanning retains one LF-delimited row per input row. Use
+    # original matches on those same rows solely for comparison termination:
+    # visible context can close a return/conditional, but a hunk gap or opposite
+    # image still cannot. Content detectors and collection checks keep their
+    # existing added-line view. Require the matched value to agree before using
+    # this evidence, since the assignment regexp itself can span whitespace.
+    source_matches = {}
+    if comparison_source is not None:
+        source_newlines = [found.start() for found in re.finditer("\n", comparison_source)]
+        source_matches = {bisect.bisect_left(source_newlines, found.start()) + 1: found
+                          for found in PATTERN_ASSIGNMENT.finditer(comparison_source)}
+
+    def comparison_safe(match: re.Match) -> bool:
+        if comparison_source is None:
+            return safe_comparison_value(text, match, patch_header is not None and patch_header.start() < match.start())
+        original = source_matches.get(line_number(match.start()))
+        return (original is not None and original.group(1) == match.group(1)
+                and safe_comparison_value(comparison_source, original, True))
 
     findings: list[Finding] = []
     if check_paths:
@@ -356,7 +539,9 @@ def content_findings(label: str, text: str, check_paths: bool) -> list[Finding]:
         for match in pattern.finditer(text):
             findings.append(Finding(label, line_number(match.start()), rule))
     for match in PATTERN_ASSIGNMENT.finditer(text):
-        if not safe_assignment_value(match.group(1)) and not safe_path_collection(text, match):
+        if (not safe_assignment_value(match.group(1))
+                and not comparison_safe(match)
+                and not safe_path_collection(text, match)):
             findings.append(Finding(label, line_number(match.start()), "credential-assignment-v1"))
     for match in PATTERN_URL_CREDENTIAL.finditer(text):
         if not safe_assignment_value(match.group(1)):
@@ -483,6 +668,7 @@ def scan_stream(label: str, check_paths: bool) -> None:
     if len(data) > TOTAL_MAX:
         reject(label, f"{label} exceeds the review limit")
     text = decode_text(label, data)
+    comparison_source = text if check_paths else None
     if check_paths:
         # A diff exposes only its headers and added lines; removed and context
         # lines already exist in the base.
@@ -494,7 +680,7 @@ def scan_stream(label: str, check_paths: bool) -> None:
             or (number == len(lines) - 1 and not line) else "#"
             for number, line in enumerate(lines)
         )
-    enforce(content_findings(label, text, check_paths))
+    enforce(content_findings(label, text, check_paths, comparison_source))
 
 
 def main() -> None:

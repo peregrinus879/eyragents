@@ -284,6 +284,315 @@ def check(source, accepted, mode="reply"):
     assert "opaque-material-49a8" not in result.stderr, "scanner disclosed rejected fixture bytes"
     count += 1
 
+# Equality operators are code, but ambiguous values keep the normal safeguards.
+# Build the expressions so this fixture source contains no credential assignments.
+for operator in ("==", "==="):
+    for spacing in ("", " "):
+        for operand in ('"page"', '"true"', "null", "false", "process.env.REVIEW_STATE"):
+            source = "token" + spacing + operator + spacing + operand + "\n"
+            check(source, True)
+            check(source, True, "outbound")
+            # Keep the original expression unchanged. A complete semicolonless
+            # return supplies visible closing evidence, not an inserted `;`.
+            complete = "export function isPage(token: string) {\n  return (\n    " + source + "  )\n}\n"
+            patch = "diff --git a/view.ts b/view.ts\n" + "\n".join("+" + line for line in complete.split("\n"))
+            check(patch, True, "diff")
+
+for source in (
+    declaration("TOKEN", repr("opaque-material-49a8")),
+    declaration("TOKEN", repr("==page")),
+    declaration("TOKEN", "=opaque-material-49a8"),
+    "TOKEN" + ": =1234567890\n",
+    "https://app:" + "=1234567890@example.invalid/\n",
+    "token" + " === " + repr("opaque-material-49a8") + "\n",
+    "token" + ' === "page" && ' + declaration("TOKEN", repr("opaque-material-49a8")),
+    "token" + " === process.env.REVIEW_STATE; " + declaration("TOKEN", "`opaque-material-49a8`"),
+    "token" + ' === get_state("page"); ' + declaration("TOKEN", "`opaque-material-49a8`"),
+    "token" + " === " + repr("sk-" + "a" * 24) + "\n",
+):
+    check(source, False)
+    check(source, False, "outbound")
+    check("diff --git a/view.ts b/view.ts\n+" + source, False, "diff")
+
+print(f"ok: bounded equality comparisons ({count} acceptance/refusal cases)")
+count = 0
+
+def check_comparison_source(source, accepted, patch_accepted=None):
+    check(source, accepted)
+    check(source, accepted, "outbound")
+    if patch_accepted is None:
+        patch_accepted = accepted
+    # Keep physical LF boundaries, including CR/Unicode-control refusal cases.
+    patch = "diff --git a/view.ts b/view.ts\n" + "\n".join("+" + line for line in source.split("\n"))
+    for mode in ("reply", "outbound", "diff"):
+        check(patch, patch_accepted, mode)
+
+comparison = "token" + ' === "page"'
+for ending in ("", "\n", "\r\n", "\n\n// ordinary comment\n"):
+    check_comparison_source(comparison + ending, True, False)
+for source in (
+    comparison + ";", comparison + ";\n", comparison + "\n;\n",
+    comparison + "; // ordinary comment\n",
+    "token" + ' ===\n    "page";\n',
+    "token" + ' ===\n    // ordinary comment\n    "page";\n',
+    comparison + "\nconst label = renderPage();\n",
+    comparison + "\n// ordinary comment\nnext = renderPage();\n",
+    "function render() {\n  " + comparison + "\n  return label;\n}\n",
+    "if (\n  " + comparison + "\n) {\n  renderPage();\n}\n",
+    "if (\n  " + comparison + ") { // ordinary comment\n  renderPage();\n}\n",
+    "if (\n  " + comparison + "\n)\n{\n  renderPage();\n}\n",
+    "function isPage() {\n  return ((\n    " + comparison + "\n  ));\n}\n",
+):
+    check_comparison_source(source, True)
+
+# A physical line end, blank/comment, or bare closer cannot hide a continued
+# operand/expression. Exercise both quoted literals and environment operands.
+for operand in ('"page"', "process.env.REVIEW_STATE"):
+    for separator in ("\n", "\n\n// ordinary comment\n", "\r\n"):
+        for trailer in ('+ "opaque-material-49a8"', '?? "opaque-material-49a8"',
+                        '&& "opaque-material-49a8"', '("opaque-material-49a8")',
+                        '.concat("opaque-material-49a8")', '["opaque-material-49a8"]'):
+            check_comparison_source("token" + " === " + operand + separator + trailer, False)
+for trailer in ('+ "opaque-material-49a8"', '? "ordinary" : "opaque-material-49a8"',
+                "as SomeType", "satisfies SomeType", ", other", '"opaque-material-49a8"'):
+    check_comparison_source(comparison + "\n" + trailer, False)
+    check_comparison_source("const result = (\n  " + comparison + "\n)\n" + trailer, False)
+for trailer in ('; ' + declaration("TOKEN", repr("opaque-material-49a8")),
+                '); ' + declaration("TOKEN", repr("opaque-material-49a8")),
+                ') { ' + declaration("TOKEN", repr("opaque-material-49a8")),
+                '/* ordinary comment */\n+ "opaque-material-49a8"'):
+    check_comparison_source(comparison + trailer, False)
+for source in (
+    "token" + " ===\n", "token" + ' =\n== "page";',
+    comparison + "\n" * 130 + '+ "opaque-material-49a8"',
+    comparison + " " * 16400 + ";", comparison + "\r",
+):
+    check_comparison_source(source, False)
+for separator in ("\r", "\v", "\f", "\x85", "\u2028", "\u2029"):
+    check_comparison_source(comparison + "\n// ordinary comment" + separator + '+ "opaque-material-49a8"', False)
+
+# Terminating one comparison never exempts later assignments or the independent
+# provider/private-key detectors, including data after a conditional header.
+for terminator in (";\n", "\n", ") {\n"):
+    for source in (
+        declaration("TOKEN", repr("opaque-material-49a8")),
+        "TOKEN" + ": =1234567890\n",
+        "https://app:" + "=1234567890@example.invalid/\n",
+        "sk-" + "a" * 24 + "\n",
+        "-----BEGIN TEST PRIVATE " + "KEY-----\n",
+    ):
+        check_comparison_source(comparison + terminator + source, False)
+
+patch_head = "diff --git a/view.ts b/view.ts\n+" + comparison + "\n"
+for boundary in ("@@ -20,1 +20,1 @@", "diff --git a/other.ts b/other.ts",
+                 "#", " unchanged context", "-removed line", r"\ No newline at end of file"):
+    for mode in ("reply", "outbound", "diff"):
+        check(patch_head + boundary + "\n+;\n", False, mode)
+        # A visible terminator before an omission already proves completion.
+        check(patch_head.replace(comparison, comparison + ";") + boundary + "\n+ordinary\n", True, mode)
+for mode in ("reply", "outbound", "diff"):
+    check(patch_head + '+\n+// ordinary comment\n++ "opaque-material-49a8"\n', False, mode)
+    check(patch_head + '+)\n++ "opaque-material-49a8"\n', False, mode)
+    check(patch_head + "+) {\n+  renderPage();\n+}\n", True, mode)
+    # Visible context is evidence for comparison termination in every mode;
+    # it is not newly published content for the diff mode's other detectors.
+    check(patch_head + " ) {\n+  renderPage();\n+}\n", True, mode)
+for header in ("diff --git a/view.ts b/view.ts\n", "--- a/view.ts\n+++ b/view.ts\n",
+               "@@ -1,1 +1,1 @@\n"):
+    for mode in ("reply", "outbound"):
+        check(header + " " + comparison + "\n", False, mode)
+        check(header + " " + comparison + "\n+;\n", True, mode)
+
+print(f"ok: bounded multiline comparison termination ({count} acceptance/refusal cases)")
+count = 0
+
+# Keep H's supplied whole-source reproducer byte-for-byte, including its lack
+# of semicolons/final newline. The original website regression is below.
+semicolonless_ts = (
+    'export function isPage(token: string) {\n'
+    '  return (\n'
+    '    token === "page"\n'
+    '  )\n'
+    '}'
+)
+check_comparison_source(semicolonless_ts, True)
+check_comparison_source(semicolonless_ts.replace("\n", "\r\n"), True)
+for expression in (
+    comparison,
+    comparison + ' ? "current" : "other"',
+    comparison + '\n      ? "current"\n      : "other"',
+    comparison + '\n      ? // ordinary comment\n        "current"\n      : false',
+    comparison + '\n      ? process.env.PAGE_LABEL\n      : process.env.TEXT_LABEL',
+):
+    source = semicolonless_ts.replace(comparison, expression)
+    check_comparison_source(source, True)
+    # Realistic edited-line patch: the function and return closers are context,
+    # not additions. Earlier unequal-length rows must not skew source matching.
+    patch = ('diff --git a/view.ts b/view.ts\n@@ -1,6 +1,6 @@\n'
+             '-// an old, much longer explanatory comment\n+// updated\n'
+             ' export function isPage(token: string) {\n   return (\n'
+             + '\n'.join('+    ' + line for line in expression.split('\n'))
+             + '\n   )\n }\n')
+    for mode in ("reply", "outbound", "diff"):
+        check(patch, True, mode)
+
+# No terminator/comment may be recognized through an escaped quote. Keep both
+# quote styles, benign-but-unsupported escapes and escapes in ternary branches.
+for expression in (
+    "token" + r' === "page\"; //opaque-material-49a8";',
+    "token" + r" === 'page\'; //opaque-material-49a8';",
+    "token" + r' === "page\\";',
+    "token" + r' === "pa\u0067e";',
+    "token" + ' === "page\\\nopaque-material-49a8";',
+    comparison + r' ? "on\"; //opaque-material-49a8" : "off";',
+    comparison + r' ? "on" : "off\"; //opaque-material-49a8";',
+):
+    check_comparison_source(expression, False)
+    check_comparison_source(semicolonless_ts.replace(comparison, expression), False)
+
+quoted_punctuation = "token" + ' === "page; // label"'
+check_comparison_source(quoted_punctuation, True, False)
+check_comparison_source(quoted_punctuation + '\n+ "opaque-material-49a8"', False)
+for expression in (
+    comparison + ' ? "current" : "opaque-material-49a8"',
+    comparison + ' ? "opaque-material-49a8" : "other"',
+    comparison + ' ? "current" : "other" + "opaque-material-49a8"',
+    comparison + ' ? "current" : "other"\n+ "opaque-material-49a8"',
+    comparison + ' ? renderPage() : renderText()',
+    comparison + ' ? "current" : "other" ? "nested" : "conditional"',
+    comparison + ' ? "current"', comparison + ' ? "current" :',
+    comparison + ' ? "current" : "other"; ' + declaration("TOKEN", repr("opaque-material-49a8")),
+):
+    check_comparison_source(semicolonless_ts.replace(comparison, expression), False)
+
+for mode in ("reply", "outbound", "diff"):
+    for continuation in (' + "opaque-material-49a8"', ' ) + "opaque-material-49a8"',
+                         ' // ordinary comment\n + "opaque-material-49a8"',
+                         ' )\n@@ -30,1 +30,1 @@\n }', ' )\n-removed context\n }'):
+        check(patch_head + continuation + '\n }\n', False, mode)
+    check(patch_head + ' // ordinary comment\n )\n }\n', True, mode)
+    check(patch_head + ' ? "current"\n : "other"\n )\n }\n', True, mode)
+    check(patch_head + ' ? "current"\n@@ -30,1 +30,1 @@\n : "other"\n )\n }\n', False, mode)
+
+# Context-assisted comparison validation does not expose removed/context
+# payloads to addition-only detectors, or exempt newly added credential bytes.
+context_assignment = declaration("TOKEN", repr("opaque-material-49a8"))
+check('diff --git a/view.ts b/view.ts\n ' + context_assignment + '+' + comparison + '\n )\n }\n', True, 'diff')
+for added in (context_assignment, "TOKEN" + ": =1234567890\n",
+              "https://app:" + "=1234567890@example.invalid/\n",
+              "sk-" + "a" * 24 + "\n", "-----BEGIN TEST PRIVATE " + "KEY-----\n"):
+    check(patch_head + ' )\n }\n+' + added, False, 'diff')
+
+print(f"ok: escape-safe literals and unchanged semicolonless/ternary use ({count} acceptance/refusal cases)")
+count = 0
+
+# Original Header.tsx:40-47, read-only verified on 2026-09-14. Preserve the
+# complete eight lines exactly, including quotes, indentation and semicolons.
+# Tests have no dependency on that external checkout; production has no path
+# or source-string whitelist. This fixture is the actual reported use case.
+original_website_tsx = (
+    'type CurrentToken = "page" | "true" | undefined;\n'
+    '\n'
+    'const currentAttribute = (token: CurrentToken) =>\n'
+    '  token === "page"\n'
+    '    ? \' aria-current="page"\'\n'
+    '    : token === "true"\n'
+    '      ? \' aria-current="true"\'\n'
+    '      : "";\n'
+)
+check_comparison_source(original_website_tsx, True)
+check_comparison_source(original_website_tsx.replace("\n", "\r\n"), True)
+addition_patch = ('diff --git a/Header.tsx b/Header.tsx\nnew file mode 100644\n'
+                  '--- /dev/null\n+++ b/Header.tsx\n@@ -0,0 +1,8 @@\n'
+                  + ''.join('+' + line for line in original_website_tsx.splitlines(keepends=True)))
+context_rows = []
+for index, line in enumerate(original_website_tsx.splitlines(keepends=True)):
+    if index == 3:
+        context_rows += ['-  Boolean(token)\n', '+' + line]
+    else:
+        context_rows.append(' ' + line)
+assert ''.join(line[1:] for line in context_rows if line[0] in ('+', ' ')) == original_website_tsx
+context_patch = ('diff --git a/Header.tsx b/Header.tsx\n--- a/Header.tsx\n+++ b/Header.tsx\n'
+                 '@@ -40,8 +40,8 @@\n' + ''.join(context_rows))
+for mode in ('reply', 'outbound', 'diff'):
+    check(addition_patch, True, mode)
+    check(context_patch, True, mode)
+
+# Generic comparisons and either branch can nest. Names resembling constants
+# must remain whole identifiers, not accidentally become a `true`/`null` prefix.
+def conditional(name, yes='"on"', no='"off"'):
+    return name + ' === "kind" ? ' + yes + ' : ' + no
+
+for expression in (
+    comparison + ' ? ' + conditional('kind') + ' : "";',
+    comparison + ' ? "" : ' + conditional('kind') + ';',
+    comparison + ' ? ' + conditional('trueFlag', conditional('other')) + ' : ' + conditional('nullFlag') + ';',
+    comparison + ' ? "" : kind\n ===\n "other"\n ? "on"\n : "off";',
+):
+    check_comparison_source(expression, True)
+check_comparison_source(original_website_tsx.replace('token === "true"', 'kind == "active"'), True)
+check_comparison_source(original_website_tsx.replace('"page"', '"section"'), True)
+
+# A complete nested expression can use raw-input EOF; a patch fragment cannot
+# invent source EOF or hide a continuation beyond the visible image.
+without_final_semicolon = original_website_tsx[:-2] + '\n'
+check_comparison_source(without_final_semicolon, True, False)
+check_comparison_source(without_final_semicolon + '+ "opaque-material-49a8"\n', False)
+for condition in (
+    'readToken() === "true"', 'token.kind === "true"', 'token["kind"] === "true"',
+    '(token = "true")', 'token' + ' = "true"', 'token' + ': "true"',
+    'token' + ' === readKind()', 'token' + ' === ["true"]', 'token' + ' === "opaque-material-49a8"',
+    'token' + ' === "true" + "opaque-material-49a8"',
+    'token' + ' === "true"; ' + declaration('TOKEN', repr('opaque-material-49a8')).strip(),
+    'token' + ' === trueValue', 'token' + ' === "true" as Kind',
+):
+    check_comparison_source(original_website_tsx.replace('token === "true"', condition), False)
+for branch in (
+    '"opaque-material-49a8"', 'readLabel()', 'label.value', 'label["value"]', 'label',
+    '"on" + "opaque-material-49a8"', '"on"\n+ "opaque-material-49a8"',
+    r'"on\"; //opaque-material-49a8"', r"'on\'; //opaque-material-49a8'",
+    declaration('TOKEN', repr('opaque-material-49a8')).strip(),
+):
+    for yes, no in ((branch, '"off"'), ('"on"', branch)):
+        check_comparison_source(comparison + ' ? "" : ' + conditional('kind', yes, no) + ';', False)
+for malformed in (
+    comparison + ' ? kind === "other" ? "on" : "off";',  # missing outer else
+    comparison + ' ? "" : kind === "other" ? "on";',      # missing inner else
+    comparison + ' ? "" : kind === "other" ? : "off";',  # missing true branch
+    comparison + ' ? "" : kind === "other";',             # incomplete nested condition
+    comparison + ' ? "" : kind === "other" ? "on" : ;',
+    comparison + ' ? "" : kind === "other" ? "on" : "off" : "extra";',
+    comparison + ' ? "" : kind === "other" ? "on"; : "off";',
+    comparison + ' ? "" : kind === "other" ? "on" : "off"; ' + declaration('TOKEN', repr('opaque-material-49a8')),
+):
+    check_comparison_source(malformed, False)
+for boundary in ('@@ -60,1 +60,1 @@', '-removed image', '#', 'diff --git a/other.ts b/other.ts'):
+    for marker in ('+', ' '):
+        patch = (patch_head + marker + '? "" : kind === "other"\n' + boundary
+                 + '\n' + marker + '? "on" : "off";\n')
+        for mode in ('reply', 'outbound', 'diff'):
+            check(patch, False, mode)
+for separator in ('\r', '\v', '\x85', '\u2028', '\u2029'):
+    check_comparison_source(comparison + ' ? "" : kind === "other"\n// comment' + separator + '? "on" : "off";', False)
+
+# Independent resource witnesses: a linear chain reaches the depth limit;
+# a shallow branching tree exhausts tokens while staying below depth/size/line
+# limits. Existing multiline/character-bound witnesses continue running above.
+for depth, accepted in ((8, True), (9, False)):
+    branch = '"off"'
+    for _ in range(depth - 1):
+        branch = conditional('kind', '"on"', branch)
+    check_comparison_source(comparison + ' ? "on" : ' + branch + ';', accepted)
+def tree(depth):
+    return '"off"' if not depth else conditional('kind', tree(depth - 1), tree(depth - 1))
+for depth, accepted in ((5, True), (6, False)):
+    check_comparison_source(comparison + ' ? ' + tree(depth - 1) + ' : ' + tree(depth - 1) + ';', accepted)
+for reference, accepted in (('k' * 128, True), ('k' * 129, False)):
+    check_comparison_source(comparison + ' ? "" : ' + conditional(reference) + ';', accepted)
+
+print(f"ok: exact original TSX and bounded nested conditionals ({count} acceptance/refusal cases)")
+count = 0
+
 inventories = (
     ("SECRET_DIRS", [".ssh", ".aws", ".gnupg", ".kube", ".mozilla", "secrets"], "{}"),
     ("SECRET_FILES", [".env", ".envrc", ".netrc", ".npmrc", ".pypirc", "auth.json", "credentials",
