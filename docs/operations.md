@@ -43,7 +43,7 @@ Full IDs, hashes, raw argv, execution context and detailed gate/scan evidence ar
 
 ### Workstream Close-Out
 
-Develop's workstream contract removes owned scratch and obsolete notes automatically when their last dependency ends. Paused work and pending publication/CI retain only necessary state and evidence. Commit/publication receipts use the commit skill's exact-ID close-out.
+Develop's workstream contract removes owned scratch and obsolete notes automatically when their last dependency ends. Paused work and pending publication/CI retain only necessary state and evidence. Commit/publication receipts use the commit skill's exact-ID close-out. If H explicitly chooses a local-only finish, `--local-only` validates and retires eligible candidate records without creating a publication binding or making a remote-success claim. The same flag is required to resume interrupted local-only disposal; publication and unsafe/active records are not eligible for that mode.
 
 ### Exact-Approved Publication
 

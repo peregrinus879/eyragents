@@ -131,6 +131,17 @@ def sync_directory(path):
         os.close(directory)
 
 
+def check_close_staging(data, pending):
+    require(data.startswith(pending), "close-out staging mismatch; retry the original selection/disposition or inspect with H")
+    # Canonical markers begin with coverage, id and outcome. Require all three,
+    # including the outcome delimiter: an empty/short prefix proves no intent.
+    # Keep the existing marker format and preserve ambiguous legacy staging.
+    marker = json.loads(data)
+    intent = encoded({key: marker[key] for key in ("coverage", "id", "outcome")})[:-2] + b","
+    require(pending.startswith(intent),
+            "ambiguous close-out staging; original coverage/disposition not established; preserve state for H")
+
+
 def atomic(path, data, immutable=False, staging=None):
     if staging is None:
         fd, name = tempfile.mkstemp(prefix=".write-", dir=path.parent)
@@ -139,7 +150,7 @@ def atomic(path, data, immutable=False, staging=None):
         try:
             fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         except FileExistsError:
-            require(data.startswith(read_private(name, CLOSE_LIMIT)), "close-out staging mismatch; preserve state for H")
+            check_close_staging(data, read_private(name, CLOSE_LIMIT))
             fd = os.open(name, os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
         with os.fdopen(fd, "wb") as stream:
@@ -154,8 +165,8 @@ def atomic(path, data, immutable=False, staging=None):
             os.replace(name, path)
         sync_directory(path.parent)
     finally:
-        # Close-out staging is exact-ID-addressed and recovered on retry, even
-        # after termination before any bytes reach disk. Other writers are unchanged.
+        # Retain exact-ID close-out staging on interruption. Recovery requires
+        # enough original bytes to establish intent; ambiguous staging stays.
         if staging is None:
             Path(name).unlink(missing_ok=True)
 
@@ -313,7 +324,8 @@ class Records:
             require(source["commit"] == value["reviewed"], "verified status/reviewed commit mismatch")
         return value
 
-    def close(self, ids, dry_run=False, accept_unverified=False):
+    def close(self, ids, dry_run=False, accept_unverified=False, local_only=False):
+        require(not (local_only and accept_unverified), "local-only and unverified-publication close-out are distinct")
         git_env = dict(os.environ, GIT_NO_LAZY_FETCH="1", GIT_OPTIONAL_LOCKS="0")
         selected = {}
         pending = {}
@@ -344,6 +356,8 @@ class Records:
                         and type(status_value["version"]) is int and status_value["version"] == 1,
                         "invalid transient closing state")
                 entry = status_value
+                require(entry["outcome"] != "LOCAL_ONLY" or local_only,
+                        "resuming LOCAL_ONLY close-out requires --local-only")
                 if payload_exists:
                     require(read_private(payload_path).decode("utf-8") == entry["payload"],
                             "closing snapshot/payload mismatch")
@@ -353,6 +367,7 @@ class Records:
                          "payload": read_private(payload_path).decode("utf-8"), "source": status_value,
                          "coverage": None, "outcome": None}
             value = self.close_source(receipt_id, entry["payload"], entry["source"])
+            require(not local_only or value["kind"] == "candidate", "--local-only cannot close publication records")
             selected[receipt_id] = (entry, value, closing, payload_exists)
 
         # A marker carries its own original bytes and, for a committed candidate,
@@ -378,7 +393,10 @@ class Records:
                 _, matches = candidate_commit(value, git("cat-file", "commit", commit, env=git_env))
                 require(matches, f"{receipt_id}: committed candidate mismatch (tree, parents, message or identities); preserve state for H")
                 proofs = []
-                if closing:
+                if local_only:
+                    require(entry["coverage"] is None, "local-only close-out cannot replace publication coverage")
+                    outcome = "LOCAL_ONLY"
+                elif closing:
                     proof = entry["coverage"]
                     require(isinstance(proof, dict) and set(proof) == {"id", "payload", "source"}
                             and isinstance(proof["id"], str) and re.fullmatch(r"[a-f0-9]{64}", proof["id"]),
@@ -386,7 +404,7 @@ class Records:
                     published = self.close_source(proof["id"], proof["payload"], proof["source"])
                     require(published["kind"] == "publish", "closing coverage is not a publication")
                     proofs.append((proof, published))
-                else:
+                elif not local_only:
                     for peer in selected.values():
                         if peer is not None and peer[1]["kind"] == "publish":
                             publication = peer[0]
@@ -406,7 +424,7 @@ class Records:
                         outcome = "verified" if verified else "UNVERIFIED"
                         covered = True
                         break
-                require(covered, f"{receipt_id}: committed candidate requires selected eligible publication ancestry coverage"
+                require(covered or local_only, f"{receipt_id}: committed candidate requires selected eligible publication ancestry coverage"
                         + (" (or --accept-unverified for a selected publication attempt)" if not accept_unverified else ""))
             else:
                 require(state == "rejected", f"{receipt_id}: ready candidates must be preserved")
@@ -417,8 +435,7 @@ class Records:
             entry["outcome"] = outcome
             require(len(encoded(entry)) <= CLOSE_LIMIT, "closing marker exceeds limit; no records changed")
             if receipt_id in pending:
-                require(encoded(entry).startswith(pending[receipt_id]),
-                        f"{receipt_id}: close-out staging mismatch; retry the original selection/disposition or inspect with H")
+                check_close_staging(encoded(entry), pending[receipt_id])
 
         if not dry_run and any(item is not None for item in selected.values()):
             directory = os.open(self.path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
@@ -591,12 +608,15 @@ def candidate_options(args):
     actions.add_argument("--close", nargs="+")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--accept-unverified", action="store_true")
+    parser.add_argument("--local-only", action="store_true")
     parser.add_argument("paths", nargs="*")
     opts = parser.parse_args(args)
-    require(opts.close is not None or not (opts.dry_run or opts.accept_unverified),
-            "--dry-run and --accept-unverified require --close")
+    require(opts.close is not None or not (opts.dry_run or opts.accept_unverified or opts.local_only),
+            "--dry-run, --accept-unverified and --local-only require --close")
+    require(not (opts.local_only and opts.accept_unverified),
+            "--local-only cannot be combined with --accept-unverified")
     if opts.close is not None:
-        for flag in ("--close", "--dry-run", "--accept-unverified"):
+        for flag in ("--close", "--dry-run", "--accept-unverified", "--local-only"):
             require(sum(arg.split("=", 1)[0] == flag for arg in args) <= 1, "duplicate close-out flag: " + flag)
         require(not opts.stage and opts.message_file is None and not opts.paths,
                 "--close cannot be combined with candidate flags or paths")
@@ -608,7 +628,7 @@ def candidate_options(args):
 
 def candidate(records, opts):
     if opts.close is not None:
-        records.close(opts.close, opts.dry_run, opts.accept_unverified)
+        records.close(opts.close, opts.dry_run, opts.accept_unverified, opts.local_only)
         return
     if opts.show or opts.clear:
         require(not opts.stage and not opts.message_file and not opts.paths, "show/clear cannot be combined with candidate options")

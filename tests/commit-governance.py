@@ -173,8 +173,10 @@ class Writer:
     def __getattr__(self, name):
         return getattr(self.stream, name)
     def write(self, data):
-        if active and phase in ("partial-write", "write"):
-            self.stream.write(data[:len(data) // 2] if phase == "partial-write" else data)
+        if active and phase in ("short-prefix", "partial-write", "intent-write", "write"):
+            end = {"short-prefix": len(b'{"coverage":'), "partial-write": len(data) // 2,
+                   "intent-write": data.rindex(b',"payload":') + len(b',"payload":'), "write": len(data)}[phase]
+            self.stream.write(data[:end])
             self.stream.flush()
             os._exit(91)
         return self.stream.write(data)
@@ -249,6 +251,109 @@ sys.exit(runtime["main"]())
             result = self.script("commit-candidate", "--close", publication, later, *flags, ok=False)
             self.assertIn("ancestry coverage", result.stderr)
             self.assertEqual(before, self.snapshot(store))
+
+    def test_close_local_only_preserves_git_and_other_candidates(self):
+        self.write("local.txt", "local result\n")
+        committed = self.record("local.txt")
+        self.script("commit-apply", committed)
+        self.write("later.txt", "still working\n")
+        ready = self.record("later.txt")
+        store = self.receipt(committed).parent
+        before_store, before_git = self.snapshot(store), self.snapshot(self.repo)
+        result = self.script("commit-candidate", "--close", committed, "--local-only", "--dry-run")
+        self.assertIn("outcome=LOCAL_ONLY", result.stdout)
+        self.assertNotIn("outcome=verified", result.stdout)
+        self.assertEqual(before_store, self.snapshot(store))
+        self.assertEqual(before_git, self.snapshot(self.repo))
+        self.script("commit-candidate", "--close", committed, "--local-only")
+        self.assertEqual(before_git, self.snapshot(self.repo))
+        self.assertEqual(self.status(ready)["state"], "ready")
+        self.assertFalse((store / (committed + ".json")).exists())
+
+    def test_close_local_only_refuses_publications_and_unsafe_candidates(self):
+        candidate, publication = self.close_bundle(verified=False)
+        store = self.receipt(candidate).parent
+        before = self.snapshot(store)
+        result = self.script("commit-candidate", "--close", candidate, publication, "--local-only", ok=False)
+        self.assertIn("cannot close publication", result.stderr)
+        self.assertEqual(before, self.snapshot(store))
+        for flags in (("--local-only", "--accept-unverified"), ("--local-only", "--local-only")):
+            self.script("commit-candidate", "--close", candidate, *flags, ok=False)
+            self.assertEqual(before, self.snapshot(store))
+        for state, extra in (("ready", {}), ("applying", {}), ("committed", {"commit": self.parent})):
+            self.set_status(candidate, state, **extra)
+            before = self.snapshot(store)
+            self.script("commit-candidate", "--close", candidate, "--local-only", ok=False)
+            self.assertEqual(before, self.snapshot(store))
+
+    def test_close_local_only_recovers_interruptions_with_same_disposition(self):
+        candidate, publication = self.close_bundle()
+        path = self.receipt(candidate)
+        original = path.read_bytes(), path.with_suffix(".status").read_bytes()
+        store = path.parent
+        unselected = {name: entry for name, entry in self.snapshot(store).items()
+                      if name in (publication + ".json", publication + ".status", "lock")}
+        before_git, before_remote = self.snapshot(self.repo), self.snapshot(self.root / "remote.git")
+        for phase in ("partial-write", "intent-write", "write", "fsync", "before-replace", "replace", "mark", "json", "status"):
+            with self.subTest(phase=phase):
+                self.interrupt_close((candidate,), phase, candidate, "--local-only")
+                if phase != "status":
+                    before = self.snapshot(store)
+                    for flags in ((), ("--dry-run",)):
+                        result = self.script("commit-candidate", "--close", publication, candidate, *flags, ok=False)
+                        self.assertIn("staging mismatch" if phase in ("partial-write", "intent-write", "write", "fsync", "before-replace")
+                                      else "requires --local-only", result.stderr)
+                        self.assertEqual(before, self.snapshot(store))
+                    preview = self.script("commit-candidate", "--close", candidate, "--local-only", "--dry-run")
+                    self.assertIn("outcome=LOCAL_ONLY", preview.stdout)
+                    self.assertEqual(before, self.snapshot(store))
+                result = self.script("commit-candidate", "--close", candidate, "--local-only")
+                self.assertNotIn("outcome=verified", result.stdout)
+                self.assertIn("absent:" if phase == "status" else "outcome=LOCAL_ONLY", result.stdout)
+                self.assertFalse((store / (candidate + ".json")).exists())
+                self.assertFalse((store / (candidate + ".status")).exists())
+                self.assertFalse((store / f".close-{candidate}.write").exists())
+                self.assertEqual(unselected, {name: entry for name, entry in self.snapshot(store).items() if name in unselected})
+                self.assertEqual(before_git, self.snapshot(self.repo))
+                self.assertEqual(before_remote, self.snapshot(self.root / "remote.git"))
+                path.write_bytes(original[0])
+                path.chmod(0o400)
+                path.with_suffix(".status").write_bytes(original[1])
+                path.with_suffix(".status").chmod(0o600)
+
+    def test_close_ambiguous_staging_preserves_original_and_alternate_dispositions(self):
+        candidate, first = self.close_bundle()
+        second, _ = self.binding()
+        self.script("publish-verify", second)
+        commit = self.status(candidate)["commit"]
+        store = self.receipt(candidate).parent
+        for name in ("e" * 64 + ".status", ".write-unattributed", ".close-" + "f" * 64 + ".write"):
+            path = store / name
+            path.write_text("unselected unknown state\n")
+            path.chmod(0o600)
+        for disposition in ("verified", "UNVERIFIED", "LOCAL_ONLY"):
+            for publication in (first, second):
+                self.set_status(publication, "ready" if disposition == "UNVERIFIED" else "verified",
+                                **({} if disposition == "UNVERIFIED" else {"commit": commit}))
+            flags = ("--accept-unverified",) if disposition == "UNVERIFIED" else ()
+            original = (candidate, "--local-only") if disposition == "LOCAL_ONLY" else (candidate, first, *flags)
+            for phase in ("create", "short-prefix"):
+                with self.subTest(disposition=disposition, phase=phase):
+                    self.interrupt_close(original, phase, candidate)
+                    staging = store / f".close-{candidate}.write"
+                    self.assertEqual(staging.read_bytes(), b"" if phase == "create" else b'{"coverage":')
+                    before = self.snapshot(store)
+                    before_git, before_remote = self.snapshot(self.repo), self.snapshot(self.root / "remote.git")
+                    for retry in (original, (candidate, "--local-only"), (second, candidate, *flags)):
+                        for preview in ((), ("--dry-run",)):
+                            with self.subTest(retry=retry, preview=preview):
+                                result = self.script("commit-candidate", "--close", *retry, *preview, ok=False)
+                                self.assertIn("ambiguous close-out staging", result.stderr)
+                                self.assertNotIn("close-out complete", result.stdout)
+                                self.assertEqual(before, self.snapshot(store))
+                                self.assertEqual(before_git, self.snapshot(self.repo))
+                                self.assertEqual(before_remote, self.snapshot(self.root / "remote.git"))
+                    staging.unlink()  # Reset only this synthetic interruption for the next case.
 
     def test_close_unverified_is_explicit_and_never_claims_success(self):
         candidate, publication = self.close_bundle(verified=False)
@@ -606,14 +711,14 @@ sys.exit(runtime["main"]())
                     path.with_suffix(".status").write_bytes(source)
                     path.with_suffix(".status").chmod(0o600)
 
-    def test_close_internal_marker_write_boundaries_leave_no_receipt_copies(self):
+    def test_close_internal_marker_write_boundaries_preserve_ambiguity_and_resume_bound_markers(self):
         candidate, publication = self.close_bundle()
         paths = [self.receipt(receipt_id) for receipt_id in (candidate, publication)]
         originals = {path: (path.read_bytes(), path.with_suffix(".status").read_bytes()) for path in paths}
         store = paths[0].parent
         lock = (store / "lock").stat().st_ino
         before_git = self.snapshot(self.repo)
-        phases = ("fsync", "create", "partial-write", "write", "before-replace", "replace")
+        phases = ("fsync", "create", "short-prefix", "partial-write", "intent-write", "write", "before-replace", "replace")
         for phase, target in ((phase, target) for phase in phases for target in (candidate, publication)):
             with self.subTest(phase=phase, target=target):
                 self.interrupt_close((candidate, publication), phase, target)
@@ -621,21 +726,32 @@ sys.exit(runtime["main"]())
                 self.assertEqual(staging.exists(), phase != "replace")
                 if phase == "create":
                     self.assertEqual(staging.read_bytes(), b"")
-                if phase == "partial-write":
+                ambiguous = phase in ("create", "short-prefix") or (phase == "partial-write" and target == candidate)
+                if phase in ("partial-write", "intent-write"):
                     prefix = staging.read_bytes()
                     self.assertTrue(prefix)
-                    self.interrupt_close((candidate, publication), phase, target)
-                    self.assertEqual(staging.read_bytes(), prefix)
+                    self.assertEqual(b',"outcome":"verified","payload":' in prefix, not ambiguous)
+                    if not ambiguous:
+                        self.interrupt_close((candidate, publication), phase, target)
+                        self.assertEqual(staging.read_bytes(), prefix)
                 before = self.snapshot(store)
-                self.script("commit-candidate", "--close", candidate, publication, "--dry-run")
-                self.assertEqual(before, self.snapshot(store))
-                self.script("commit-candidate", "--close", candidate, publication)
-                self.assertEqual([path.name for path in store.iterdir()], ["lock"])
+                if ambiguous:
+                    for flags in ((), ("--dry-run",)):
+                        result = self.script("commit-candidate", "--close", candidate, publication, *flags, ok=False)
+                        self.assertIn("ambiguous close-out staging", result.stderr)
+                        self.assertEqual(before, self.snapshot(store))
+                    staging.unlink()  # Ambiguous fixture state is preserved by the helper, then reset here.
+                else:
+                    self.script("commit-candidate", "--close", candidate, publication, "--dry-run")
+                    self.assertEqual(before, self.snapshot(store))
+                    self.script("commit-candidate", "--close", candidate, publication)
+                    self.assertEqual([path.name for path in store.iterdir()], ["lock"])
                 self.assertEqual(lock, (store / "lock").stat().st_ino)
                 self.assertEqual(before_git, self.snapshot(self.repo))
                 for path, (payload, source) in originals.items():
-                    path.write_bytes(payload)
-                    path.chmod(0o400)
+                    if not path.exists():
+                        path.write_bytes(payload)
+                        path.chmod(0o400)
                     path.with_suffix(".status").write_bytes(source)
                     path.with_suffix(".status").chmod(0o600)
 
@@ -644,7 +760,7 @@ sys.exit(runtime["main"]())
         path = self.receipt(candidate)
         originals = path.read_bytes(), path.with_suffix(".status").read_bytes()
         store = path.parent
-        self.interrupt_close((candidate, publication), "partial-write", candidate)
+        self.interrupt_close((candidate, publication), "intent-write", candidate)
         staging = store / f".close-{candidate}.write"
         prefix = staging.read_bytes()
         for defect in ("mismatch", "oversized", "orphan", "symlink", "hardlink", "public", "fifo", "directory"):
