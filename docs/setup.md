@@ -5,7 +5,7 @@
 ## Prerequisites
 
 - Git, GNU Make, and GNU Stow
-- jq, Python with PyYAML, Node.js, and mise
+- jq, Python with PyYAML, Node.js, mise, and ripgrep (`rg`)
 - ShellCheck 0.11.0 or newer
 - GNU coreutils and util-linux (`flock`, `setsid`)
 - Claude Code, Codex, OpenCode, and Hermes Agent installed through [mise](https://mise.jdx.dev) under `~/.local/share/mise`, where the Codex sandbox can execute them. Hermes uses a private Python 3.13 runtime; provider sign-in remains interactive.
@@ -13,7 +13,7 @@
 On Arch Linux:
 
 ```bash
-sudo pacman -Syu --needed git make stow jq python python-yaml nodejs shellcheck util-linux mise
+sudo pacman -Syu --needed git make stow jq python python-yaml nodejs shellcheck util-linux mise ripgrep
 ```
 
 ### WSL Account Check
