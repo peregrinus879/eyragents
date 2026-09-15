@@ -95,7 +95,7 @@ lint:
 	  agents/.agents/skills/spar/scripts/spar-payload-scan scripts/reconcile-codex-config.py scripts/reconcile-hermes-config.py scripts/update-references.py tests/reference-migration.py \
 	  hermes/.hermes/plugins/eyragents/__init__.py tests/hermes.py tests/hermes-runtime.py tests/hermes-live.py tests/hermes-live-fixtures.py tests/config-contracts.py \
 	  agents/.agents/skills/commit/scripts/governance.py tests/commit-governance.py tests/develop-live.py tests/develop-live-fixtures.py docs/agent-guide-src/build.py
-	@set -e; for plugin in opencode/.config/opencode/plugins/*.js; do node --check "$$plugin"; done
+	@set -e; for plugin in opencode/.config/opencode/plugins/*.js opencode/.config/opencode/lib/*.mjs; do node --check "$$plugin"; done
 	@echo "ok:   lint"
 
 test:

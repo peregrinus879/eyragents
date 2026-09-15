@@ -1,28 +1,20 @@
 // Adapt only native Read/Glob external-directory fallback asks, never location
-// grants or shell/edit decisions. OpenCode 1.18.30 legacy plugin/SDK contract.
+// grants or shell/edit decisions. OpenCode 1.18.31 legacy plugin/SDK contract.
+// Selected source rechecked 2026-09-15; docs/access.md owns evidence and limits.
 // The managed config omits the redundant external '*' ask so an explicit
 // project/agent restatement remains distinguishable and is never auto-approved.
 // Trusted native tools/plugins are a prerequisite, not an isolation guarantee.
 import { realpath, stat } from "node:fs/promises"
 import { homedir } from "node:os"
-import { dirname, isAbsolute, join, normalize, relative, resolve } from "node:path"
+import { dirname, isAbsolute, join, relative, resolve } from "node:path"
+import { bounded, inside, safePath, protectedPath, protectedLayout, protectedTarget, resolveKnown, readMountLayout, classifiedMount } from "../lib/safety-paths.mjs"
 
 const LIMIT = 256
 const LIFETIME = 60_000
-const inside = (root, path) => path === root || path.startsWith(root + "/")
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value)
 const id = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,200}$/.test(value)
 const argumentKey = (value) => JSON.stringify(value, Object.keys(value).sort())
 const AUDITOR_CAPS = Symbol.for("eyragents.auditor.original-caps")
-
-async function bounded(promise) {
-  let timer
-  try {
-    return await Promise.race([promise, new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error("read adapter lookup timed out")), 5_000)
-    })])
-  } finally { clearTimeout(timer) }
-}
 
 function matches(subject, pattern) {
   if (pattern === "~" || pattern.startsWith("~/")) pattern = homedir() + pattern.slice(1)
@@ -65,58 +57,28 @@ function historyOrStore(path) {
 
 export const ReadPermissions = async ({ client, directory, worktree }) => {
   const home = homedir()
-  const configRoot = process.env.XDG_CONFIG_HOME || join(home, ".config")
-  const dataRoot = process.env.XDG_DATA_HOME || join(home, ".local/share")
-  const cacheRoot = process.env.XDG_CACHE_HOME || join(home, ".cache")
-  const stateRoot = process.env.XDG_STATE_HOME || join(home, ".local/state")
-  const roots = [join(home, "Projects"), join(home, ".local/bin"),
-    configRoot, dataRoot, cacheRoot,
-    "/tmp", "/var/tmp", "/usr", "/etc", "/opt", "/sys", "/var/lib/pacman"]
-  const safePath = (path) => typeof path === "string" && isAbsolute(path) && normalize(path) === path &&
-    !/[\\*?\x00-\x1f\x7f]/.test(path)
-  const resolveExisting = async (path) => {
-    try { return await realpath(path) } catch (error) {
-      if (error.code === "ENOENT") return path
-      throw error
-    }
+  const layout = async (origins) => {
+    origins ??= await bounded(protectedLayout(home))
+    return { ...origins, mounts: await bounded(readMountLayout(origins.homes)) }
   }
-  const layout = async () => {
-    const canonical = await bounded(Promise.all([configRoot, dataRoot, cacheRoot].map(async (root) => {
-      if (!safePath(root) || root === "/" || root === home) throw new Error("unsupported XDG root")
-      return resolveExisting(root)
-    })))
-    if (canonical.some((root) => !safePath(root) || root === "/" || root === home)) throw new Error("unsupported resolved XDG root")
-    const stores = [...new Set([join(home, ".local/share"), dataRoot, canonical[1]])]
-      .flatMap((root) => [join(root, "opencode"), join(root, "keyrings")])
-    stores.push(stateRoot, join(home, ".local/state"))
-    for (const root of new Set([join(home, ".config"), configRoot, canonical[0]])) {
-      stores.push(...["gh", "git", "BraveSoftware", "chromium", "google-chrome", "1Password", "Bitwarden"]
-        .map((name) => join(root, name)))
-      stores.push(join(root, "gh/hosts.yml"))
-    }
-    stores.push(...[".ssh", ".aws", ".gnupg", ".kube", ".mozilla", ".password-store", ".docker",
-      ".agents/hooks", ".claude/projects", ".claude/sessions", ".claude/session-env", ".claude/tasks", ".claude/debug",
-      ".codex/sessions", ".codex/archived_sessions", ".hermes/sessions", ".hermes/logs", ".hermes/memories",
-      ".aws/credentials", ".aws/config", ".kube/config", ".claude.json", ".claude/.credentials.json",
-      ".claude/history.jsonl", ".codex/config.toml", ".codex/auth.json",
-      ".codex/history.jsonl", ".hermes/config.yaml", ".hermes/auth.json", ".hermes/.env", ".hermes/state.db",
-      ".env", ".envrc", ".netrc", ".npmrc", ".pypirc", ".bash_history", ".zsh_history",
-      ...["rsa", "dsa", "ecdsa", "ed25519"].map((type) => ".ssh/id_" + type)].map((name) => join(home, name)))
-    // Resolve declared stores/leaves as well as their XDG parents. A store
-    // symlink must not make its resolved spelling look like ordinary material.
-    const declared = [...new Set(stores)]
-    const resolvedStores = await bounded(Promise.all(declared.map(resolveExisting)))
-    if (resolvedStores.some((root) => !safePath(root) || root === "/")) throw new Error("unsupported protected root")
-    return { roots: [...roots, ...canonical], stores: [...new Set([...declared, ...resolvedStores])] }
-  }
-  const ordinary = (path, layout) => {
-    if (!safePath(path) || historyOrStore(path) || layout.stores.some((root) => inside(root, path))) return false
-    // Dotfile-based application configuration/dependencies cover tools that do
-    // not use XDG, without granting the rest of the user's documents/home.
-    const local = relative(home, path)
-    const dotted = inside(home, path) && /^\.[^/.][^/]*(?:\/|$)/.test(local)
-    return dotted || layout.roots.some((root) => safePath(root) && root !== "/" &&
-      (!inside(home, path) || inside(home, root)) && inside(root, path))
+  // Bind topology relevant to this call. A desktop overmount elsewhere must
+  // not cancel a checked read; changes on its path/search subtree still do.
+  const snapshot = (origins, paths, recursive) => JSON.stringify({ ...origins,
+    mounts: origins.mounts.filter((mount) => paths.some((path) => inside(mount.point, path) || recursive && inside(path, mount.point))),
+  })
+  const ordinary = (path, layout, legacy = false, recursive = false) => {
+    if (!safePath(path) || path === "/" || historyOrStore(path) || protectedTarget(path, layout) ||
+        layout.stores.some((root) => inside(root, path)) || !classifiedMount(path, layout.mounts, recursive)) return false
+    const excluded = ["/root", "/proc", "/dev", "/run", "/mnt", "/media"]
+    if (excluded.some((root) => inside(root, path))) return false
+    const own = layout.homes.find((root) => inside(root, path))
+    if (own) {
+      if (!/^\.[^/.][^/]*(?:\/|$)/.test(relative(own, path)) && !inside(join(own, "Projects"), path)) return false
+    } else if (inside("/home", path)) return false
+    if (recursive && [...layout.homes, ...excluded, "/home", ...layout.stores].some((root) => inside(path, root))) return false
+    if (!legacy) return true
+    return inside(home, path) && /^\.[^/.][^/]*(?:\/|$)/.test(relative(home, path)) ||
+      layout.roots.some((root) => (!inside(home, path) || inside(home, root)) && inside(root, path))
   }
   const calls = new Map()
   let config
@@ -166,8 +128,8 @@ export const ReadPermissions = async ({ client, directory, worktree }) => {
       const origins = await layout()
       const canonical = await realpath(call.path)
       const info = await stat(call.path)
-      if (!current() || JSON.stringify(origins) !== call.layout ||
-          !ordinary(call.path, origins) || !ordinary(canonical, origins) || (!info.isFile() && !info.isDirectory()) ||
+      if (!current() || canonical !== call.canonical || snapshot(origins, [call.path, canonical], call.tool === "glob") !== call.layout ||
+          !ordinary(call.path, origins, false, call.tool === "glob") || !ordinary(canonical, origins, false, call.tool === "glob") || (!info.isFile() && !info.isDirectory()) ||
           (call.tool === "glob" && !info.isDirectory())) return
       const parent = info.isDirectory() ? call.path : dirname(call.path)
       const pattern = join(parent, "*")
@@ -189,6 +151,8 @@ export const ReadPermissions = async ({ client, directory, worktree }) => {
           !object(part.state.input) || argumentKey(part.state.input) !== call.input) return
       const agent = agents.find((agent) => agent.name === message.info.agent)
       if (!agent || !Array.isArray(agent.permission)) return
+      // The approved expansion is primary convenience, not reviewer widening.
+      if (agent.name === "auditor" && [call.path, canonical].some((path) => !ordinary(path, origins, true, call.tool === "glob"))) return
       const sessionRules = session.permission ?? []
       const patterns = [pattern, join(info.isDirectory() ? canonical : dirname(canonical), "*")]
       const explicitRestriction = () => patterns.some((subject) =>
@@ -207,7 +171,7 @@ export const ReadPermissions = async ({ client, directory, worktree }) => {
       if (call.tool === "glob" && evaluate(permissions, "glob", call.pattern)?.action !== "allow") return
       // Recheck mutable inputs after policy I/O. This is not a filesystem or
       // policy transaction; unknown changes keep the ordinary native prompt.
-      if (JSON.stringify(await layout()) !== call.layout || await realpath(call.path) !== canonical ||
+      if (snapshot(await layout(), [call.path, canonical], call.tool === "glob") !== call.layout || await realpath(call.path) !== canonical ||
           !current() || explicitRestriction()) return
       // Reply is a completion phase, not a cancellable policy lookup. Native
       // Permission.reply publishes Replied before resolving the waiting tool;
@@ -240,19 +204,36 @@ export const ReadPermissions = async ({ client, directory, worktree }) => {
     "tool.execute.before": async (input, output) => {
       if (disposed || !config || !["read", "glob"].includes(input.tool) ||
           !id(input.sessionID) || !id(input.callID) || !object(output.args)) return
-      prune()
       const callKey = key(input.sessionID, input.callID)
-      if (calls.has(callKey)) { calls.get(callKey).used = true; calls.get(callKey).controller?.abort(); return }
       const value = input.tool === "read" ? output.args.filePath : output.args.path ?? directory
       if (typeof value !== "string" || !value || (input.tool === "glob" && typeof output.args.pattern !== "string")) return
       const path = isAbsolute(value) ? value : resolve(directory, value)
+      // Hard material veto also runs when native workspace/location rules would
+      // not ask. Old no-adaptation categories keep their native handling.
+      const refuse = () => { throw new Error("read-permissions: protected or unverifiable native file target") }
+      if (protectedPath(path)) refuse()
+      let canonical
+      try { canonical = await bounded(realpath(path)) } catch (error) {
+        if (error.code === "ENOENT") {
+          // Keep native not-found handling only for an ordinary missing path,
+          // not a dangling/looping link or inaccessible requested ancestor.
+          await bounded(resolveKnown(path)).catch(refuse)
+          return
+        }
+        refuse()
+      }
+      if (protectedPath(canonical)) refuse()
       let origins
-      try { origins = await layout() } catch { return }
-      if (disposed || !config || !ordinary(path, origins)) return
+      try { origins = await bounded(protectedLayout(home)) } catch { return }
+      if (protectedTarget(path, origins) || protectedTarget(canonical, origins)) refuse()
+      prune()
+      if (calls.has(callKey)) { calls.get(callKey).used = true; calls.get(callKey).controller?.abort(); return }
+      try { origins = await layout(origins) } catch { return }
+      if (disposed || !config || !ordinary(path, origins, false, input.tool === "glob")) return
       if (calls.has(callKey)) { calls.get(callKey).used = true; calls.get(callKey).controller?.abort(); return }
       prune(true)
-      calls.set(callKey, { tool: input.tool, path, pattern: output.args.pattern,
-        input: argumentKey(output.args), layout: JSON.stringify(origins), expires: Date.now() + LIFETIME, used: false })
+      calls.set(callKey, { tool: input.tool, path, canonical, pattern: output.args.pattern,
+        input: argumentKey(output.args), layout: snapshot(origins, [path, canonical], input.tool === "glob"), expires: Date.now() + LIFETIME, used: false })
     },
     "tool.execute.after": async (input) => { remove(key(input.sessionID, input.callID)) },
     event: async ({ event }) => {

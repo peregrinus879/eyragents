@@ -111,19 +111,60 @@ fi
 
 # Read-only reviewer profile: runtime-minimal reads plus the repository, with
 # Git internals and credential-shaped paths denied and command network off.
-profile="permissions.spar-reviewer={description=\"Repository-scoped read-only spar reviewer\",filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":tmpdir\"=\"deny\",\":slash_tmp\"=\"deny\",\"$reviewer\"=\"read\",\"$repo\"=\"read\",\"$repo/.git\"=\"deny\",\"~/.aws\"=\"deny\",\"~/.claude/.credentials.json\"=\"deny\",\"~/.codex/auth.json\"=\"deny\",\"~/.config/gh/hosts.yml\"=\"deny\",\"~/.docker/config.json\"=\"deny\",\"~/.gnupg\"=\"deny\",\"~/.kube\"=\"deny\",\"~/.local/share/opencode/auth.json\"=\"deny\",\"~/.netrc\"=\"deny\",\"~/.npmrc\"=\"deny\",\"~/.pypirc\"=\"deny\",\"~/.ssh\"=\"deny\",\"~/.bash_history\"=\"deny\",\"~/.zsh_history\"=\"deny\",\"~/.config/BraveSoftware\"=\"deny\",\"~/.config/chromium\"=\"deny\",\"~/.local/share/keyrings\"=\"deny\",\"~/.mozilla\"=\"deny\",glob_scan_max_depth=64,"
-profile+='":workspace_roots"={"."="read",".git"="deny","**/.git"="deny",'
-profile+='"**/.env"="deny","**/.env.*"="deny","**/secrets"="deny","**/secrets/**"="deny",'
-profile+='"**/*.key"="deny","**/*.pem"="deny","**/*.p12"="deny","**/*.pfx"="deny",'
-profile+='"**/credentials"="deny","**/credentials.*"="deny","**/auth.json"="deny",'
-profile+='"**/.netrc"="deny","**/.npmrc"="deny","**/.pypirc"="deny",'
-profile+='"**/id_rsa"="deny","**/id_dsa"="deny","**/id_ecdsa"="deny","**/id_ed25519"="deny",'
-profile+='"**/.aws"="deny","**/.ssh"="deny","**/.gnupg"="deny","**/.kube"="deny","**/.mozilla"="deny",'
-profile+='"**/.config/BraveSoftware"="deny","**/.config/chromium"="deny","**/.local/share/keyrings"="deny",'
-profile+='"~/.hermes"="deny","**/.hermes/config.yaml"="deny",'
-profile+='"**/.claude/.credentials.json"="deny","**/.codex/auth.json"="deny","**/.config/gh/hosts.yml"="deny",'
-profile+='"**/.docker/config.json"="deny","**/.local/share/opencode/auth.json"="deny","**/.bash_history"="deny","**/.zsh_history"="deny"'
-profile+='}},network={enabled=false}}'
+# Embedded inventory keeps deployed bridges independent of repository tests.
+# Root-table literals avoid system/temp glob scans. In Codex 0.154 absent
+# read-deny targets outside writable roots are skipped, not created on the host;
+# virtual /proc masking is still not an independently verified runtime guarantee.
+system_files=(
+  etc/shadow etc/shadow- etc/gshadow etc/gshadow-
+  etc/security/opasswd etc/security/opasswd.old etc/krb5.keytab
+  etc/ipsec.secrets var/lib/NetworkManager/secret_key var/lib/systemd/credential.secret
+  proc/kcore proc/vmcore dev/mem dev/port
+  etc/ssh/ssh_host_rsa_key etc/ssh/ssh_host_dsa_key etc/ssh/ssh_host_ecdsa_key etc/ssh/ssh_host_ed25519_key
+)
+system_trees=(
+  etc/ssl/private etc/credstore etc/credstore.encrypted usr/lib/credstore
+  usr/lib/credstore.encrypted etc/cryptsetup-keys.d etc/NetworkManager/system-connections
+  usr/lib/NetworkManager/system-connections var/lib/iwd etc/wireguard etc/openvpn
+  etc/ipsec.d/private etc/samba/private var/lib/samba/private etc/pacman.d/gnupg
+  etc/letsencrypt var/lib/systemd/coredump var/crash sys/kernel/debug sys/kernel/tracing
+)
+home_files=(
+  .claude/.credentials.json .claude/history.jsonl .codex/auth.json .codex/config.toml
+  .codex/history.jsonl .config/gh/hosts.yml .docker/config.json .hermes/config.yaml
+  .hermes/auth.json .hermes/.env .hermes/state.db .hermes/state.db-wal .hermes/state.db-shm
+  .local/share/opencode/auth.json .local/share/opencode/opencode.db
+  .local/share/opencode/opencode.db-wal .local/share/opencode/opencode.db-shm
+  .env .envrc .netrc .npmrc .pypirc .bash_history .zsh_history
+)
+home_trees=(
+  .aws .ssh .gnupg .kube .mozilla .password-store
+  .config/BraveSoftware .config/chromium .config/google-chrome .config/1Password
+  .config/Bitwarden .local/share/keyrings .claude/projects .claude/sessions
+  .claude/session-env .claude/tasks .claude/debug .codex/sessions .codex/archived_sessions
+  .hermes/sessions .hermes/logs .local/share/opencode/storage .local/share/opencode/log
+)
+file_shapes=(
+  '.env' '.env.*' '.envrc' '*.key' '*.pem' '*.p12' '*.pfx' '*.keytab' 'ssh_host_*_key'
+  credentials 'credentials.*' auth.json .credentials.json .netrc .npmrc .pypirc
+  id_rsa id_dsa id_ecdsa id_ed25519
+)
+profile="permissions.spar-reviewer={description=\"Repository-scoped read-only spar reviewer\",filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":tmpdir\"=\"deny\",\":slash_tmp\"=\"deny\",\"$reviewer\"=\"read\",\"$repo\"=\"read\",\"$repo/.git\"=\"deny\","
+for path in "${system_files[@]}" "${system_trees[@]}"; do profile+="\"/$path\"=\"deny\","; done
+for path in "${home_files[@]}" "${home_trees[@]}" .hermes; do profile+="\"~/$path\"=\"deny\","; done
+profile+='glob_scan_max_depth=64,":workspace_roots"={"."="read",".git"="deny",'
+declare -A copy_seen=()
+for path in "${system_files[@]}" "${system_trees[@]}" "${home_files[@]}" "${home_trees[@]}" "${file_shapes[@]}" .git secrets; do
+  [[ ! -v copy_seen[$path] ]] || continue
+  copy_seen[$path]=1
+  profile+="\"**/$path\"=\"deny\","
+done
+# rg --files expands workspace masks to files, not directory objects. Every
+# copied tree needs a descendant mask; a bare directory glob is insufficient.
+for path in "${system_trees[@]}" "${home_trees[@]}" "${file_shapes[@]}" .git secrets; do
+  profile+="\"**/$path/**\"=\"deny\","
+done
+profile="${profile%,}}},network={enabled=false}}"
 
 args=(
   --ignore-user-config

@@ -3,6 +3,7 @@
 # All runtime inputs are fixtures; no OpenCode process or host config is used.
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+umask 077
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
 mkdir -p "$TMP/home"
@@ -22,6 +23,13 @@ const { AuditorPermissions } = await import(pathToFileURL(join(tmp, "auditor.mjs
 const base = JSON.parse(await readFile(join(repo, "opencode/.config/opencode/opencode.json"), "utf8"))
 const truncation = join(process.env.XDG_DATA_HOME, "opencode/tool-output/*")
 const defaults = { "*": "allow", read: { "*": "allow", "*.env": "ask", "*.env.*": "ask", "*.env.example": "allow" }, external_directory: { "*": "ask", [truncation]: "allow" } }
+// Version 1.18.30 also seeds temp, discovered skills and declared references.
+// The managed auditor deliberately emits a stricter map rather than copying
+// those additional native capabilities. These are permission subjects only.
+const upstreamDefaults = structuredClone(defaults)
+for (const root of ["/fixture-native-temp", "/fixture-discovered-skills", "/fixture-declared-reference"]) {
+  upstreamDefaults.external_directory[root + "/*"] = "allow"
+}
 const rank = { allow: 0, ask: 1, deny: 2 }
 const max = (left, right) => rank[left] >= rank[right] ? left : right
 let checks = 0
@@ -121,6 +129,33 @@ for (const cap of [{}, "ask", "deny", { read: "ask", glob: "ask", external_direc
   checks++
 }
 await check()
+const configured = await check()
+const corpus = JSON.parse(await readFile(join(repo, "tests/safety-paths.json"), "utf8"))
+const dangerous = [...corpus.system_files, ...corpus.raw_files,
+  ...[...corpus.system_trees, ...corpus.raw_trees].map((name) => name + "/ordinary.txt"),
+  "service.keytab", ".keytab", ".key", ".pem", "etc/ssh/ssh_host_ed25519_key", ".codex/config.toml", ".claude/projects/note"]
+for (const prefix of ["", "copy/deep/", "../scratch/", "../../tmp/fixture/"]) {
+  for (const name of dangerous) {
+    const path = prefix + name
+    assert.equal(evaluate("read", path, rules(configured.permission)), "deny", path)
+    assert.equal(evaluate("edit", path, rules(configured.permission)), "deny", path)
+    assert.equal(evaluate("read", path, native(configured.permission, configured.agent.auditor.permission)), "deny", path)
+    checks++
+  }
+  for (const name of [...corpus.positive_files, "etc/ssh/ssh_host_ed25519_key.pub", "etc/shadow-policy", "var/crashes/note", "sys/kernel/debugger/note"]) {
+    const path = prefix + name
+    assert.equal(evaluate("read", path, native(configured.permission, configured.agent.auditor.permission)), "allow", path)
+    assert.equal(evaluate("edit", path, native(configured.permission, configured.agent.auditor.permission)), "deny", path)
+    checks++
+  }
+}
+for (const path of ["/fixture-native-temp/*", "/fixture-discovered-skills/*", "/fixture-declared-reference/*"]) {
+  const parent = evaluate("external_directory", path, rules(upstreamDefaults), rules(configured.permission))
+  const actual = evaluate("external_directory", path, rules(upstreamDefaults), rules(configured.permission), rules(configured.agent.auditor.permission))
+  assert.equal(parent, "allow")
+  assert.equal(actual, "ask", "native defaults cannot widen the managed reviewer")
+  checks++
+}
 for (const action of ["ask", "deny"]) {
   for (const tool of ["read", "glob", "external_directory"]) {
     await check({ [tool]: action })

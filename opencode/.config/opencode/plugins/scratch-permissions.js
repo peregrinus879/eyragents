@@ -1,14 +1,15 @@
-// Restore native scratch writes without a worktree-relative lookalike grant.
-// Source contract: OpenCode b578b726, plugin/config, permission and native tools.
+// Checked native edits for owned execution scratch and persistent project work.
+// Source contract: OpenCode 1.18.31, config/permission and native file tools.
+// Selected source rechecked 2026-09-15; docs/access.md owns evidence and limits.
 // Preflight rejects existing link escapes; it cannot prevent a subsequent
 // filesystem race or identify which session owns a child of the managed root.
 // Merged config has no provenance for a project restating a default unchanged.
 import { lstat, realpath } from "node:fs/promises"
 import { homedir, tmpdir } from "node:os"
 import { isAbsolute, join, normalize, relative } from "node:path"
+import { bounded, inside, safePath, protectedPath, protectedLayout, protectedTarget, resolveKnown, readMountLayout, classifiedMount } from "../lib/safety-paths.mjs"
 
 const SCRATCH_ROOT = "/tmp/opencode"
-const inside = (root, target) => target === root || target.startsWith(root + "/")
 
 function matches(subject, pattern) {
   if (pattern === "~" || pattern.startsWith("~/")) pattern = homedir() + pattern.slice(1)
@@ -32,11 +33,36 @@ function action(permissions, tool, subject) {
 
 export const ScratchPermissions = async ({ directory, worktree }) => {
   let guard
-  const refuse = () => { throw new Error("scratch-permissions: unsafe or ambiguous scratch target; use a regular non-link path inside the managed root") }
+  let config
+  const home = homedir()
+  const refuse = () => { throw new Error("scratch-permissions: protected, unsafe or ambiguous native file target") }
+
+  const subjects = (input, args) => {
+    let paths = []
+    let move = false
+    if (input.tool === "apply_patch") {
+      if (typeof args?.patchText !== "string") return { paths, move }
+      // Over-approximate native headers, including heredoc/CRLF wrappers.
+      for (const line of args.patchText.trim().split("\n")) {
+        const header = /^\*\*\* (Add File|Update File|Delete File|Move to):(.*)$/s.exec(line.replace(/\r$/, ""))
+        if (!header) continue
+        move ||= header[1] === "Move to"
+        const operand = header[2].trim()
+        if (operand) paths.push(isAbsolute(operand) ? normalize(operand) : join(directory, operand))
+      }
+    } else if (typeof args?.filePath === "string") {
+      // Native Edit/Write preserve absolute spellings, including link/.. .
+      paths = [isAbsolute(args.filePath) ? args.filePath : join(directory, args.filePath)]
+    }
+    return { paths, move }
+  }
+
+  const protectedWrite = (path) => protectedPath(path) || /(?:^|\/)\.git(?:\/|$)/.test(path)
 
   return {
     config: async (cfg) => {
-      if (guard || process.platform !== "linux" || join(tmpdir(), "opencode") !== SCRATCH_ROOT) return
+      config = cfg
+      if (guard || process.platform !== "linux") return
       const rules = cfg.permission?.edit
       if (!rules || typeof rules !== "object" || Array.isArray(rules)) return
       const read = cfg.permission.read
@@ -45,72 +71,69 @@ export const ScratchPermissions = async ({ directory, worktree }) => {
       const entries = Object.entries(rules)
       if (entries[0]?.[0] !== "*" || entries[0]?.[1] !== "allow" ||
           entries[1]?.[0] !== "../*" || entries[1]?.[1] !== "ask") return
-      if (![directory, worktree].every((path) => typeof path === "string" && isAbsolute(path) &&
-          normalize(path) === path && !/[\\*?\x00-\x1f\x7f]/.test(path)) || !inside(worktree, directory) && worktree !== "/") return
+      if (![directory, worktree, home].every(safePath) || home === "/" || !inside(worktree, directory)) return
+
+      let origins, mounts
+      try {
+        origins = await bounded(protectedLayout(home))
+        mounts = await bounded(readMountLayout(origins.homes))
+        if (await realpath(worktree) !== worktree ||
+            await realpath(directory) !== directory) return
+      } catch {
+        return // Unsupported layout receives no new grant.
+      }
+      const roots = []
+      // Persistent authority is independent of TMPDIR and creates no root,
+      // ownership change, disposal entitlement or cleanup operation.
+      for (const path of [join(home, "Projects/scratch"), ...(join(tmpdir(), "opencode") === SCRATCH_ROOT ? [SCRATCH_ROOT] : [])]) {
+        try {
+          if (!classifiedMount(path, mounts)) continue
+          const metadata = await bounded(lstat(path))
+          if (metadata.isDirectory() && metadata.uid === process.getuid() && !(metadata.mode & 0o022) &&
+              await bounded(realpath(path)) === path && !protectedTarget(path, origins)) roots.push({ path, metadata })
+        } catch { /* A missing/unsafe root cannot acquire an allowance. */ }
+      }
+      if (!roots.length) return
 
       const additions = []
-      if (worktree !== SCRATCH_ROOT) {
-        if (inside(SCRATCH_ROOT, worktree)) {
-          const depth = relative(SCRATCH_ROOT, worktree).split("/").length
-          additions.push(["../**", "allow"], ["../".repeat(depth + 1) + "*", "ask"])
-        } else {
-          additions.push([relative(worktree, SCRATCH_ROOT) + "/*", "allow"])
-        }
+      const enclosing = roots.filter((root) => root.path !== worktree && inside(root.path, worktree))
+        .sort((a, b) => a.path.length - b.path.length)[0]
+      if (enclosing) {
+        const depth = relative(enclosing.path, worktree).split("/").length
+        additions.push(["../**", "allow"], ["../".repeat(depth + 1) + "*", "ask"])
+      }
+      // Put the other root's explicit allow after the ancestor boundary ask.
+      // All inherited restrictions still follow this bounded union.
+      for (const root of roots) {
+        if (!inside(worktree, root.path) && !inside(root.path, worktree)) additions.push([relative(worktree, root.path) + "/*", "allow"])
       }
       if (additions.some(([pattern]) => Object.hasOwn(rules, pattern))) return
 
-      let root
-      try {
-        root = await lstat(SCRATCH_ROOT)
-        if (!root.isDirectory() || root.uid !== process.getuid() || root.mode & 0o022 ||
-            await realpath(SCRATCH_ROOT) !== SCRATCH_ROOT || await realpath(worktree) !== worktree ||
-            await realpath(directory) !== directory) return
-      } catch {
-        return // Unsupported layout retains the native ask/deny, never a grant.
-      }
-
       const next = Object.fromEntries([...entries.slice(0, 2), ...additions, ...entries.slice(2)])
       const added = { edit: Object.fromEntries(additions) }
-      const before = async (input, output) => {
-        if (!["edit", "write", "apply_patch"].includes(input.tool)) return
-        const args = output.args
-        let paths = []
-        let move = false
-        if (input.tool === "apply_patch") {
-          if (typeof args?.patchText !== "string") return
-          // Over-approximate the native parser's headers, including wrappers.
-          // Added/context lines have a prefix and cannot become file headers.
-          for (const line of args.patchText.trim().split("\n")) {
-            const header = /^\*\*\* (Add File|Update File|Delete File|Move to):(.*)$/s.exec(line.replace(/\r$/, ""))
-            if (!header) continue
-            move ||= header[1] === "Move to"
-            const operand = header[2].trim()
-            if (operand) paths.push(isAbsolute(operand) ? normalize(operand) : join(directory, operand))
-          }
-        } else {
-          if (typeof args?.filePath !== "string") return
-          // Native edit/write normalize relative operands, but pass absolute
-          // spellings unchanged to the filesystem, including symlink/.. traversal.
-          paths = [isAbsolute(args.filePath) ? args.filePath : join(directory, args.filePath)]
-        }
-        paths = paths.filter((path) => inside(SCRATCH_ROOT, normalize(path)) ||
+      const before = async (paths, move, verifiedLayout) => {
+        paths = paths.filter((path) => roots.some((root) => inside(root.path, normalize(path))) ||
           action(added, "edit", relative(worktree, path)) === "allow")
         if (!paths.length) return
+        if (!verifiedLayout) refuse()
         if (move) throw new Error("scratch-permissions: use Add File and Delete File instead of Move to so both endpoints receive native permission checks")
 
-        const current = await lstat(SCRATCH_ROOT).catch(refuse)
-        if (!current.isDirectory() || current.uid !== process.getuid() || current.mode & 0o022 ||
-            current.dev !== root.dev || current.ino !== root.ino || await realpath(SCRATCH_ROOT) !== SCRATCH_ROOT) refuse()
+        const currentMounts = await readMountLayout(origins.homes).catch(refuse)
         for (const path of paths) {
-          if (path === SCRATCH_ROOT || !inside(SCRATCH_ROOT, path) || normalize(path) !== path ||
+          const root = roots.filter((root) => inside(root.path, path)).sort((a, b) => b.path.length - a.path.length)[0]
+          if (!root || path === root.path || normalize(path) !== path ||
               /[\\\x00-\x1f\x7f]/.test(path)) refuse()
+          const current = await lstat(root.path).catch(refuse)
+          if (!current.isDirectory() || current.uid !== process.getuid() || current.mode & 0o022 ||
+              current.dev !== root.metadata.dev || current.ino !== root.metadata.ino ||
+              await realpath(root.path) !== root.path || !classifiedMount(path, currentMounts)) refuse()
           const subject = relative(worktree, path)
           const parent = path.slice(0, path.lastIndexOf("/"))
           if (action(cfg.permission, "read", subject) === "deny" || action(cfg.permission, "edit", subject) === "deny" ||
               action(cfg.permission, "external_directory", parent + "/*") === "deny") refuse()
 
-          const parts = relative(SCRATCH_ROOT, path).split("/")
-          let existing = SCRATCH_ROOT
+          const parts = relative(root.path, path).split("/")
+          let existing = root.path
           for (let index = 0; index < parts.length; index++) {
             const target = join(existing, parts[index])
             let metadata
@@ -132,7 +155,22 @@ export const ScratchPermissions = async ({ directory, worktree }) => {
       cfg.permission.edit = next
     },
     "tool.execute.before": async (input, output) => {
-      if (guard) await guard(input, output)
+      if (!config || !["edit", "write", "apply_patch"].includes(input.tool)) return
+      const { paths, move } = subjects(input, output.args)
+      // Material checks precede native source reads, including Apply Patch's
+      // diff construction before its edit ask and both Move-to endpoints.
+      const canonical = []
+      for (const path of paths) {
+        if (protectedWrite(path)) refuse()
+        const target = await bounded(resolveKnown(path)).catch(refuse)
+        if (protectedWrite(target)) refuse()
+        canonical.push(target)
+      }
+      const origins = await bounded(protectedLayout(home)).catch(() => undefined)
+      if (origins && [...paths, ...canonical].some((path) => protectedTarget(path, origins))) refuse()
+      if (guard) {
+        await bounded(guard(paths, move, origins)).catch(refuse)
+      }
     },
   }
 }

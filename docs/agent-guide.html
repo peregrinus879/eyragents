@@ -235,7 +235,7 @@
   <div id="toast" role="status" aria-live="polite" hidden></div>
   <script id="reference-data" type="application/json">{
   "title": "AI Guide",
-  "reviewed": "2026-09-14",
+  "reviewed": "2026-09-15",
   "scope": "Standalone reference for Claude Code, Codex, OpenCode and Hermes Agent. Source baselines qualify each control; installed client help and configuration determine actual behavior.",
   "items": [
     {
@@ -704,18 +704,40 @@
       "title": "Select a workflow",
       "keys": [
         "/skills",
-        "/develop",
         "/commit",
         "/publish",
         "/spar"
       ],
       "source": "opencode-tui",
-      "detail": "Develop preserves the current agent mode. Commit, publish and spar wrappers use Build; commit and publication retain their separate approval boundaries.",
+      "detail": "Select a skill, or use the commit, publish and spar wrappers in Build. Commit and publication retain their separate approval boundaries.",
       "mode": "OpenCode prompt",
       "essential": false,
       "warning": "",
       "tags": "",
       "extra": [
+        "agents"
+      ],
+      "hosts": [
+        "eyragents"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "ai-opencode-develop",
+      "app": "opencode",
+      "category": "OpenCode",
+      "title": "Develop in the current agent mode",
+      "keys": [
+        "/develop"
+      ],
+      "source": "agents-develop",
+      "detail": "The managed wrapper inherits the current agent under the checked 1.18.31 command contract. A plan-only prompt tests instruction adherence; native Plan/Build slash-command acceptance remains separate.",
+      "mode": "OpenCode prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [
+        "opencode-commands",
         "agents"
       ],
       "hosts": [
@@ -1172,6 +1194,24 @@
       "url": "https://github.com/peregrinus879/eyragents/blob/main/docs/operations.md",
       "scope": "Managed workflows and command wrappers reviewed 2026-09-14. Native client controls retain their own evidence baselines; current session status wins over a resumed model preference."
     },
+    "agents-access": {
+      "title": "EyrAgents access policy",
+      "label": "EyrAgents access policy",
+      "url": "https://github.com/peregrinus879/eyragents/blob/main/docs/access.md",
+      "scope": "Safety source/fixture/metadata baseline 2026-09-14; selected Claude 2.1.272 public-material and OpenCode 1.18.31 source contracts rechecked 2026-09-15. Codex/Hermes retain their prior review depth. Activation and live dispatch need separate evidence."
+    },
+    "agents-develop": {
+      "title": "Managed OpenCode develop wrapper",
+      "label": "EyrAgents develop wrapper",
+      "url": "https://github.com/peregrinus879/eyragents/blob/main/opencode/.config/opencode/commands/develop.md",
+      "scope": "Managed definition reviewed 2026-09-15: no agent override, so the current agent is inherited. Pair with the versioned OpenCode command contract; this is not live Plan/Build or slash-command acceptance."
+    },
+    "opencode-commands": {
+      "title": "OpenCode 1.18.31 command execution",
+      "label": "OpenCode command source",
+      "url": "https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/src/session/prompt.ts#L1356-L1473",
+      "scope": "Selected version-matched source rechecked 2026-09-15: cmd.agent ?? input.agent, with the current agent supplied by the same-version TUI prompt dispatcher. This qualifies managed wrapper mode selection only; other controls retain their own older baselines."
+    },
     "claude": {
       "title": "Claude Code controls",
       "label": "Claude Code controls",
@@ -1234,6 +1274,13 @@
         "codex",
         "opencode-tui",
         "hermes"
+      ]
+    },
+    {
+      "title": "Read scope and persistent scratch",
+      "text": "Shared guidance authorizes task-relevant system and own-dotfile reads, and in-scope implementation in the repository and ~/Projects/scratch. Protected material and native restrictions still govern use. Persistent scratch is preserved project work. The access policy maps each client's capabilities, supported layouts and remaining limits; restart affected clients after configuration changes.",
+      "sources": [
+        "agents-access"
       ]
     }
   ],

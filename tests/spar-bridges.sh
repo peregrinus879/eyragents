@@ -7,6 +7,14 @@
 # credentials are assembled at runtime so the repository itself stays scannable.
 set -euo pipefail
 
+FIXTURES_ONLY=false
+case ${1:-} in
+  '') [[ $# == 0 ]] || exit 64 ;;
+  --fixtures-only) [[ $# == 1 ]] || exit 64; FIXTURES_ONLY=true ;;
+  *) printf 'usage: spar-bridges.sh [--fixtures-only]\n' >&2; exit 64 ;;
+esac
+# Focused verification omits repository/index contracts and review-brief setup
+# (including its synthetic commit). All scanner and fake-client checks still run.
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 CLAUDE_BRIDGE="$ROOT/agents/.agents/skills/spar/scripts/spar-claude"
 CODEX_BRIDGE="$ROOT/agents/.agents/skills/spar/scripts/spar-codex"
@@ -265,7 +273,8 @@ printf 'Review.' | "${SCAN_OUT[@]}" "$TMP/art/code.md" >/dev/null 2>&1 ||
   fail "scanner rejected credential-handling code without a literal secret"
 # Generate scanner fixtures from label/value pairs rather than embedding
 # credential assignments as literals in this test's own source.
-python3 - "$SCANNER" <<'PY'
+python3 - "$SCANNER" "$TMP" <<'PY'
+from pathlib import Path
 import runpy
 import subprocess
 import sys
@@ -279,9 +288,13 @@ def declaration(name, value):
 
 def check(source, accepted, mode="reply"):
     global count
-    result = subprocess.run([scanner, mode], input=source, text=True, capture_output=True)
+    result = subprocess.run([scanner, mode], input=source.encode('utf-8'), capture_output=True)
     assert result.returncode == (0 if accepted else 2), (mode, accepted, result.stderr)
-    assert "opaque-material-49a8" not in result.stderr, "scanner disclosed rejected fixture bytes"
+    assert b"opaque-material-49a8" not in result.stderr, "scanner disclosed rejected fixture bytes"
+    if not accepted:
+        assert not result.stdout, "scanner emitted rejected fixture bytes"
+    elif mode == "outbound":
+        assert result.stdout == source.encode('utf-8'), "scanner changed accepted payload bytes"
     count += 1
 
 # Equality operators are code, but ambiguous values keep the normal safeguards.
@@ -401,7 +414,8 @@ for header in ("diff --git a/view.ts b/view.ts\n", "--- a/view.ts\n+++ b/view.ts
                "@@ -1,1 +1,1 @@\n"):
     for mode in ("reply", "outbound"):
         check(header + " " + comparison + "\n", False, mode)
-        check(header + " " + comparison + "\n+;\n", True, mode)
+        # A one-sided terminator leaves the other image unproved at patch EOF.
+        check(header + " " + comparison + "\n+;\n", False, mode)
 
 print(f"ok: bounded multiline comparison termination ({count} acceptance/refusal cases)")
 count = 0
@@ -598,7 +612,7 @@ inventories = (
     ("SECRET_FILES", [".env", ".envrc", ".netrc", ".npmrc", ".pypirc", "auth.json", "credentials",
                       ".credentials.json", ".bash_history", ".zsh_history", "id_rsa", "id_dsa",
                       "id_ecdsa", "id_ed25519"], "{}"),
-    ("SECRET_GLOBS", [".env.*", "credentials.*", "*.key", "*.pem", "*.p12", "*.pfx"], "()"),
+    ("SECRET_GLOBS", [".env.*", "credentials.*", "*.key", "*.pem", "*.p12", "*.pfx", "*.keytab", "ssh_host_*_key"], "()"),
     ("SECRET_SUFFIXES", [".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml", ".codex/config.toml"], "()"),
     ("SECRET_TREES", [".config/BraveSoftware", ".config/chromium", ".local/share/keyrings"], "()"),
 )
@@ -671,6 +685,343 @@ for boundary in ("    '.ssh',", "@@ -20,1 +20,1 @@", "-    '.ssh',"):
     check(source + "\n" + boundary + "\n+}\n", False, "diff")
 
 print(f"ok: bounded path-metadata collections ({count} acceptance/refusal cases)")
+count = 0
+
+# Exact complete Hermes hunk from the refused Safety preflight patch, including
+# old declarations, unchanged inventories and the replacement's wrapped rows.
+# Keep this fixture independent of the worktree, Git/index and temporary audit
+# artifact. Quoted rows keep this test source reviewable by the same scanner.
+preflight_header = (
+    'diff --git c/hermes/.hermes/plugins/eyragents/__init__.py w/hermes/.hermes/plugins/eyragents/__init__.py\n'
+    '--- c/hermes/.hermes/plugins/eyragents/__init__.py\n'
+    '+++ w/hermes/.hermes/plugins/eyragents/__init__.py\n'
+    '@@ -23,24 +25,56 @@ import re\n'
+)
+preflight_rows = (
+    ' import stat\n'
+    ' import subprocess\n'
+    ' \n'
+    '-SECRET_DIRS = {".ssh", ".aws", ".gnupg", ".kube", ".mozilla", "secrets"}\n'
+    '+SECRET_DIRS = {".ssh", ".aws", ".gnupg", ".kube", ".mozilla", ".password-store", "secrets"}\n'
+    ' SECRET_FILES = {\n'
+    '     ".env", ".envrc", ".netrc", ".npmrc", ".pypirc", "auth.json",\n'
+    '     "credentials", ".credentials.json", ".bash_history", ".zsh_history",\n'
+    '     "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519",\n'
+    ' }\n'
+    '-SECRET_GLOBS = (".env.*", "credentials.*", "*.key", "*.pem", "*.p12", "*.pfx")\n'
+    '+SECRET_GLOBS = (".env.*", "credentials.*", "*.key", "*.pem", "*.p12", "*.pfx",\n'
+    '+                "*.keytab", "ssh_host_*_key")\n'
+    ' SECRET_SUFFIXES = (\n'
+    '     ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml",\n'
+    '     ".codex/config.toml",\n'
+    ' )\n'
+    '-SECRET_TREES = (".config/BraveSoftware", ".config/chromium", ".local/share/keyrings")\n'
+    '+SECRET_TREES = (".config/BraveSoftware", ".config/chromium", ".config/google-chrome",\n'
+    '+                ".config/1Password", ".config/Bitwarden", ".local/share/keyrings")\n'
+    '+# Component suffixes also cover recognisable copies. This finite inventory\n'
+    '+# cannot identify arbitrary renamed copies or every hardlink alias.\n'
+    '+SYSTEM_FILES = (\n'
+    '+    "etc/shadow", "etc/shadow-", "etc/gshadow", "etc/gshadow-",\n'
+    '+    "etc/security/opasswd", "etc/security/opasswd.old", "etc/krb5.keytab",\n'
+    '+    "etc/ipsec.secrets", "var/lib/NetworkManager/secret_key", "var/lib/systemd/credential.secret",\n'
+    '+)\n'
+    '+SYSTEM_TREES = (\n'
+    '+    "etc/ssl/private", "etc/credstore", "etc/credstore.encrypted",\n'
+    '+    "usr/lib/credstore", "usr/lib/credstore.encrypted", "etc/cryptsetup-keys.d",\n'
+    '+    "etc/NetworkManager/system-connections", "usr/lib/NetworkManager/system-connections",\n'
+    '+    "var/lib/iwd", "etc/wireguard", "etc/openvpn", "etc/ipsec.d/private",\n'
+    '+    "etc/samba/private", "var/lib/samba/private", "etc/pacman.d/gnupg", "etc/letsencrypt",\n'
+    '+)\n'
+    '+RAW_FILES = ("proc/kcore", "proc/vmcore", "dev/mem", "dev/port")\n'
+    '+RAW_TREES = ("var/lib/systemd/coredump", "var/crash", "sys/kernel/debug", "sys/kernel/tracing")\n'
+    '+SESSION_FILES = (".claude.json", ".claude/history.jsonl", ".codex/history.jsonl",\n'
+    '+                 ".codex/session_index.jsonl", ".local/share/fish/fish_history",\n'
+    '+                 ".local/state/fish/fish_history")\n'
+    '+SESSION_TREES = (\n'
+    '+    ".claude/projects", ".claude/sessions", ".claude/session-env", ".claude/tasks", ".claude/debug",\n'
+    '+    ".codex/sessions", ".codex/archived_sessions", ".codex/log",\n'
+    '+    ".local/share/opencode", ".local/state/opencode", ".cache/opencode",\n'
+    '+)\n'
+    '+CONFIG_STORES = ("BraveSoftware", "chromium", "google-chrome", "1Password", "Bitwarden")\n'
+    '+XDG_DEFAULTS = {"XDG_CONFIG_HOME": ".config", "XDG_DATA_HOME": ".local/share",\n'
+    '+                "XDG_CACHE_HOME": ".cache", "XDG_STATE_HOME": ".local/state"}\n'
+    '+BROWSE_EXCLUDED = tuple(Path(p) for p in ("/home", "/root", "/proc", "/dev", "/run", "/mnt", "/media", "/Volumes"))\n'
+    '+LOCAL_FILESYSTEMS = {"ext2", "ext3", "ext4", "xfs", "btrfs", "f2fs", "zfs", "erofs", "squashfs", "overlay"}\n'
+    ' FILE_TOOLS = {"read_file", "search_files", "write_file", "patch"}\n'
+    ' HEADER = re.compile(r"^(\\*\\*\\*\\s*(?:Update|Add|Delete)\\s+File:\\s*)(.+)$")\n'
+    ' MOVE = re.compile(r"^(\\*\\*\\*\\s*Move\\s*File:\\s*)(.+?)\\s*->\\s*(.+)$")\n'
+    ' _ERROR = "_eyragents_refusal"\n'
+    ' _ready = False\n'
+    ' OTHER_SESSION_ROOT = Path("/tmp/opencode")\n'
+    '+_ALLOW_MISSING = getattr(os.path, "ALLOW_MISSING", None)\n'
+    ' \n'
+    ' \n'
+    ' def below(path: Path, root: Path) -> bool:\n'
+)
+assert sum(row.startswith(('-', ' ')) for row in preflight_rows.splitlines()) == 24
+assert sum(row.startswith(('+', ' ')) for row in preflight_rows.splitlines()) == 56
+preflight_patch = preflight_header + preflight_rows
+
+def check_artifact(source, accepted, name='metadata-preflight.patch'):
+    global count
+    artifact = Path(sys.argv[2], 'art', name)
+    artifact.write_bytes(source.encode('utf-8'))
+    result = subprocess.run([scanner, 'outbound', '--scratch-root', sys.argv[2], '--', str(artifact)],
+                            input=b'Review.', capture_output=True)
+    assert result.returncode == (0 if accepted else 2), result.stderr
+    if accepted:
+        assert result.stdout == (f'Review.\n\n===== artifact: {name} =====\n' + source
+                                 + f'\n===== end artifact: {name} =====').encode('utf-8')
+    else:
+        assert not result.stdout, 'rejected artifact bytes were emitted'
+    assert b'opaque-material-49a8' not in result.stderr, 'scanner disclosed rejected fixture bytes'
+    count += 1
+
+for mode in ('reply', 'outbound'):
+    check(preflight_patch, True, mode)
+    # Qualification follows the content, never the producer's file name.
+    check(preflight_patch.replace('hermes/.hermes/plugins/eyragents/__init__.py', 'policy.py'), True, mode)
+check_artifact(preflight_patch, True)
+
+header = 'diff --git a/policy.py b/policy.py\n--- a/policy.py\n+++ b/policy.py\n@@ -1,8 +1,8 @@\n'
+literal = declaration('SECRET_FILES', "['.ssh']")
+terminator = 'NEXT = True\n'
+
+# Completed old/new collections can look past a replacement, but that
+# replacement cannot close the other image. Context must qualify in BOTH.
+for marker, opposite in (('-', '+'), ('+', '-')):
+    for start in (marker, ' '):
+        for ending in (' ' + terminator, marker + terminator + opposite + terminator):
+            patch = header + start + literal + opposite + '# replacement comment\n' + ending
+            for mode in ('reply', 'outbound'):
+                check(patch, True, mode)
+        for suffix in ("+ ['opaque-material-49a8']", "or ['opaque-material-49a8']",
+                       "if condition else ['opaque-material-49a8']", '[0]', '.copy()', '()'):
+            for intervening in ('# replacement comment\n', terminator):
+                patch = (header + start + literal + opposite + intervening
+                         + marker + '    ' + suffix + '\n ' + terminator)
+                for mode in ('reply', 'outbound'):
+                    check(patch, False, mode)
+                check_artifact(patch, False)
+
+# Every detector still sees both full-diff sides and context, including rows
+# skipped as termination evidence. The diff mode retains its addition-only
+# content contract; its omitted rows never become collection evidence.
+unsafe_values = (
+    declaration('TOKEN', repr('opaque-material-49a8')),
+    declaration('SECRET_FILES', "['.ssh', 'opaque-material-49a8']"),
+    declaration('SECRET_FILES', "['.ssh'] + ['opaque-material-49a8']"),
+    declaration('SECRET_FILES', "[p for p in ['.ssh']]"),
+    declaration('SECRET_FILES', "['.ssh/\\x73k-" + 'a' * 24 + "']"),
+    provider_value + '\n', 'ghp_' + 'a' * 24 + '\n', 'github_pat_' + 'a' * 24 + '\n',
+    'AKIA' + 'A' * 16 + '\n', '-----BEGIN TEST PRIVATE ' + 'KEY-----\n',
+)
+for marker in ('-', '+', ' '):
+    for value in unsafe_values:
+        patch = (header + ' ' + literal + marker + value + ' ' + terminator)
+        for mode in ('reply', 'outbound'):
+            check(patch, False, mode)
+        check_artifact(patch, False)
+        # Only the deliberately unsafe row is added/removed/context here.
+        check(patch, marker != '+', 'diff')
+
+# A context collection's changed/unfinished interior is deliberately not
+# reconstructed by joining images. Nor can either side's literal prefix hide
+# a computed continuation or a missing terminator in the other image.
+for mode in ('reply', 'outbound'):
+    for before, after in (("'.ssh',", "'opaque-material-49a8',"),
+                          ("'opaque-material-49a8',", "'.ssh',"),
+                          ("'.ssh',", "'.aws',")):
+        check(header + ' ' + declaration('SECRET_FILES', '[') + '-' + before + '\n+'
+              + after + '\n ]\n ' + terminator, False, mode)
+    for marker in ('-', '+'):
+        opposite = '+' if marker == '-' else '-'
+        for barrier in ('@@ -20,1 +20,1 @@\n', 'diff --git a/other.py b/other.py\n',
+                        'diff --cc other.py\n', '--- a/other.py\n', '+++ b/other.py\n',
+                        '#\n', '\\ No newline at end of file\n'):
+            for value in ("['.ssh']", '['):
+                patch = (header + marker + declaration('SECRET_FILES', value)
+                         + opposite + '# replacement\n' + barrier + marker + ']\n ' + terminator)
+                check(patch, False, mode)
+        for ending in ('', '\n', opposite + terminator, ' \n'):
+            check(header + marker + literal + opposite + '# replacement\n' + ending, False, mode)
+        # Every skipped physical row/byte consumes the original bound.
+        check(header + marker + literal + (opposite + '# replacement\n') * 128 + ' ' + terminator, False, mode)
+        check(header + marker + literal + opposite + '#' + 'x' * 16400 + '\n ' + terminator, False, mode)
+    # No patch header means no authority to skip an apparent +/- continuation.
+    check('-' + literal + '+[' + repr('opaque-material-49a8') + ']\n ' + terminator, False, mode)
+
+# The metadata suffix must qualify the whole name, not a prefix/similar word.
+for name in ('SECRET_FILES_EXTRA', 'SECRETFILES', 'SECRET_FILE', 'SECRET_FILES2', 'SECRET_DIRS_API_KEY'):
+    for mode in ('reply', 'outbound', 'diff'):
+        check(header + '+' + declaration(name, "['.ssh']") + '+' + terminator, False, mode)
+
+# Addition-only mode does not stitch across its omission barriers, even after
+# a completed collection. Ordinary all-added literal inventories still pass.
+for mode in ('reply', 'outbound', 'diff'):
+    check(header + '+' + literal + '+' + terminator, True, mode)
+    for suffix in ("+ ['opaque-material-49a8']", '.copy()', '[0]'):
+        check(header + '+' + literal + '+    ' + suffix + '\n+' + terminator, False, mode)
+for barrier in (' ' + terminator, '-' + terminator, '@@ -20,1 +20,1 @@\n', '#\n',
+                'diff --git a/other.py b/other.py\n', '--- a/other.py\n', '+++ b/other.py\n'):
+    check(header + '+' + literal + barrier + '+' + terminator, False, 'diff')
+
+print(f"ok: actual Safety hunk and old/new/context metadata preflight ({count} acceptance/refusal cases)")
+count = 0
+
+def check_image_patch(rows, accepted, diff_accepted=True, path='view.ts'):
+    old_count = sum(row.startswith(('-', ' ')) for row in rows.split('\n'))
+    new_count = sum(row.startswith(('+', ' ')) for row in rows.split('\n'))
+    patch = (f'diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n'
+             + f'@@ -1,{old_count} +1,{new_count} @@\n' + rows)
+    for mode in ('reply', 'outbound'):
+        check(patch, accepted, mode)
+    check_artifact(patch, accepted, 'comparison-preflight.patch')
+    check(patch, diff_accepted, 'diff')
+
+# Exact auditor witness: the added semicolon finishes only the new image.
+# The old comparison still has a computed operand in the following context.
+auditor_rows = (' let result =\n   ' + comparison + '\n+  ;\n'
+                '   + "opaque-material-49a8"\n next = true\n')
+old_source = 'let result =\n  ' + comparison + '\n  + "opaque-material-49a8"\nnext = true\n'
+new_source = 'let result =\n  ' + comparison + '\n  ;\n  + "opaque-material-49a8"\nnext = true\n'
+assert ''.join(row[1:] for row in auditor_rows.splitlines(keepends=True) if row[0] in ('-', ' ')) == old_source
+assert ''.join(row[1:] for row in auditor_rows.splitlines(keepends=True) if row[0] in ('+', ' ')) == new_source
+for mode in ('reply', 'outbound'):
+    check(old_source, False, mode)
+    check(new_source, True, mode)
+check_image_patch(auditor_rows, False)
+check_image_patch(auditor_rows.replace('\n', '\r\n'), False)
+check_image_patch(auditor_rows.replace('+  ;', '-  ;'), False)
+for unary in ('+', '-'):
+    check_image_patch(auditor_rows.replace(comparison, unary + comparison), False)
+
+context_head = ' let result =\n   ' + comparison + '\n'
+for marker, opposite in (('-', '+'), ('+', '-')):
+    # No operator, property, cast, conditional or escaped quote in either
+    # image may borrow the other image's earlier semicolon.
+    for continuation in ('+ "opaque-material-49a8"', '?? "opaque-material-49a8"',
+                         '&& "opaque-material-49a8"', '.concat("opaque-material-49a8")',
+                         '["opaque-material-49a8"]', '("opaque-material-49a8")',
+                         '? "on" : "opaque-material-49a8"', 'as SomeType', 'satisfies SomeType'):
+        check_image_patch(context_head + marker + '  ;\n   ' + continuation + '\n next = true\n', False)
+        # Adjacent replacements in either order, including a new-image-only
+        # literal that the addition-only assignment matcher does not detect.
+        check_image_patch(context_head + marker + '  ;\n' + opposite + '  ' + continuation
+                          + '\n next = true\n', False)
+        check_image_patch(context_head + opposite + '  ' + continuation + '\n'
+                          + marker + '  ;\n next = true\n', False)
+    for branch in ('"opaque-material-49a8"', 'renderLabel()', '"on" + "opaque-material-49a8"',
+                   r'"on\"; //opaque-material-49a8"'):
+        check_image_patch(context_head + marker + '  ? "on" : false;\n'
+                          + opposite + '  ? ' + branch + ' : false;\n', False)
+
+    for ending in ('', '\n', ' \n', ' // ordinary comment\n', ' )\n'):
+        check_image_patch(context_head + marker + '  ;\n' + ending, False)
+    for boundary in ('@@ -20,1 +20,1 @@\n', 'diff --git a/other.ts b/other.ts\n',
+                     'diff --cc other.ts\n', 'diff --combined other.ts\n',
+                     '--- a/other.ts\n', '+++ b/other.ts\n', '#\n',
+                     '\\ No newline at end of file\n'):
+        check_image_patch(context_head + marker + '  ;\n' + boundary + opposite + '  ;\n', False)
+        # A boundary after termination was proved in BOTH images is harmless.
+        check_image_patch(context_head + '-  ;\n+  ;\n' + boundary, True)
+
+    # Skipped rows consume physical limits and cannot hide control separators.
+    check_image_patch(context_head + (marker + '// ordinary comment\n') * 128 + ' ;\n', False)
+    check_image_patch(context_head + marker + '//' + 'x' * 16400 + '\n ;\n', False)
+    for separator in ('\r', '\v', '\f', '\x85', '\u2028', '\u2029'):
+        check_image_patch(context_head + marker + '// comment' + separator + ';\n ;\n', False)
+
+# Both images remain usable when each has visible completion, including
+# adjacent terminator/operand/conditional replacements and common context.
+for ending in (' ;\n', '- ;\n+ ; // revised\n', '+ ;\n next = true\n',
+               '- ;\n next = true\n',
+               '- ? "on" : false;\n+ ? "off" : true;\n'):
+    check_image_patch(context_head + ending, True)
+    check_image_patch((context_head + ending).replace('\n', '\r\n'), True)
+check_image_patch(' let result =\n   token' + ' ===\n- "page";\n+ "true";\n', True)
+check_image_patch('-' + comparison + '\n-;\n+' + comparison + '\n+;\n', True)
+return_head = ' function choose(token) {\n   return (\n     ' + comparison + '\n'
+check_image_patch(return_head + '- )\n+ )\n }\n', True)
+check_image_patch(return_head + '- )\n+ )\n', False)
+
+# The exact new-image Header.tsx bytes survive an adjacent nested-branch edit;
+# its old branch is also a bounded literal with its own visible completion.
+header_rows = ''.join(('-' + line.replace('"true"', '"other"') + '+' + line) if index == 6 else ' ' + line
+                      for index, line in enumerate(original_website_tsx.splitlines(keepends=True)))
+assert ''.join(row[1:] for row in header_rows.splitlines(keepends=True) if row[0] in ('+', ' ')) == original_website_tsx
+check_image_patch(header_rows, True)
+for depth, accepted in ((5, True), (6, False)):
+    check_image_patch(context_head + '- ? "on" : false;\n+ ? ' + tree(depth - 1)
+                      + ' : ' + tree(depth - 1) + ';\n', accepted)
+
+# Separate credential assignments and provider/private-key values on every
+# full-patch side remain independently scanned after the comparison terminates.
+for marker in ('-', '+', ' '):
+    for value in (declaration('TOKEN', repr('opaque-material-49a8')),
+                  'sk-' + 'a' * 24 + '\n', '-----BEGIN TEST PRIVATE ' + 'KEY-----\n'):
+        check_image_patch(context_head + '- ;\n+ ;\n' + marker + value, False, marker != '+')
+
+print(f"ok: dual-image context comparisons and auditor witness ({count} acceptance/refusal cases)")
+count = 0
+
+# Markdown +/- bullets are payload bytes, not image markers. Cross both signs,
+# nested/mixed signs and indentation with both continuation directions for
+# BOTH bounded exceptions, so their classification cannot silently diverge.
+for bullet in ('-', '+', '- +', '+ -'):
+    for indent in ('', '  ', '\t'):
+        prefix = indent + bullet + ' '
+        for kind, body, continuation in (
+            ('metadata', literal, "  + ['opaque-material-49a8']\n"),
+            ('comparison', comparison + '\n', '  + "opaque-material-49a8"\n'),
+        ):
+            description = prefix + body
+            safe_image = description + 'NEXT = True\n'
+            unsafe_image = description + continuation + 'NEXT = True\n'
+            for direction in ('+', '-'):
+                # Includes the exact metadata witness: context '- SECRET_FILES',
+                # an added computed continuation, and context NEXT = True.
+                rows = ' ' + description + direction + continuation + ' NEXT = True\n'
+                old_image = ''.join(row[1:] for row in rows.splitlines(keepends=True) if row[0] in ('-', ' '))
+                new_image = ''.join(row[1:] for row in rows.splitlines(keepends=True) if row[0] in ('+', ' '))
+                assert old_image == (unsafe_image if direction == '-' else safe_image)
+                assert new_image == (unsafe_image if direction == '+' else safe_image)
+                check_image_patch(rows, False, path='policy.md')
+                # All-added views preserve the EXACT reconstructed Markdown
+                # images and prove the safe/unsafe contrast independently.
+                # They do not reinterpret raw Markdown as a complete patch.
+                for image, accepted in ((old_image, direction != '-'), (new_image, direction != '+')):
+                    image_rows = ''.join('+' + row for row in image.splitlines(keepends=True))
+                    check_image_patch(image_rows, accepted, accepted, path='policy.md')
+
+            # Visible termination in each image keeps the harmless bullet usable.
+            check_image_patch(' ' + description + '-NEXT = False\n+NEXT = True\n', True, path='policy.md')
+            check_image_patch(' ' + description + ' NEXT = True\n', True, path='policy.md')
+            # Raw handling stays as it was, including indented bullets and
+            # an unmarked computed trailer. Only the comparison needs a ';'.
+            raw_safe = description if kind == 'metadata' else description.rstrip('\n') + ';\n'
+            for mode in ('reply', 'outbound'):
+                check(raw_safe, True, mode)
+                check(description + continuation, False, mode)
+            check_artifact(raw_safe, True, 'raw-bullet.md')
+            check_artifact(description + continuation, False, 'raw-bullet.md')
+
+# The physical +/- column is authoritative even when the payload bullet has
+# the opposite sign. Neither a same-image continuation nor an incomplete
+# collection may acquire an exception from the sign deeper in that row.
+for marker, bullet in (('+', '-'), ('-', '+')):
+    for body, continuation in ((literal, "  + ['opaque-material-49a8']\n"),
+                               (comparison + '\n', '  + "opaque-material-49a8"\n')):
+        description = marker + bullet + ' ' + body
+        check_image_patch(description + marker + continuation + marker + 'NEXT = True\n',
+                          False, marker != '+', path='policy.md')
+        check_image_patch(description + marker + 'NEXT = True\n', True, path='policy.md')
+    incomplete = marker + bullet + ' ' + declaration('SECRET_FILES', '[')
+    opposite = '-' if marker == '+' else '+'
+    check_image_patch(incomplete + opposite + " '.ssh',\n" + marker + ']\n' + marker + 'NEXT = True\n',
+                      False, marker != '+', path='policy.md')
+
+print(f"ok: shared physical markers and reconstructed Markdown images ({count} acceptance/refusal cases)")
 PY
 
 for _ in $(seq 1 10); do printf '%s=%s\n' "$key_name" "$token"; done >"$TMP/art/many.md"
@@ -720,14 +1071,104 @@ printf '%s\n' 'diff --git a/app.py b/app.py' "-$(printf '%s=%s' "$key_name" "$to
 printf '%s\n' 'diff --git a/config.toml b/config.toml' '+"secrets" = "deny"' '+secrets: allow' | "$SCANNER" diff >/dev/null ||
   fail "diff scanner flagged a permission rule as a secret"
 
+# The shared corpus is a test input only. Exercise the deployed scanner copy,
+# which has no adjacent repository, policy module or safety-paths.json file.
+python3 - "$WORK/bridges/spar-payload-scan" "$ROOT/tests/safety-paths.json" "$TMP" <<'PY'
+import json
+from pathlib import Path
+import runpy
+import subprocess
+import sys
+
+scanner, corpus_file, scratch = sys.argv[1:]
+corpus = json.loads(Path(corpus_file).read_text())
+policy = runpy.run_path(scanner)
+root = Path(scratch) / "path-fixtures"
+root.mkdir()
+system_files = corpus["system_files"] + corpus["raw_files"]
+system_files += [f"etc/ssh/ssh_host_{kind}_key" for kind in ("rsa", "dsa", "ecdsa", "ed25519")]
+system_trees = corpus["system_trees"] + corpus["raw_trees"]
+home_files = [
+    ".claude/.credentials.json", ".claude/history.jsonl", ".codex/auth.json", ".codex/config.toml",
+    ".codex/history.jsonl", ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml",
+    ".hermes/auth.json", ".hermes/.env", ".hermes/state.db", ".hermes/state.db-wal", ".hermes/state.db-shm",
+    ".local/share/opencode/auth.json", ".local/share/opencode/opencode.db",
+    ".local/share/opencode/opencode.db-wal", ".local/share/opencode/opencode.db-shm",
+    ".env", ".envrc", ".netrc", ".npmrc", ".pypirc", ".bash_history", ".zsh_history",
+]
+home_trees = [
+    ".aws", ".ssh", ".gnupg", ".kube", ".mozilla", ".password-store",
+    ".config/BraveSoftware", ".config/chromium", ".config/google-chrome", ".config/1Password",
+    ".config/Bitwarden", ".local/share/keyrings", ".claude/projects", ".claude/sessions",
+    ".claude/session-env", ".claude/tasks", ".claude/debug", ".codex/sessions", ".codex/archived_sessions",
+    ".hermes/sessions", ".hermes/logs", ".local/share/opencode/storage", ".local/share/opencode/log",
+]
+shapes = ["service.keytab", "ssh_host_future_algorithm_key", "server.key", "server.pem", "client.p12",
+          "client.pfx", "credentials", "credentials.json", "auth.json", ".credentials.json",
+          "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", ".env.production"]
+trees = system_trees + home_trees + ["secrets"]
+denied = system_files + home_files + shapes + [tree + "/nested/opaque.txt" for tree in trees]
+positive = corpus["positive_files"] + [
+    "etc/ssh/ssh_host_rsa_key.pub", "etc/ssh/ssh_host_ecdsa_key.pub", "etc/ssh/ssh_host_ed25519_key.pub",
+    "etc/ssh/ssh_host_future_algorithm_key.pub", "src/auth.py", "docs/keytab-policy.md",
+    "etc/shadow-policy.md", "sys/kernel/debug-notes.md", "etc/credstore-notes.md",
+    ".codex/config.toml.example", ".codex/sessions-policy.md", ".claude/settings.json",
+    ".hermes/memories/notes.md", ".hermes/skills/example/SKILL.md", ".config/opencode/opencode.json",
+]
+cases = {"system_files": system_files, "system_trees": system_trees, "home_files": home_files,
+         "home_trees": home_trees, "additional_shapes": corpus["additional_shapes"], "denied": [], "positive": []}
+count = 0
+for path in system_files + home_files + trees:
+    assert policy["sensitive_path"]("/" + path), path
+for path in (".config/gh/hosts.yml/nested/opaque.txt", ".docker/config.json/nested/opaque.txt",
+             ".hermes/config.yaml/nested/opaque.txt"):
+    assert policy["sensitive_path"]("legacy-provider-copy/" + path), path
+for prefix in ("", "copied layout/"):
+    for accepted, paths in ((False, denied), (True, positive)):
+        for path in paths:
+            relative = prefix + path
+            assert policy["sensitive_path"](relative) is not accepted, relative
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("ordinary fixture bytes\n")
+            result = subprocess.run([scanner, "outbound", "--scratch-root", scratch, "--", str(target)],
+                                    input="Review.", text=True, capture_output=True)
+            assert result.returncode == (0 if accepted else 2), (relative, result.stderr)
+            assert accepted or not result.stdout, relative
+            # Actual outbound/diff parsing, including spaces and Git C-quoted
+            # octal paths. No host credential/dump tree is opened or scanned.
+            header = "diff --git " + json.dumps("a/" + relative) + " " + json.dumps("b/" + relative) + "\n"
+            for mode in ("outbound", "diff"):
+                result = subprocess.run([scanner, mode], input=header + "+ordinary fixture bytes\n",
+                                        text=True, capture_output=True)
+                assert result.returncode == (0 if accepted else 2), (mode, relative, result.stderr)
+                count += 1
+            escaped = header.replace("/", r"\057")
+            assert policy["diff_header_sensitive"](escaped.removeprefix("diff --git ").strip()) is not accepted, relative
+            cases["positive" if accepted else "denied"].append(relative)
+            count += 1
+
+# New paths remain valid only as bounded metadata collections. All existing
+# malformed/computed/nested/scalar/credential-bearing refusals above still run.
+for name, values in (("SECRET_FILES", system_files + home_files), ("SECRET_TREES", trees),
+                     ("SECRET_GLOBS", corpus["additional_shapes"])):
+    source = name + " = " + repr(values) + "\n"
+    result = subprocess.run([scanner, "reply"], input=source, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+Path(scratch, "path-cases.json").write_text(json.dumps(cases))
+print(f"ok: standalone scanner system/copy/session inventory ({count} artifact/header cases)")
+PY
+
 # The repository must stay reviewable by its own scanner, file by file: the whole tree
 # exceeds one review request, and the bound on a request is deliberate. The index is
 # scanned, since that is what a commit exposes and a working-tree deletion is not.
-empty_tree=$(git -C "$ROOT" hash-object -t tree /dev/null)
-while IFS= read -r -d '' tracked; do
-  git -C "$ROOT" --literal-pathspecs diff --binary --cached "$empty_tree" -- "$tracked" | "$SCANNER" outbound >/dev/null ||
-    fail "the repository's own tracked content fails the outbound scan: $tracked"
-done < <(git -C "$ROOT" ls-files -z)
+if ! $FIXTURES_ONLY; then
+  empty_tree=$(git -C "$ROOT" hash-object -t tree /dev/null)
+  while IFS= read -r -d '' tracked; do
+    git -C "$ROOT" --literal-pathspecs diff --binary --cached "$empty_tree" -- "$tracked" | "$SCANNER" outbound >/dev/null ||
+      fail "the repository's own tracked content fails the outbound scan: $tracked"
+  done < <(git -C "$ROOT" ls-files -z)
+fi
 
 # --- Bridges ---
 repo="$TMP/repo"
@@ -742,15 +1183,20 @@ printf 'in-repo artifact\n' >"$repo/notes.md"
 printf '/.eyr-plans/\n' >"$repo/.gitignore"
 # Generator semantics live in review-brief.sh. Exercise the generated artifact's
 # handoff to both mocked reviewers in the ordinary review below, without gates.
-git -C "$repo" add README.md notes.md .gitignore
-git -C "$repo" -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm 'bridge fixture'
-printf 'Outcome: review bridge fixture\nNon-goals: deployment\nConstraints: offline\nAcceptance: intact brief\n' >"$TMP/art/intent.md"
-/usr/bin/env -C "$repo" "$ROOT/agents/.agents/skills/spar/scripts/review-brief" \
-  --intent "$TMP/art/intent.md" --out "$TMP/art/brief.md" --plan >"$TMP/brief.out"
 local_brief="$repo/.eyr-plans/bridge-fixture/spar/repo-brief.md"
 (umask 077; mkdir -p "${local_brief%/*}")
-/usr/bin/env -C "$repo" "$ROOT/agents/.agents/skills/spar/scripts/review-brief" \
-  --intent "$TMP/art/intent.md" --out "$local_brief" --plan >"$TMP/local-brief.out"
+if $FIXTURES_ONLY; then
+  printf 'synthetic review brief\n' >"$TMP/art/brief.md"
+  cp -- "$TMP/art/brief.md" "$local_brief"
+else
+  git -C "$repo" add README.md notes.md .gitignore
+  git -C "$repo" -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm 'bridge fixture'
+  printf 'Outcome: review bridge fixture\nNon-goals: deployment\nConstraints: offline\nAcceptance: intact brief\n' >"$TMP/art/intent.md"
+  /usr/bin/env -C "$repo" "$ROOT/agents/.agents/skills/spar/scripts/review-brief" \
+    --intent "$TMP/art/intent.md" --out "$TMP/art/brief.md" --plan >"$TMP/brief.out"
+  /usr/bin/env -C "$repo" "$ROOT/agents/.agents/skills/spar/scripts/review-brief" \
+    --intent "$TMP/art/intent.md" --out "$local_brief" --plan >"$TMP/local-brief.out"
+fi
 mkdir -p "$repo/secrets"
 printf 'harmless\n' >"$repo/secrets/ordinary.md"
 run_bridge() { # bridge mode calls-file [bridge args...]
@@ -943,5 +1389,81 @@ for bridge in "$CLAUDE_BRIDGE" "$CODEX_BRIDGE"; do
   rc=0
 done
 
-SPAR_BRIDGE_FIXTURES="$TMP" env -u HOST_CODEX_CONFIG -u CONFIG_CONTRACT_ROOT python3 -B "$ROOT/tests/config-contracts.py"
+python3 - "$TMP" "$repo" "$HOMEBOX" "$SHIMS" <<'PY'
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tomllib
+
+scratch, repo, home, shims = sys.argv[1:]
+cases = json.loads(Path(scratch, "path-cases.json").read_text())
+
+def argv(name):
+    return Path(scratch, name + ".argv").read_bytes().decode().rstrip("\0").split("\0")
+
+claude_args = argv("spar-claude")
+settings = json.loads(claude_args[claude_args.index("--settings") + 1])
+permissions = settings["permissions"]
+assert permissions["allow"] == [f"Read(/{repo}/**)"], "Claude reviewer read scope changed"
+denies = set(permissions["deny"])
+for path in cases["system_files"]:
+    assert f"Read(//{path})" in denies, path
+for path in cases["system_trees"]:
+    assert {f"Read(//{path})", f"Read(//{path}/**)"} <= denies, path
+for path in cases["home_files"]:
+    assert f"Read(/{home}/{path})" in denies, path
+for path in cases["home_trees"]:
+    assert {f"Read(/{home}/{path})", f"Read(/{home}/{path}/**)"} <= denies, path
+for prefix in ("./", "./**/"):
+    for path in cases["system_files"] + cases["home_files"] + cases["additional_shapes"]:
+        assert f"Read({prefix}{path})" in denies, path
+    for path in cases["system_trees"] + cases["home_trees"] + [".git", "secrets"]:
+        assert {f"Read({prefix}{path})", f"Read({prefix}{path}/**)"} <= denies, path
+
+codex_args = argv("spar-codex")
+profile = next(arg for arg in codex_args if arg.startswith("permissions.spar-reviewer="))
+profile = tomllib.loads(profile)["permissions"]["spar-reviewer"]
+fs = profile["filesystem"]
+workspace = fs[":workspace_roots"]
+assert profile["network"] == {"enabled": False}
+assert {key: value for key, value in fs.items() if value == "read"} == {
+    ":minimal": "read", str(Path(shims, "codex")): "read", repo: "read",
+}, "Codex reviewer read scope changed"
+assert fs[":root"] == fs[":tmpdir"] == fs[":slash_tmp"] == fs[repo + "/.git"] == "deny"
+assert {key: value for key, value in workspace.items() if value != "deny"} == {".": "read"}
+assert all(not any(char in key for char in "*?[") for key in fs), "root-table glob scan added"
+for path in cases["system_files"] + cases["system_trees"]:
+    assert fs["/" + path] == "deny", path
+    assert path not in workspace and "/" + path not in workspace, "system literal in workspace table"
+for path in cases["home_files"] + cases["home_trees"]:
+    assert fs["~/" + path] == "deny", path
+for path in cases["system_files"] + cases["system_trees"] + cases["home_files"] + cases["home_trees"] + cases["additional_shapes"]:
+    assert workspace["**/" + path] == "deny", path
+for path in cases["system_trees"] + cases["home_trees"] + [".git", "secrets"]:
+    assert workspace["**/" + path + "/**"] == "deny", "missing file-expansion descendant mask: " + path
+
+# Exercise real rg --files selection of synthetic paths only. This catches the
+# bare-directory-glob bug without invoking Codex or claiming sandbox dispatch.
+def selected(patterns):
+    command = ["rg", "--files", "--hidden", "--no-ignore", "--null"]
+    for pattern in sorted(patterns):
+        command += ["--glob", pattern]
+    result = subprocess.run(command + ["."], cwd=Path(scratch, "path-fixtures"), capture_output=True)
+    assert result.returncode in (0, 1), result.stderr
+    return {path.removeprefix("./") for path in result.stdout.decode().split("\0") if path}
+
+for name, patterns in (
+    ("Claude repository rules", [rule[len("Read(./"):-1] for rule in denies if rule.startswith("Read(./")]),
+    ("Codex workspace masks", [pattern for pattern, mode in workspace.items() if mode == "deny"]),
+):
+    matches = selected(patterns)
+    assert set(cases["denied"]) <= matches, (name, "unselected payloads", set(cases["denied"]) - matches)
+    assert not set(cases["positive"]) & matches, (name, "positive source excluded", set(cases["positive"]) & matches)
+print(f"ok: both reviewer profiles retain scope and mask {len(set(cases['denied']))} synthetic payload paths; {len(cases['positive'])} positives usable")
+PY
+
+if ! $FIXTURES_ONLY; then
+  SPAR_BRIDGE_FIXTURES="$TMP" env -u HOST_CODEX_CONFIG -u CONFIG_CONTRACT_ROOT python3 -B "$ROOT/tests/config-contracts.py"
+fi
 printf 'ok: spar bridges relay scanned one-pass reviews from a scrubbed environment and honor opt-out\n'

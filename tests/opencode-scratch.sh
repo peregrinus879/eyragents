@@ -2,14 +2,17 @@
 # Hermetic plugin fixtures only. No OpenCode process, host config or model call.
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+umask 077
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
 mkdir -p "$TMP/home" "$TMP/opencode" "$TMP/repo/subdir" "$TMP/outside"
 export HOME="$TMP/home" TMPDIR="$TMP"
 unset NODE_OPTIONS NODE_COMPILE_CACHE
-node --input-type=module - "$ROOT" "$TMP" <<'JS'
+env -i PATH="$PATH" HOME="$HOME" TMPDIR="$TMPDIR" HISTFILE=/dev/null node --input-type=module - "$ROOT" "$TMP" <<'JS'
 import assert from "node:assert/strict"
 import * as fs from "node:fs/promises"
+import filesystem from "node:fs/promises"
+import { syncBuiltinESMExports } from "node:module"
 import { execFileSync } from "node:child_process"
 import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -18,6 +21,26 @@ const [repo, tmp] = process.argv.slice(2)
 const root = join(tmp, "opencode")
 const worktree = join(tmp, "repo")
 const directory = join(worktree, "subdir")
+const persistent = join(process.env.HOME, "Projects/scratch")
+const mountFile = join(tmp, "mountinfo")
+const ordinaryMounts = "10 1 8:1 / / rw - ext4 /dev/fixture rw\n"
+const metadataFailures = new Map()
+const actualRealpath = filesystem.realpath
+filesystem.realpath = async (path) => {
+  for (const [prefix, code] of metadataFailures) {
+    if (String(path).startsWith(prefix)) throw Object.assign(new Error("fixture metadata failure"), { code })
+  }
+  return actualRealpath(path)
+}
+syncBuiltinESMExports()
+await fs.mkdir(join(tmp, "lib"))
+await fs.mkdir(join(tmp, "plugins"))
+await fs.writeFile(mountFile, ordinaryMounts)
+const helper = await fs.readFile(join(repo, "opencode/.config/opencode/lib/safety-paths.mjs"), "utf8")
+for (const anchor of ['const SYSTEM_ROOT = "/"', 'const MOUNTINFO = "/proc/self/mountinfo"']) assert.equal(helper.split(anchor).length, 2)
+await fs.writeFile(join(tmp, "lib/safety-paths.mjs"), helper
+  .replace('const SYSTEM_ROOT = "/"', `const SYSTEM_ROOT = ${JSON.stringify(join(tmp, "system"))}`)
+  .replace('const MOUNTINFO = "/proc/self/mountinfo"', `const MOUNTINFO = ${JSON.stringify(mountFile)}`))
 const source = await fs.readFile(join(repo, "opencode/.config/opencode/plugins/scratch-permissions.js"), "utf8")
 const base = JSON.parse(await fs.readFile(join(repo, "opencode/.config/opencode/opencode.json"), "utf8"))
 const anchor = 'const SCRATCH_ROOT = "/tmp/opencode"'
@@ -28,13 +51,16 @@ assert.equal(source.split(anchor).length, 2)
 // caller's own /tmp/opencode parent to authorize every simulated outside path.
 base.permission.external_directory = Object.fromEntries(Object.entries(base.permission.external_directory)
   .map(([pattern, action]) => [pattern === "/tmp/opencode/*" ? root + "/*" : pattern, action]))
-await fs.writeFile(join(tmp, "production.mjs"), source)
-await fs.writeFile(join(tmp, "fixture.mjs"), source.replace(anchor, `const SCRATCH_ROOT = ${JSON.stringify(root)}`))
-const { ScratchPermissions } = await import(pathToFileURL(join(tmp, "fixture.mjs")))
-const production = await import(pathToFileURL(join(tmp, "production.mjs")))
+await fs.writeFile(join(tmp, "plugins/production.mjs"), source)
+await fs.writeFile(join(tmp, "plugins/fixture.mjs"), source.replace(anchor, `const SCRATCH_ROOT = ${JSON.stringify(root)}`))
+const { ScratchPermissions } = await import(pathToFileURL(join(tmp, "plugins/fixture.mjs")))
+const production = await import(pathToFileURL(join(tmp, "plugins/production.mjs")))
 const unchanged = structuredClone(base)
 await (await production.ScratchPermissions({ directory, worktree, root })).config(unchanged)
 assert.deepEqual(unchanged, base)
+await fs.mkdir(persistent, { recursive: true })
+const sentinel = join(persistent, "user-work.md")
+await fs.writeFile(sentinel, "preserve existing persistent work\n")
 
 let checks = 1
 const contains = (parent, target) => parent === target || target.startsWith(parent + "/")
@@ -163,10 +189,18 @@ await probe(state, "apply_patch", { patchText: "cat <<'EOF'\n" + patch(`*** Add 
 for (const path of [join(tmp, "sibling/tmp/opencode/note.md"), root + "X/note.md", join(tmp, "outside/note.md")]) {
   await probe(state, "write", { filePath: path, content: "fixture" }, [add(path)], "ask")
 }
+
+// The persistent root remains eligible when temporary scratch is unsupported.
+const persistentOnly = structuredClone(base)
+const persistentHooks = await production.ScratchPermissions({ directory, worktree })
+await persistentHooks.config(persistentOnly)
+await probe({ config: persistentOnly, hooks: persistentHooks, wt: worktree, cwd: directory }, "write",
+  { filePath: join(persistent, "independent.md"), content: "fixture" }, [add(join(persistent, "independent.md"))], "allow")
+assert.equal(evaluate("edit", relative(worktree, join(root, "not-granted.md")), persistentOnly.permission), "ask")
 for (const [name, expected] of [["scratch", "allow"], ["scratch-other", "ask"]]) {
   const path = join(process.env.HOME, "Projects", name, "note.md")
   assert.equal(evaluate("external_directory", dirname(path) + "/*", state.config.permission), expected)
-  await probe(state, "write", { filePath: path, content: "fixture" }, [add(path)], "ask")
+  await probe(state, "write", { filePath: path, content: "fixture" }, [add(path)], expected)
 }
 
 // Rules already merged from projects remain later and authoritative.
@@ -255,7 +289,7 @@ if (process.getuid() !== 0) {
 await fs.chmod(root, 0o777)
 const noGrant = structuredClone(base)
 await setup(noGrant)
-assert.deepEqual(noGrant, base)
+assert.equal(evaluate("edit", relative(worktree, renamed), noGrant.permission), "ask")
 await probe(state, "write", { filePath: renamed, content: "fixture" }, [edit(renamed)], "refused")
 await fs.chmod(root, 0o700)
 await fs.rename(root, root + "-saved")
@@ -266,30 +300,157 @@ try {
   await fs.symlink(root + "-saved", root)
   const symlinkRoot = structuredClone(base)
   await setup(symlinkRoot)
-  assert.deepEqual(symlinkRoot, base)
+  assert.equal(evaluate("edit", relative(worktree, renamed), symlinkRoot.permission), "ask")
   await probe(state, "write", { filePath: renamed, content: "fixture" }, [edit(renamed)], "refused")
   await fs.unlink(root)
 } finally { await fs.rename(root + "-saved", root) }
 
 // Real worktree coordinates, including bounded nested-worktree grants.
-for (const wt of ["/", tmp, root, join(root, "nested/repo"), join(tmp, "worktree [with spaces]")]) {
+for (const wt of ["/", tmp, root, join(root, "nested/repo"), persistent, join(persistent, "nested/repo"), join(tmp, "worktree [with spaces]")]) {
   if (wt !== "/" && wt !== tmp) await fs.mkdir(wt, { recursive: true })
   const cwd = wt === "/" || wt === tmp ? directory : wt
   const located = await setup(structuredClone(base), wt, cwd)
   const target = join(root, "location-result.md")
   await probe(located, "write", { filePath: target, content: "fixture" }, [add(target)], "allow")
+  const persistentTarget = join(persistent, "union-result.md")
+  await probe(located, "apply_patch", { patchText: patch(`*** Add File: ${target}`, "+temporary", `*** Add File: ${persistentTarget}`, "+persistent") }, [add(target), add(persistentTarget)], "allow")
   const outside = join(tmp, "outside/no-grant.md")
   const baseline = evaluate("edit", relative(wt, outside), base.permission)
   assert.equal(evaluate("edit", relative(wt, outside), located.config.permission), baseline)
   await probe(located, "write", { filePath: outside, content: "fixture" }, [add(outside)], wt === "/" ? "ask" : baseline)
   if (wt === "/") {
-    // The unchanged ../* edit rule misses non-Git '/' subjects. An approved
-    // persistent location therefore permits edits here, not in a Git worktree.
-    const persistent = join(process.env.HOME, "Projects/scratch/root-worktree.md")
-    assert.equal(evaluate("edit", relative(wt, persistent), base.permission), "allow")
-    await probe(located, "write", { filePath: persistent, content: "fixture" }, [add(persistent)], "allow")
+    // No new grant fixes the documented non-Git '/' baseline limitation.
+    const path = join(persistent, "root-worktree.md")
+    assert.equal(evaluate("edit", relative(wt, path), base.permission), "allow")
+    await probe(located, "write", { filePath: path, content: "fixture" }, [add(path)], "allow")
   }
 }
+const corpus = JSON.parse(await fs.readFile(join(repo, "tests/safety-paths.json"), "utf8"))
+const protectedNames = [...corpus.system_files, ...corpus.raw_files,
+  ...[...corpus.system_trees, ...corpus.raw_trees].map((name) => name + "/ordinary.txt"),
+  "private.keytab", ".keytab", ".key", ".pem", "etc/ssh/ssh_host_ed25519_key", ".codex/config.toml", ".codex/sessions/note", ".config/1Password/note"]
+for (const location of [persistent, root, worktree]) {
+  for (const prefix of ["", "copy/deep/"]) {
+    for (const name of protectedNames) {
+      const path = join(location, prefix, name)
+      await probe(state, "apply_patch", { patchText: patch(`*** Add File: ${path}`, "+synthetic") }, [add(path)], "refused")
+    }
+  }
+  for (const name of [...corpus.positive_files, "etc/ssh/ssh_host_ed25519_key.pub", "etc/shadow-policy", "var/crashes/note", "sys/kernel/debugger/note"]) {
+    const path = join(location, "positive", name)
+    await probe(state, "write", { filePath: path, content: "fixture" }, [add(path)], "allow")
+  }
+}
+for (const wanted of ["ask", "deny"]) {
+  const config = structuredClone(base)
+  config.permission.edit[relative(worktree, sentinel)] = wanted
+  await probe(await setup(config), "write", { filePath: sentinel, content: "fixture" }, [edit(sentinel)], wanted === "deny" ? "refused" : "ask")
+  await probe(state, "write", { filePath: sentinel, content: "fixture" }, [edit(sentinel)], wanted,
+    { edit: { [relative(worktree, sentinel)]: wanted } })
+}
+await probe(state, "write", { filePath: sentinel, content: "fixture" }, [edit(sentinel)], "deny", base.agent.auditor.permission)
+await fs.symlink(join(tmp, "outside"), join(persistent, "escape"))
+await fs.link(sentinel, join(persistent, "hardlink"))
+for (const path of [join(persistent, "escape/unread.md"), join(persistent, "hardlink"), persistent + "/escape/../new.md"]) {
+  await probe(state, "write", { filePath: path, content: "fixture" }, [add(path)], "refused")
+}
+await fs.unlink(join(persistent, "hardlink"))
+for (const [from, to] of [[sentinel, join(root, "move.md")], [mixed, join(persistent, "move.md")], [sentinel, join(persistent, ".git/config")]]) {
+  await probe(state, "apply_patch", { patchText: patch(`*** Update File: ${from}`, `*** Move to: ${to}`, "@@", "-old", "+new") }, [edit(from), add(to)], "refused")
+}
+const beforeSentinel = await fs.readFile(sentinel, "utf8")
+await probe(state, "apply_patch", { patchText: patch(`*** Update File: ${sentinel}`, "@@", "-old", "+new", `*** Add File: ${join(root, "etc/shadow")}`, "+bad") }, [edit(sentinel), add(join(root, "etc/shadow"))], "refused")
+assert.equal(await fs.readFile(sentinel, "utf8"), beforeSentinel)
+// Inaccessible unrelated credential inventory must not suppress root grants or
+// ordinary workspace edits. The same errors on requested targets still veto
+// before the backend, even outside the newly granted scratch roots.
+const privateParent = join(tmp, "system/var/lib/NetworkManager")
+await fs.mkdir(privateParent, { recursive: true })
+await fs.writeFile(join(privateParent, "secret_key"), "synthetic inventory fixture\n")
+const workspaceFailure = join(worktree, "unreadable-target")
+await fs.mkdir(workspaceFailure)
+const currentWrite = join(workspaceFailure, "ordinary.txt")
+await fs.writeFile(currentWrite, "keep this requested-target fixture\n")
+for (const code of ["EACCES", "EPERM", "ELOOP"]) {
+  metadataFailures.set(privateParent + "/", code)
+  try {
+    const current = await setup()
+    for (const location of [root, persistent, worktree]) {
+      const path = join(location, "inaccessible-inventory-control.md")
+      await probe(current, "write", { filePath: path, content: "fixture" }, [add(path)], "allow")
+    }
+    const credential = join(privateParent, "secret_key")
+    await probe(current, "write", { filePath: credential, content: "fixture" }, [edit(credential)], "refused")
+    metadataFailures.set(workspaceFailure + "/", code)
+    await probe(current, "write", { filePath: currentWrite, content: "fixture" }, [edit(currentWrite)], "refused")
+    assert.equal(await fs.readFile(currentWrite, "utf8"), "keep this requested-target fixture\n")
+  } finally { metadataFailures.clear() }
+}
+const danglingWorkspace = join(worktree, "dangling-target")
+await fs.symlink(join(tmp, "outside/missing-target"), danglingWorkspace)
+await probe(state, "write", { filePath: danglingWorkspace, content: "fixture" }, [add(danglingWorkspace)], "refused")
+const stacked = "20 10 8:2 / /usr rw - ext4 /dev/fixture rw\n30 20 8:3 / /usr rw - ext4 /dev/other rw\n"
+for (const records of [stacked,
+  "20 999 8:2 / /usr rw - ext4 /dev/fixture rw\n",
+  "20 10 8:2 / /usr rw - ext4 /dev/fixture rw\n20 10 8:3 / /var rw - ext4 /dev/other rw\n"]) {
+  await fs.writeFile(mountFile, ordinaryMounts + records)
+  const current = await setup()
+  for (const location of [root, persistent, worktree]) {
+    const path = join(location, "unrelated-mount-control.md")
+    await probe(current, "write", { filePath: path, content: "fixture" }, [add(path)], "allow")
+  }
+}
+const affectedStack = `20 10 8:2 / ${persistent} rw - ext4 /dev/fixture rw\n30 20 8:3 / ${persistent} rw - ext4 /dev/other rw\n`
+await fs.writeFile(mountFile, ordinaryMounts + affectedStack)
+const partial = await setup()
+assert.equal(evaluate("edit", relative(worktree, sentinel), partial.config.permission), "ask")
+const unaffected = join(root, "other-root-control.md")
+await probe(partial, "write", { filePath: unaffected, content: "fixture" }, [add(unaffected)], "allow")
+await probe(state, "write", { filePath: sentinel, content: "fixture" }, [edit(sentinel)], "refused")
+// A supported separate HOME filesystem permits persistent scratch. A visible
+// whole-root alias at a nonancestor mountpoint must suppress its new grant and
+// invalidate an already-installed grant at preflight, without affecting /tmp.
+const homeMount = `20 10 8:2 / ${process.env.HOME} rw - ext4 /dev/fixture rw\n`
+const homeMirror = "30 10 8:2 / /media/disk rw - ext4 /dev/fixture rw\n"
+await fs.writeFile(mountFile, ordinaryMounts + homeMount)
+const homeState = await setup()
+const aliasTarget = join(persistent, "whole-root-alias-control.md")
+await probe(homeState, "write", { filePath: aliasTarget, content: "fixture" }, [add(aliasTarget)], "allow")
+for (const records of [homeMount + homeMirror, homeMirror + homeMount]) {
+  await fs.writeFile(mountFile, ordinaryMounts + records)
+  const current = await setup()
+  assert.equal(evaluate("edit", relative(worktree, aliasTarget), current.config.permission), "ask", "nonancestor whole-root alias cannot receive a scratch grant")
+  await probe(homeState, "write", { filePath: aliasTarget, content: "fixture" }, [edit(aliasTarget)], "refused")
+  await probe(current, "write", { filePath: unaffected, content: "fixture" }, [add(unaffected)], "allow")
+}
+// A whole Btrfs subvolume aliased into otherwise supported /var/log must not
+// disable grants for unrelated scratch roots. The read suite checks /var/log's
+// refusal directly; this suite witnesses continued checked edit execution.
+await fs.writeFile(mountFile, ordinaryMounts + "20 10 8:2 /@log /var/log rw - btrfs /dev/fixture rw\n30 10 8:2 /@log /media/disk rw - btrfs /dev/fixture rw\n")
+const unrelatedAlias = await setup()
+await probe(unrelatedAlias, "write", { filePath: unaffected, content: "fixture" }, [add(unaffected)], "allow")
+await probe(unrelatedAlias, "write", { filePath: aliasTarget, content: "fixture" }, [edit(aliasTarget)], "allow")
+for (const text of ["bad\n", ordinaryMounts + `20 10 8:1 /elsewhere ${persistent} rw - ext4 /dev/fixture rw\n`]) {
+  await fs.writeFile(mountFile, text)
+  await probe(state, "write", { filePath: sentinel, content: "fixture" }, [edit(sentinel)], "refused")
+  const cfg = structuredClone(base)
+  await setup(cfg)
+  assert.equal(evaluate("edit", relative(worktree, sentinel), cfg.permission), "ask")
+}
+await fs.writeFile(mountFile, ordinaryMounts)
+await fs.rename(persistent, persistent + "-saved")
+try {
+  await fs.mkdir(persistent)
+  await probe(state, "write", { filePath: join(persistent, "replacement.md"), content: "fixture" }, [add(join(persistent, "replacement.md"))], "refused")
+  await fs.rmdir(persistent)
+  await fs.symlink(persistent + "-saved", persistent)
+  const cfg = structuredClone(base)
+  await setup(cfg)
+  assert.equal(evaluate("edit", relative(worktree, sentinel), cfg.permission), "ask")
+  await probe(state, "write", { filePath: sentinel, content: "fixture" }, [edit(sentinel)], "refused")
+  await fs.unlink(persistent)
+} finally { await fs.rename(persistent + "-saved", persistent) }
+assert.equal(await fs.readFile(sentinel, "utf8"), "preserve existing persistent work\n", "persistent data is never cleanup-owned by location")
 for (const wt of [join(tmp, "missing-worktree"), join(tmp, "wild*worktree")]) {
   const config = structuredClone(base)
   await setup(config, wt, wt)

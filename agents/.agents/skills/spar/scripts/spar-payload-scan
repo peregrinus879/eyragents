@@ -100,6 +100,36 @@ DIFF_HEADER_PREFIXES = (
 )
 GIT_C_ESCAPES = {"a": "\a", "b": "\b", "t": "\t", "n": "\n", "v": "\v", "f": "\f", "r": "\r", '"': '"', "\\": "\\"}
 
+# Standalone deployed inventory, checked against the synthetic test corpus.
+# Exact file suffixes and component-delimited trees recognize copies without
+# treating arbitrary core/shadow source names as payloads. This is not content
+# classification or exhaustive coverage of renamed stores and custom layouts.
+PROTECTED_FILES = (
+    "etc/shadow", "etc/shadow-", "etc/gshadow", "etc/gshadow-",
+    "etc/security/opasswd", "etc/security/opasswd.old", "etc/krb5.keytab",
+    "etc/ipsec.secrets", "var/lib/NetworkManager/secret_key", "var/lib/systemd/credential.secret",
+    "proc/kcore", "proc/vmcore", "dev/mem", "dev/port",
+    ".claude/.credentials.json", ".claude/history.jsonl", ".codex/config.toml", ".codex/auth.json",
+    ".codex/history.jsonl", ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml",
+    ".hermes/state.db", ".hermes/state.db-wal", ".hermes/state.db-shm",
+    ".local/share/opencode/auth.json", ".local/share/opencode/opencode.db",
+    ".local/share/opencode/opencode.db-wal", ".local/share/opencode/opencode.db-shm",
+)
+PROTECTED_TREES = (
+    "etc/ssl/private", "etc/credstore", "etc/credstore.encrypted", "usr/lib/credstore",
+    "usr/lib/credstore.encrypted", "etc/cryptsetup-keys.d", "etc/NetworkManager/system-connections",
+    "usr/lib/NetworkManager/system-connections", "var/lib/iwd", "etc/wireguard", "etc/openvpn",
+    "etc/ipsec.d/private", "etc/samba/private", "var/lib/samba/private", "etc/pacman.d/gnupg",
+    "etc/letsencrypt", "var/lib/systemd/coredump", "var/crash", "sys/kernel/debug", "sys/kernel/tracing",
+    ".config/BraveSoftware", ".config/chromium", ".config/google-chrome", ".config/1Password",
+    ".config/Bitwarden", ".local/share/keyrings", ".claude/projects", ".claude/sessions",
+    ".claude/session-env", ".claude/tasks", ".claude/debug", ".codex/sessions", ".codex/archived_sessions",
+    ".hermes/sessions", ".hermes/logs", ".local/share/opencode/storage", ".local/share/opencode/log",
+    # Retain the earlier refusal of these provider paths even if copied as
+    # directories rather than ordinary files. New system file names stay exact.
+    ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml",
+)
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -120,6 +150,17 @@ def safe_code_value(value: str) -> bool:
         PATTERN_SAFE_VALUE.fullmatch(literal) or PATTERN_HARMLESS_LITERAL.fullmatch(literal)
         for _, literal in PATTERN_QUOTED_LITERAL.findall(value)
     )
+
+
+def assignment_marker(prefix: str, in_diff: bool) -> str | None:
+    """Share image selection across every bounded assignment exception.
+
+    A recognized patch uses only its physical first column, never an indented
+    Markdown bullet or source-level unary sign. Raw input retains its existing
+    leading-whitespace handling.
+    """
+    marker = prefix[:1] if in_diff else prefix.lstrip(" \t")[:1]
+    return marker if marker in ("+", "-") else None
 
 
 def comparison_atom(value: str) -> str | None:
@@ -149,12 +190,24 @@ def safe_comparison_value(text: str, match: re.Match, in_diff: bool) -> bool:
     # As with path collections, bound both characters and physical lines and
     # preserve diff markers before skipping blanks/comments. A patch's final
     # addition does not establish source EOF, even at a file/hunk transition.
-    marker = prefix.lstrip(" \t")[:1]
-    marker = marker if marker in ("+", "-") else "+" if in_diff else None
+    marker = assignment_marker(prefix, in_diff)
+    context = in_diff and marker is None
+    markers = ("-", "+") if context else (marker,)
     start = match.start(1)
     snippet = text[start:start + COMPARISON_MAX_CHARS + 1]
     lines = snippet.split("\n")
     truncated = start + len(snippet) < len(text)
+    return all(comparison_image(lines, image, truncated, context) for image in markers)
+
+
+def comparison_image(lines: list[str], marker: str | None, truncated: bool, context: bool) -> bool:
+    """A context comparison must independently finish in both visible images.
+
+    Only this dual-image check skips opposite rows, never borrowing their
+    operands or termination. Marked comparisons retain their stricter opposite-
+    row barrier. Every physical row/character still consumes the original bound.
+    No hunk/file/omission boundary or patch EOF supplies source termination.
+    """
     consumed = 0
     closed = False
     # Restricted grammar, implemented with a bounded expectation stack:
@@ -185,6 +238,10 @@ def safe_comparison_value(text: str, match: re.Match, in_diff: bool) -> bool:
         if re.search(r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029]", line):
             return False
         if number and marker:
+            if line.startswith((*DIFF_HEADER_PREFIXES, "@@", "\\ No newline")):
+                return False
+            if context and line.startswith("-" if marker == "+" else "+"):
+                continue
             if not line.startswith((marker, " ")):
                 return False
             line = line[1:]
@@ -296,22 +353,21 @@ def sensitive_path(value: str) -> bool:
     def sensitive_component(name: str) -> bool:
         return bool(
             re.fullmatch(r"\.env(?:[._~-].*)?", name)
-            or re.search(r"\.(?:key|pem|p12|pfx)(?:[._~-].*)?$", name)
+            or re.search(r"\.(?:key|pem|p12|pfx|keytab)(?:[._~-].*)?$", name)
             or re.fullmatch(r"secrets?(?:[._~-].*)?", name)
             or re.fullmatch(r"credentials(?:\..*)?", name)
             or re.fullmatch(r"auth\.json(?:[._~-].*)?", name)
             or re.fullmatch(r"\.(?:netrc|npmrc|pypirc)(?:[._~-].*)?", name)
             or re.fullmatch(r"id_(?:rsa|dsa|ecdsa|ed25519)(?:[._~-].*)?", name)
-            or name in (".aws", ".ssh", ".gnupg", ".kube", ".mozilla", ".bash_history", ".zsh_history")
+            or re.fullmatch(r"ssh_host_.*_key", name)
+            or name in (".aws", ".ssh", ".gnupg", ".kube", ".mozilla", ".password-store",
+                        ".envrc", ".credentials.json", ".bash_history", ".zsh_history")
         )
 
-    path = "/" + value.lower().strip("/") + "/"
-    return any(sensitive_component(part) for part in path.split("/")) or any(
-        "/" + store + "/" in path for store in (
-            ".config/bravesoftware", ".config/chromium", ".local/share/keyrings",
-            ".claude/.credentials.json", ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml",
-        )
-    )
+    path = "/" + value.lower().strip("/")
+    return (any(sensitive_component(part) for part in path.split("/"))
+            or any(path.endswith("/" + name.lower()) for name in PROTECTED_FILES)
+            or any("/" + name.lower() + "/" in path + "/" for name in PROTECTED_TREES))
 
 
 def unquote_git_path(value: str) -> str:
@@ -390,26 +446,39 @@ def metadata_path(value: object) -> bool:
     ) is not None
 
 
-def collection_terminated(lines: list[str], index: int, marker: str | None, truncated: bool) -> bool:
+def collection_terminated(lines: list[str], index: int, marker: str | None, truncated: bool,
+                          in_diff: bool) -> bool:
     """A valid literal prefix is not enough inside a mapping/call's brackets.
 
     Require EOF, a closing outer delimiter or a clearly separate declaration.
     Operators, call/index/attribute trailers, conditional/comprehension clauses,
     omitted diff rows and other ambiguous continuations cannot close the RHS.
+    After a complete literal, opposite-image rows can be passed over in a
+    recognized patch, but cannot themselves supply termination evidence.
     """
+    skipped_opposite = False
+    consumed = sum(map(len, lines[:index + 1]))
     for number in range(index + 1, len(lines)):
-        if number >= 128:
+        consumed += len(lines[number])
+        if number >= 128 or consumed > 16384:
             return False
         line = lines[number]
         # Python also ends comments at CR. Do not skip a whole LF-delimited
         # comment row that can conceal code after another control separator.
         if re.search(r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029]", line):
             return False
+        if number == len(lines) - 1 and truncated:
+            return False
         if not line and number == len(lines) - 1 and not truncated:
-            return True
+            return not skipped_opposite
         if marker:
-            if line.startswith("diff --git "):
-                return True
+            # File headers must not masquerade as opposite-image source rows.
+            # Hunks, omissions and unknown unmarked rows also fail below.
+            if line.startswith((*DIFF_HEADER_PREFIXES, "@@", "\\ No newline")):
+                return False
+            if in_diff and line.startswith("-" if marker == "+" else "+"):
+                skipped_opposite = True
+                continue
             if not line.startswith((marker, " ")):
                 return False
             line = line[1:]
@@ -422,17 +491,19 @@ def collection_terminated(lines: list[str], index: int, marker: str | None, trun
             r'''(?:["']?[A-Za-z_][A-Za-z0-9_]*["']?\s*[:=](?!=)|(?:def|class|import|from|return|pass|raise)\b)''',
             following,
         ) is not None
-    return not truncated
+    return not truncated and not skipped_opposite
 
 
-def safe_path_collection(text: str, match: re.Match) -> bool:
+def safe_path_collection(text: str, match: re.Match, in_diff: bool = False) -> bool:
     """Check the entire literal RHS, preserving raw/diff boundaries.
 
     No eval/literal_eval, bare-container exemption or source-file exemption.
     The AST is bounded to 16,384 source characters, 128 physical lines and 256 items;
     only flat list/tuple/set string values (or an empty mapping) are accepted.
-    Diff additions may use their own prefix or explicit context, never an
-    opposite-image line or an omitted-line barrier.
+    An unfinished diff collection may use its own prefix or explicit context,
+    never an opposite-image line or an omitted-line barrier. A context
+    assignment must qualify independently in both images. Opposite rows are
+    skipped only in termination lookahead, never removed from content scanning.
     """
     prefix = text[match.start():match.start(1)]
     name = re.search(r'''([A-Za-z0-9_]+)["']?\s*[:=]\s*$''', prefix)
@@ -441,8 +512,8 @@ def safe_path_collection(text: str, match: re.Match) -> bool:
     start = match.start(1)
     if text[start:start + 1] not in ("[", "(", "{"):
         return False
-    marker = prefix.lstrip(" \t")[:1]
-    marker = marker if marker in ("+", "-") else None
+    marker = assignment_marker(prefix, in_diff)
+    markers = ("-", "+") if in_diff and marker is None else (marker,)
     snippet = text[start:start + 16385]
     # Match the assignment regexp's LF boundaries. splitlines() also splits
     # CR/vertical-tab/Unicode separators and could hide a suffix still captured
@@ -450,6 +521,11 @@ def safe_path_collection(text: str, match: re.Match) -> bool:
     parts = snippet.split("\n")
     lines = [part + ("\n" if index < len(parts) - 1 else "") for index, part in enumerate(parts)]
     truncated = start + len(snippet) < len(text)
+    return all(path_collection_image(lines, image, truncated, in_diff) for image in markers)
+
+
+def path_collection_image(lines: list[str], marker: str | None, truncated: bool, in_diff: bool) -> bool:
+    """Validate one bounded image; physical bounds include all skipped rows."""
     source = ""
     for number, line in enumerate(lines):
         if number >= 128:
@@ -457,6 +533,8 @@ def safe_path_collection(text: str, match: re.Match) -> bool:
         if number == len(lines) - 1 and truncated and not line.endswith("\n"):
             return False
         if number and marker:
+            if line.startswith((*DIFF_HEADER_PREFIXES, "@@", "\\ No newline")):
+                return False
             if not line.startswith((marker, " ")):
                 return False
             line = line[1:]
@@ -476,11 +554,11 @@ def safe_path_collection(text: str, match: re.Match) -> bool:
         except (ValueError, RecursionError, MemoryError):
             return False
         if isinstance(node, ast.Dict) and not node.keys:
-            return collection_terminated(lines, number, marker, truncated)
+            return collection_terminated(lines, number, marker, truncated, in_diff)
         if not isinstance(node, (ast.List, ast.Tuple, ast.Set)) or len(node.elts) > 256:
             return False
         return (all(isinstance(item, ast.Constant) and metadata_path(item.value) for item in node.elts)
-                and collection_terminated(lines, number, marker, truncated))
+                and collection_terminated(lines, number, marker, truncated, in_diff))
     return False
 
 
@@ -541,7 +619,7 @@ def content_findings(label: str, text: str, check_paths: bool, comparison_source
     for match in PATTERN_ASSIGNMENT.finditer(text):
         if (not safe_assignment_value(match.group(1))
                 and not comparison_safe(match)
-                and not safe_path_collection(text, match)):
+                and not safe_path_collection(text, match, patch_header is not None and patch_header.start() < match.start())):
             findings.append(Finding(label, line_number(match.start()), "credential-assignment-v1"))
     for match in PATTERN_URL_CREDENTIAL.finditer(text):
         if not safe_assignment_value(match.group(1)):

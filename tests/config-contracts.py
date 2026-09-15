@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
 """Check the authority boundaries of the managed tool configurations.
 
-These checks parse the deployed configuration files and assert the boundaries
-that AGENTS.md promises: automatic modes stay bounded, pushes and privilege
-escalation stay denied, credential stores are neither readable nor writable,
-Git internals are not writable by file tools, destructive Git operations need
-an explicit instruction, and permission ordering keeps later denies effective.
-Wording, key order, and implementation shape are deliberately not pinned.
+Check source configuration, modeled path rules and selected real guard functions.
+These are configured-baseline and plugin-derived contracts, not proof of client
+dispatch, sandbox construction, mount isolation or classifier decisions. The
+dedicated plugin/bridge suites own layout, alias, approval and execution fixtures.
+Precise authority invariants remain alongside the shared synthetic Safety corpus.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import posixpath
 import re
 import runpy
 import subprocess
 import tomllib
+from functools import lru_cache
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(os.environ.get("CONFIG_CONTRACT_ROOT", Path(__file__).resolve().parent.parent))
 
@@ -50,9 +52,15 @@ PROJECT_STORE_DIRECTORIES = (".aws", ".gnupg", ".kube", ".ssh", ".config/BraveSo
 PROJECT_STORE_FILES = (".claude/.credentials.json", ".codex/auth.json", ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml", ".local/share/opencode/auth.json", ".bash_history", ".zsh_history")
 PROJECT_STORES = (*PROJECT_STORE_DIRECTORIES, *PROJECT_STORE_FILES)
 # Standing read authorization is separate from OpenCode's external location asks.
-SYSTEM_READ_TREES = ("/usr", "/etc", "/opt", "/sys", "/var/lib/pacman")
+SYSTEM_READ_TREES = ("/bin", "/boot", "/efi", "/etc", "/lib", "/lib64", "/opt",
+                     "/sbin", "/srv", "/sys", "/usr", "/var", "/var/lib/pacman")
 # Temp read authorization excludes the other tools' session roots.
 TEMP_READ_TREES = ("/tmp", "/var/tmp")
+HOME_READ_PATHS = (".config/nvim/init.lua", ".local/bin/ordinary-tool", ".local/share/mise/runtime",
+                   ".local/share/nvim/plugin.lua", ".local/share/fonts/font.ttf", ".local/share/man/page.1",
+                   ".bashrc", ".bash_profile", ".profile", ".zshrc", ".zprofile", ".gitconfig", ".inputrc")
+FIXTURE_HOME = "/fixture-home"
+FIXTURE_CWD = FIXTURE_HOME + "/Projects/repo"
 
 CREDENTIAL_SHAPES = (
     ".env",
@@ -171,6 +179,91 @@ def evaluate(tool: str, subject: str, *configs: dict) -> str:
     return result
 
 
+@lru_cache(maxsize=4096)
+def path_pattern(pattern: str):
+    # Managed POSIX path-pattern subset: * stays in a segment and **/ can
+    # match zero directories. This is not OpenCode's wildcard matcher above.
+    expression = re.escape(pattern).replace(r"\*\*/", "(?:.*/)?").replace(r"\*\*", ".*")
+    return re.compile(expression.replace(r"\*", "[^/]*").replace(r"\?", "[^/]"))
+
+
+def path_glob(subject: str, pattern: str) -> bool:
+    return path_pattern(pattern).fullmatch(subject) is not None
+
+
+def below_path(path: str, root: str) -> bool:
+    return root == "/" or path == root or path.startswith(root.rstrip("/") + "/")
+
+
+def claude_file_rule(rule: str, tool: str, target: str, action: str, cwd=FIXTURE_CWD, home=FIXTURE_HOME) -> bool:
+    if rule == tool:
+        return True
+    if not rule.startswith(tool + "(") or not rule.endswith(")"):
+        return False
+    pattern = rule[len(tool) + 1:-1]
+    relative_rule = False
+    if pattern.startswith("//"):
+        anchor, pattern = "/", pattern[2:]
+    elif pattern.startswith("~/"):
+        anchor, pattern = home, pattern[2:]
+    elif pattern.startswith("/"):
+        anchor, pattern = home + "/.claude", pattern[1:]
+    else:
+        anchor, pattern = cwd, pattern.removeprefix("./")
+        relative_rule = True
+    if not below_path(target, anchor):
+        return False
+    subject = posixpath.relpath(target, anchor)
+    # Basenames follow gitignore depth rules. The corpus uses anchored
+    # multi-segment paths for subtree boundaries, not negation/extended globs.
+    if "/" not in pattern:
+        pattern = "**/" + pattern
+    elif relative_rule and action in ("deny", "ask") and pattern.endswith("/**") and "/" not in pattern[:-3]:
+        pattern = "**/" + pattern
+    return path_glob(subject, pattern)
+
+
+def claude_file_action(config: dict, tool: str, target: str) -> str | None:
+    for action in ("deny", "ask", "allow"):
+        if any(claude_file_rule(rule, tool, target, action) for rule in config.get(action, [])):
+            return action
+    # No rule match is not a denial or a classifier verdict in auto mode.
+    return None
+
+
+def codex_entries(filesystem: dict, roots: list[str]):
+    """Materialize configured POSIX paths only, without filesystem/host reads."""
+    special = {":root": "/", ":slash_tmp": "/tmp", ":tmpdir": "/fixture-tmp"}
+    for key, value in filesystem.items():
+        if key in ("glob_scan_max_depth", ":minimal"):
+            continue  # Runtime platform roots are not invented by this model.
+        bases = roots if key == ":workspace_roots" else [special.get(key, key.replace("~/", FIXTURE_HOME + "/", 1))]
+        for base in bases:
+            for subpath, access in (value.items() if isinstance(value, dict) else [(".", value)]):
+                path = base if subpath == "." else base.rstrip("/") + "/" + subpath
+                if access in ("read", "write"):
+                    path = path.removesuffix("/**")
+                yield path, access
+
+
+def codex_file_action(entries: list[tuple[str, str]], target: str) -> str:
+    # Glob masks must match the file itself. Matching only a directory ancestor
+    # would hide a missing /** rule: Linux's rg --files does not emit directories.
+    if any(access == "deny" and path_glob(target, path) for path, access in entries if "*" in path or "?" in path):
+        return "deny"
+    literals = [(path, access) for path, access in entries if not any(c in path for c in "*?[]") and below_path(target, path)]
+    return max(literals, key=lambda item: (len(Path(item[0]).parts), {"read": 0, "write": 1, "deny": 2}[item[1]]),
+               default=("/", "deny"))[1]
+
+
+SAFETY = load_json("tests/safety-paths.json")
+SYSTEM_FILES = (*SAFETY["system_files"], *SAFETY["raw_files"])
+SYSTEM_TREES = (*SAFETY["system_trees"], *SAFETY["raw_trees"])
+for paths in (SYSTEM_FILES, SYSTEM_TREES, SAFETY["positive_files"]):
+    require(len(paths) == len(set(paths)) and all(path and not path.startswith("/") and
+            all(part not in ("", ".", "..") for part in path.split("/")) for path in paths), "invalid synthetic Safety path corpus")
+
+
 # Claude Code
 claude = load_json("claude-code/.claude/settings.json")
 permissions = claude["permissions"]
@@ -178,6 +271,8 @@ require(permissions["defaultMode"] == "auto", "Claude default mode is not auto")
 require(permissions["disableBypassPermissionsMode"] == "disable", "Claude bypass mode is enabled")
 require("sandbox" not in claude, "Claude tracked settings enable sandboxing")
 require("$defaults" in claude["autoMode"]["hard_deny"], "Claude auto mode dropped the built-in hard denies")
+for section in ("allow", "soft_deny"):
+    require("$defaults" in claude["autoMode"][section], f"Claude auto mode dropped built-in {section} rules")
 claude_deny = set(permissions["deny"])
 for command in (*HARD_DENIED_GIT, *PRIVILEGE, *REPOSITORY_HOST):
     require(f"Bash({command})" in claude_deny, f"Claude deny missing: {command}")
@@ -204,6 +299,20 @@ for rule in permissions["allow"]:
         not rule.startswith(("Bash(git push", "Bash(gh ", "Bash(sudo")),
         f"Claude automatic allow reaches a guarded command: {rule}",
     )
+for path in (*HOME_READ_PATHS, "Projects/sibling/README.md"):
+    require(claude_file_action(permissions, "Read", FIXTURE_HOME + "/" + path) == "allow", f"Claude scoped home read is shadowed: {path}")
+require(claude_file_action(permissions, "Edit", FIXTURE_HOME + "/Projects/scratch/result.md") == "allow", "Claude lacks scoped persistent-scratch editing")
+for target in ("/ordinary.md", FIXTURE_HOME + "/Documents/ordinary.md", "/home/other/.config/ordinary.md"):
+    require(claude_file_action(permissions, "Read", target) != "allow", f"Claude adds an unreviewed broad read grant: {target}")
+for target in (FIXTURE_HOME + "/Projects/scratch-other/result.md", FIXTURE_HOME + "/Projects/quarry/result.md", FIXTURE_HOME + "/.bashrc"):
+    require(claude_file_action(permissions, "Edit", target) != "allow", f"Claude scratch allowance reaches another edit scope: {target}")
+# Classifier prose is reviewed as policy, not simulated as deterministic matching.
+hard_denies = " ".join(claude["autoMode"]["hard_deny"])
+require("credentials" in hard_denies and "even when the user names the file" in hard_denies,
+        "Claude classifier reintroduces a named-file credential exception")
+require("implicit" in hard_denies and "normal OS interfaces" in hard_denies, "Claude classifier conflates agent inspection with normal program runtime")
+require("specific credential file" not in soft_denies, "Claude credentials remain a waivable soft rule")
+require("reviewed repository ID" in soft_denies and "explicit push URLs" in soft_denies, "Claude lost the pinned-reference classifier exception")
 
 # Codex
 codex_template = load_toml("templates/codex/config.toml")
@@ -212,10 +321,14 @@ codex_template = load_toml("templates/codex/config.toml")
 def check_codex(config: dict, label: str) -> None:
     require(config["default_permissions"] == "trusted-workspace", f"{label} default profile drifted")
     require(config["approvals_reviewer"] == "auto_review", f"{label} approval review drifted")
+    require(config["approval_policy"] == "on-request" and config["web_search"] == "live", f"{label} approval/network surfaces drifted")
     require("sandbox_mode" not in config, f"{label} mixes legacy sandbox with permission profile")
     profile = config["permissions"]["trusted-workspace"]
+    require(profile.get("extends") == ":workspace", f"{label} lost inherited workspace metadata protections")
+    require(profile.get("workspace_roots") == {"~/Projects/scratch": True}, f"{label} persistent scratch is not the sole profile-defined workspace root")
     filesystem = profile["filesystem"]
     require(filesystem[":root"] == "deny", f"{label} filesystem root is not denied")
+    require(filesystem.get(":minimal") == "read", f"{label} lacks normal runtime reads")
     require(profile["network"]["enabled"] is False, f"{label} command network is enabled")
     require(filesystem.get("~/.local/share/mise") == "read", f"{label} cannot execute mise-managed runtimes")
     for path in (*CREDENTIAL_DIRECTORIES, *CREDENTIAL_FILES):
@@ -228,6 +341,11 @@ def check_codex(config: dict, label: str) -> None:
         require(filesystem.get(other) == "deny", f"{label} reads another tool's session root: {other}")
     for key in filesystem:
         require(not (key.startswith(("/tmp/", "/var/tmp/")) and any(c in key for c in "*?")), f"{label} carries a glob under a temp root, which stalls the sandbox: {key}")
+        require(not (key.startswith("/") and any(c in key for c in "*?[]")), f"{label} adds a system-root glob scan: {key}")
+        if filesystem[key] in ("read", "write"):
+            require(not any(c in key.removesuffix("/**") for c in "*?[]"), f"{label} uses an unsupported read/write glob: {key}")
+    for key in ("/home", "~", "/proc", "/dev", "/run"):
+        require(key not in filesystem, f"{label} blanket region rule loses read descendants or runtime interfaces: {key}")
     for shape in CREDENTIAL_SHAPES:
         require(shape == ".npmrc" or filesystem.get(f"~/**/{shape}") == "deny" or filesystem.get(f"~/Projects/**/{shape}") == "deny", f"{label} credential shape reachable under ~/Projects: {shape}")
     for store in PROJECT_STORES:
@@ -249,6 +367,30 @@ def check_codex(config: dict, label: str) -> None:
         name = shape.removesuffix("/**")
         require(workspace.get(f"**/{name}") == "deny", f"{label} workspace deny missing: {shape}")
         require(name not in workspace, f"{label} literal workspace entry creates placeholder files: {name}")
+    for path in (*SYSTEM_FILES, *SYSTEM_TREES, *(f"etc/ssh/ssh_host_{kind}_key" for kind in ("rsa", "dsa", "ecdsa", "ed25519"))):
+        require(filesystem.get("/" + path) == "deny", f"{label} missing literal system/raw exclusion: {path}")
+    # This models configured masks only. Missing literals outside writable roots
+    # are skipped by 0.154 bwrap; virtual /proc is mounted again after masks.
+    entries = list(codex_entries(filesystem, [FIXTURE_CWD, FIXTURE_HOME + "/Projects/scratch"]))
+    for scope in (FIXTURE_CWD, FIXTURE_HOME + "/Projects/scratch", FIXTURE_HOME + "/Projects/sibling"):
+        for store in (*PROJECT_STORE_DIRECTORIES, "secrets", *SYSTEM_TREES):
+            for suffix in ("/ordinary.txt", "/nested/ordinary.txt"):
+                target = scope + "/copy/" + store + suffix
+                require(codex_file_action(entries, target) == "deny", f"{label} copied-directory mask cannot select contents: {target}")
+        for shape in SAFETY["additional_shapes"]:
+            target = scope + "/copy/" + shape.replace("*", "fixture")
+            require(codex_file_action(entries, target) == "deny", f"{label} private-key shape mask missing: {target}")
+    for path in HOME_READ_PATHS:
+        require(codex_file_action(entries, FIXTURE_HOME + "/" + path) == "read", f"{label} scoped home read is shadowed: {path}")
+    for target in (FIXTURE_CWD + "/ordinary.md", FIXTURE_HOME + "/Projects/scratch/ordinary.md"):
+        require(codex_file_action(entries, target) == "write", f"{label} writable root lost: {target}")
+    for scope in (FIXTURE_CWD, FIXTURE_HOME + "/Projects/scratch"):
+        for subpath in (".git/config", ".git/hooks/pre-commit"):
+            require(codex_file_action(entries, scope + "/" + subpath) == "read", f"{label} writable Git configuration/hooks: {scope}/{subpath}")
+    for target in (FIXTURE_HOME + "/Projects/quarry/ordinary.md", FIXTURE_HOME + "/Projects/scratch-other/ordinary.md"):
+        require(codex_file_action(entries, target) == "read", f"{label} scratch write leaked to a sibling: {target}")
+    for target in (FIXTURE_HOME + "/Documents/ordinary.md", "/home/other/.config/ordinary.md", "/unlisted-system/ordinary.md"):
+        require(codex_file_action(entries, target) == "deny", f"{label} unlisted region received a read grant: {target}")
     policy = config["auto_review"]["policy"]
     require("explicitly approves the exact candidate" in policy, f"{label} auto review no longer gates commits")
     # No template carries the marker the reconcile puts on a kept host line, so a
@@ -295,6 +437,10 @@ require(read_rules["*"] == "allow" and edit_rules["*"] == "allow", "OpenCode wor
 require("*" not in external_rules, "OpenCode read adapter cannot distinguish explicit asks from a copied fallback")
 require(evaluate("external_directory", "/unlisted/location/*", opencode["permission"]) == "ask", "OpenCode native external fallback no longer asks")
 require((ROOT / "opencode/.config/opencode/plugins/read-permissions.js").is_file(), "OpenCode read adapter is missing")
+require((ROOT / "opencode/.config/opencode/plugins/scratch-permissions.js").is_file(), "OpenCode guarded scratch adapter is missing")
+safety_helper = ROOT / "opencode/.config/opencode/lib/safety-paths.mjs"
+require(safety_helper.is_file(), "OpenCode shared native-file Safety helper is missing")
+require(not (ROOT / "opencode/.config/opencode/plugins/safety-paths.mjs").exists(), "OpenCode Safety helper is in the plugin autoload directory")
 # Read and edit subjects are worktree-relative; external subjects are the parent
 # directory plus /*, so an external rule that names a file can never match and
 # file stores are denied by **/ rules in read and edit, while directory stores
@@ -302,6 +448,8 @@ require((ROOT / "opencode/.config/opencode/plugins/read-permissions.js").is_file
 for rule in external_rules:
     require(rule == "*" or rule.endswith("/*") or rule.endswith("/**"), f"OpenCode external rule can never match a parent-directory subject: {rule}")
 require(edit_rules.get("../*") == "ask", "OpenCode edits outside a non-root worktree without asking")
+# Persisted baseline only: the scratch plugin adds checked per-call exceptions.
+# Its fixture suite, not this untransformed map, verifies persistent writes.
 for subject in ("../../tmp/opencode/session/result.md", "../sibling/tmp/opencode/result.md"):
     require(evaluate("edit", subject, opencode["permission"]) == "ask", "OpenCode unsafe relative temp write exception reopened")
 for tree in ("scratch", "quarry"):
@@ -327,6 +475,7 @@ for tree in reference_trees:
     require(external_rules.get(f"{tree}/**") == "allow", f"OpenCode OS reference location is not preapproved: {tree}")
 for tree in ("~/Projects", "/etc", "/opt", "/sys", *TEMP_READ_TREES):
     require(f"{tree}/**" not in external_rules, f"OpenCode retains a broad external directory grant: {tree}")
+require(opencode["permission"].get("webfetch") == "allow" and opencode["permission"].get("websearch") == "allow", "OpenCode primary web research drifted")
 external_cases = {
     f"{tree}{suffix}": "allow" if tree in reference_trees else "ask"
     for tree in ("/fixture-home/Projects", *SYSTEM_READ_TREES, *TEMP_READ_TREES)
@@ -551,35 +700,75 @@ for skill_dir in sorted([*(ROOT / "agents/.agents/skills").iterdir(), *(ROOT / "
     require(bool(fields.get("description")), f"skill lacks a description: {skill_dir.name}")
     require(set(fields) <= STANDARD_SKILL_FIELDS, f"skill uses non-standard frontmatter fields: {skill_dir.name}: {set(fields) - STANDARD_SKILL_FIELDS}")
 
-# One concrete path corpus exercises the scanner and effective permission
-# matchers, including store copies at the worktree root and at depth.
+# One concrete path corpus exercises actual scanner predicates and modeled
+# configured rules. Keep tool-specific stronger/own-learning boundaries separate.
 scan = runpy.run_path(str(ROOT / "agents/.agents/skills/spar/scripts/spar-payload-scan"))
-corpus = [*(store + "/ordinary.txt" for store in PROJECT_STORE_DIRECTORIES), *PROJECT_STORE_FILES,
-          *(shape.replace("*", "fixture") for shape in CREDENTIAL_SHAPES if shape != "secrets/**"), "secrets/ordinary.txt"]
-safe_paths = ("README.md", "credentials-policy.md", "example.env", "docs/authentication.md", ".config/gh-policy.md")
+additional_stores = (".config/google-chrome", ".config/1Password", ".config/Bitwarden", ".password-store")
+history_paths = (".codex/config.toml", ".codex/history.jsonl", ".claude/history.jsonl",
+                 ".claude/projects/fixture/session.jsonl", ".claude/projects/fixture/subagents/session.jsonl",
+                 ".claude/sessions/ordinary.txt", ".claude/session-env/ordinary.txt", ".claude/debug/ordinary.txt",
+                 ".codex/sessions/ordinary.txt", ".codex/archived_sessions/ordinary.txt",
+                 ".hermes/sessions/ordinary.txt", ".hermes/logs/ordinary.txt", ".hermes/state.db",
+                 ".hermes/state.db-wal", ".hermes/state.db-shm", ".local/share/opencode/storage/ordinary.txt",
+                 ".local/share/opencode/log/ordinary.txt", ".local/share/opencode/opencode.db",
+                 ".local/share/opencode/opencode.db-wal", ".local/share/opencode/opencode.db-shm")
+corpus = list(dict.fromkeys([
+    *(store + suffix for store in (*PROJECT_STORE_DIRECTORIES, *additional_stores, *SYSTEM_TREES)
+      for suffix in ("/ordinary.txt", "/nested/ordinary.txt")),
+    *PROJECT_STORE_FILES, *SYSTEM_FILES, *history_paths,
+    *(shape.replace("*", "fixture") for shape in (*CREDENTIAL_SHAPES, *SAFETY["additional_shapes"]) if shape != "secrets/**"),
+    "secrets/ordinary.txt", "secrets/nested/ordinary.txt",
+    *(f"etc/ssh/ssh_host_{kind}_key" for kind in ("rsa", "dsa", "ecdsa", "ed25519")),
+]))
+safe_paths = tuple(dict.fromkeys([
+    "README.md", "credentials-policy.md", "example.env", "docs/authentication.md", ".config/gh-policy.md",
+    *SAFETY["positive_files"], "etc/shadow-policy.md", "etc/gshadow-policy.md", "etc/security/opasswd.policy",
+    "src/auth.py", "src/core_dump.py", "docs/keytab-policy.md", ".config/nvim/init.lua",
+    *(tree + "-public/ordinary.txt" for tree in SYSTEM_TREES),
+    *(f"etc/ssh/ssh_host_{kind}_key.pub" for kind in ("rsa", "dsa", "ecdsa", "ed25519")),
+]))
+codex_primary = list(codex_entries(codex_template["permissions"]["trusted-workspace"]["filesystem"],
+                                 [FIXTURE_CWD, FIXTURE_HOME + "/Projects/scratch"]))
 bridge_fixtures = os.environ.get("SPAR_BRIDGE_FIXTURES")
 if bridge_fixtures:
     argv = (Path(bridge_fixtures) / "spar-claude.argv").read_bytes().decode().rstrip("\0").split("\0")
-    bridge_claude = json.loads(argv[argv.index("--settings") + 1])["permissions"]["deny"]
+    bridge_claude_permissions = json.loads(argv[argv.index("--settings") + 1])["permissions"]
+    bridge_claude = bridge_claude_permissions["deny"]
+    require(argv[argv.index("--tools") + 1] == "Read,Glob,Grep" and argv[argv.index("--permission-mode") + 1] == "dontAsk",
+            "Claude reviewer tool/mode boundary drifted")
+    require({"Write", "Edit", "NotebookEdit", "Bash", "WebFetch", "WebSearch", "Task"} <= set(bridge_claude),
+            "Claude reviewer lost explicit capability denies")
+    require(all(rule.startswith("Read(") for rule in bridge_claude_permissions["allow"]), "Claude reviewer added a non-read allowance")
     argv = (Path(bridge_fixtures) / "spar-codex.argv").read_bytes().decode().rstrip("\0").split("\0")
     profile = next(arg for arg in argv if arg.startswith("permissions.spar-reviewer="))
-    bridge_codex = tomllib.loads(profile)["permissions"]["spar-reviewer"]["filesystem"][":workspace_roots"]
-
-    def path_glob(subject: str, pattern: str) -> bool:
-        # Claude path globs and Codex workspace globs match **/ at zero depth.
-        expression = re.escape(pattern).replace(r"\*\*/", "(?:.*/)?").replace(r"\*\*", ".*").replace(r"\*", "[^/]*")
-        return re.fullmatch(expression, subject) is not None
+    bridge_profile = tomllib.loads(profile)["permissions"]["spar-reviewer"]
+    bridge_filesystem = bridge_profile["filesystem"]
+    bridge_codex = bridge_filesystem[":workspace_roots"]
+    require(bridge_profile["network"]["enabled"] is False and not bridge_profile.get("workspace_roots"), "Codex reviewer network/root scope widened")
+    require(all(bridge_filesystem[key] == "deny" for key in (":root", ":tmpdir", ":slash_tmp")), "Codex reviewer root/temp boundary widened")
+    require(bridge_codex["."] == "read" and bridge_codex[".git"] == "deny", "Codex reviewer repository boundary drifted")
+    require(not any(access == "write" for _, access in codex_entries(bridge_filesystem, [FIXTURE_CWD])), "Codex reviewer acquired writes")
+    for setting in ('approval_policy="never"', 'web_search="disabled"', 'agents.enabled=false', 'features.request_permissions_tool=false'):
+        require(setting in argv, f"Codex reviewer lost its fixed restriction: {setting}")
 
 for prefix in ("", "copy/deep/"):
     for name, denied in [(name, True) for name in corpus] + [(name, False) for name in safe_paths]:
         subject = prefix + name
         require(scan["sensitive_path"](subject) == denied, f"scanner path corpus mismatch: {subject}")
+        absolute_target = FIXTURE_CWD + "/" + subject
+        for tool in ("Read", "Edit"):
+            require((claude_file_action(claude["permissions"], tool, absolute_target) == "deny") == denied,
+                    f"Claude primary {tool} path corpus mismatch: {subject}")
+        require(codex_file_action(codex_primary, absolute_target) == ("deny" if denied else "write"),
+                f"Codex configured workspace mask mismatch: {subject}")
         for permissions in (opencode["permission"], derived_agents["auditor"]["permission"]):
             require((evaluate("read", subject, permissions) == "deny") == denied, f"OpenCode path corpus mismatch: {subject}")
+        require(evaluate("edit", subject, opencode["permission"]) == ("deny" if denied else "allow"),
+                f"OpenCode configured workspace edit mismatch: {subject}")
+        require(evaluate("edit", subject, derived_agents["auditor"]["permission"]) == "deny", f"OpenCode auditor can edit corpus path: {subject}")
         if bridge_fixtures:
             claude_denied = any(rule.startswith("Read(./") and path_glob(subject, rule[7:-1]) for rule in bridge_claude)
-            ancestors = ["/".join(subject.split("/")[:end]) for end in range(1, len(subject.split("/")) + 1)]
-            codex_denied = any(action == "deny" and any(path_glob(path, pattern) for path in ancestors) for pattern, action in bridge_codex.items())
+            codex_denied = any(action == "deny" and path_glob(subject, pattern) for pattern, action in bridge_codex.items())
             require(claude_denied == denied, f"Claude bridge path corpus mismatch: {subject}")
             require(codex_denied == denied, f"Codex bridge path corpus mismatch: {subject}")
             fixture = Path(bridge_fixtures) / "corpus" / subject
@@ -589,8 +778,8 @@ for prefix in ("", "copy/deep/"):
                                       "outbound", "--scratch-root", bridge_fixtures, "--", str(fixture)],
                                      input="Review synthetic fixture.", capture_output=True, text=True)
             require(scanned.returncode == (2 if denied else 0), f"scanner artifact corpus mismatch: {subject}")
-# Preapproved project roots retain read/edit restrictions and copied-store
-# denies at the root and at depth. These are path strings, not secret IO.
+# Preapproved project roots retain persisted read/edit restrictions. Actual
+# guarded scratch exceptions are exercised in tests/opencode-scratch.sh.
 for tree in ("scratch", "quarry"):
     for prefix in ("", "copy/deep/"):
         for name, denied in [(name, True) for name in corpus] + [(name, False) for name in safe_paths]:
@@ -602,7 +791,78 @@ for tree in ("scratch", "quarry"):
                 require(evaluate("external_directory", external, permissions) in (("allow", "deny") if denied else ("allow",)), f"OpenCode {tree} location policy drifted: {external}")
             require(evaluate("edit", subject, opencode["permission"]) == ("deny" if denied else "ask"), f"OpenCode {tree} edit policy drifted: {subject}")
             require(evaluate("edit", subject, opencode["permission"], derived_agents["auditor"]["permission"]) == "deny", f"OpenCode auditor can edit {tree}: {subject}")
+            for tool in ("Read", "Edit"):
+                action = claude_file_action(claude["permissions"], tool, target)
+                require((action == "deny") == denied, f"Claude {tree} {tool} protection mismatch: {subject}")
+                if not denied:
+                    require(action == "allow" if tool == "Read" or tree == "scratch" else action != "allow",
+                            f"Claude {tree} {tool} allowance mismatch: {subject}")
+            # .npmrc outside a workspace is an existing Codex scan limitation,
+            # not a demand that every temp/system/home shape be OS-masked.
+            if tree == "scratch" or name != ".npmrc":
+                require(codex_file_action(codex_primary, target) == ("deny" if denied else "write" if tree == "scratch" else "read"),
+                        f"Codex configured {tree} boundary mismatch: {subject}")
             if name in (store + "/ordinary.txt" for store in PROJECT_STORE_DIRECTORIES) or name == "secrets/ordinary.txt":
                 for permissions in (opencode["permission"], derived_agents["auditor"]["permission"]):
                     require(evaluate("external_directory", external, permissions) == "deny", f"OpenCode {tree} copied directory store reopened: {external}")
-print(f"ok: configuration authority boundaries ({2 * (len(corpus) + len(safe_paths))} path cases{', both bridge profiles' if bridge_fixtures else ''}; {len(external_cases)} external locations; {4 * (len(corpus) + len(safe_paths))} scratch/quarry paths)")
+
+# Exercise the real pure OpenCode predicate without calling filesystem layout,
+# mount-info, client dispatch or the approval adapter. Stronger no-adaptation
+# categories and auditor legacy eligibility stay with tests/opencode-read.sh.
+guard_cases = [("/" + prefix + name, denied) for prefix in ("", "copy/deep/")
+               for name, denied in [(name, True) for name in corpus] + [(name, False) for name in safe_paths]]
+guard = subprocess.run([
+    "node", "--input-type=module", "-e",
+    'let text=""; for await (const chunk of process.stdin) text+=chunk; '
+    'const {source, paths}=JSON.parse(text); '
+    'const {protectedPath}=await import("data:text/javascript;base64,"+Buffer.from(source).toString("base64")); '
+    'process.stdout.write(JSON.stringify(paths.map(path=>protectedPath(path))));',
+], input=json.dumps({"source": safety_helper.read_text(encoding="utf-8"), "paths": [path for path, _ in guard_cases]}),
+    capture_output=True, text=True, timeout=15, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": FIXTURE_HOME})
+require(guard.returncode == 0, "OpenCode pure Safety predicate failed to load/evaluate")
+guard_results = json.loads(guard.stdout)
+require(len(guard_results) == len(guard_cases), "OpenCode pure Safety predicate returned incomplete results")
+for (path, denied), result in zip(guard_cases, guard_results):
+    require(result == denied, f"OpenCode pure Safety predicate disagrees with shared corpus: {path}")
+
+# Run Hermes's real path decision with identity resolution and absent fixture
+# files. These are lexical-policy checks, not host metadata or native dispatch.
+hermes = runpy.run_path(str(ROOT / "hermes/.hermes/plugins/eyragents/__init__.py"))
+hermes_globals = hermes["path_denial"].__globals__
+with patch.dict(os.environ, {"HOME": FIXTURE_HOME}, clear=True), \
+     patch.dict(hermes_globals, {"resolve_target": lambda path: path}), \
+     patch.object(Path, "exists", return_value=False):
+    for prefix in ("", "copy/deep/"):
+        for name, denied in [(name, True) for name in corpus] + [(name, False) for name in safe_paths]:
+            # The common history cases are foreign for the other clients.
+            # Do not force Hermes to admit copies or deny its own runtime store.
+            if name.startswith((".hermes/sessions/", ".hermes/logs/", ".hermes/state.db")):
+                continue
+            target = Path(FIXTURE_CWD) / prefix / name
+            for write in (False, True):
+                require(bool(hermes["path_denial"](target, write, Path(FIXTURE_HOME))) == denied,
+                        f"Hermes lexical {'write' if write else 'read'} protection mismatch: {prefix + name}")
+    for suffix in ("memories/MEMORY.md", "skills/local/SKILL.md", "curator/ordinary.json"):
+        require(hermes["path_denial"](Path(FIXTURE_HOME) / ".hermes" / suffix, True, Path(FIXTURE_HOME)) is None,
+                f"Hermes own learning acquired a foreign-store deny: {suffix}")
+
+# Positive read scopes are checked after system masks so a broad denial cannot
+# make an inventory-only test pass while hiding useful configuration/metadata.
+for name in SAFETY["positive_files"]:
+    if not name.startswith(("etc/", "usr/", "sys/", "var/")):
+        continue
+    require(claude_file_action(claude["permissions"], "Read", "/" + name) == "allow", f"Claude useful system read lost: {name}")
+    require(codex_file_action(codex_primary, "/" + name) == "read", f"Codex useful configured system read lost: {name}")
+for name in SYSTEM_FILES:
+    require(scan["sensitive_path"]("/" + name), f"scanner absolute protected-file mismatch: {name}")
+    for tool in ("Read", "Edit"):
+        require(claude_file_action(claude["permissions"], tool, "/" + name) == "deny", f"Claude absolute protected-file mismatch: {name}")
+for target in ("/proc/cpuinfo", "/dev/null", "/run/ordinary-status", FIXTURE_HOME + "/.local/state/ordinary/config.json"):
+    require(not scan["sensitive_path"](target), f"scanner confuses scope exclusion with protected material: {target}")
+    require(claude_file_action(claude["permissions"], "Read", target) != "deny", f"Claude blanket runtime/state denial: {target}")
+require(claude_file_action(claude["permissions"], "Edit", FIXTURE_HOME + "/.claude/projects/fixture/memory/MEMORY.md") != "deny",
+        "Claude transcript protection blocks its own memory")
+
+print(f"ok: source configuration authority boundaries ({2 * (len(corpus) + len(safe_paths))} corpus cases; "
+      f"{len(external_cases)} configured external locations; {4 * (len(corpus) + len(safe_paths))} scratch/quarry paths; "
+      f"real auditor transform and lexical guard predicates; {'captured bridge profiles' if bridge_fixtures else 'bridge capture checks deferred to spar-bridges.sh'}; no native dispatch proof)")

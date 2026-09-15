@@ -114,42 +114,56 @@ jq -e '.loggedIn == true and .authMethod == "claude.ai" and .apiProvider == "fir
 
 # Read-only reviewer settings: the repository is readable; Git internals,
 # credential-shaped repository paths, and credential stores are denied.
+# Inventories stay embedded for standalone deployment. System targets use
+# absolute rules; copied stores stay under the existing repository read scope.
 settings=$(jq -cn --arg repo "$repo" --arg home "$account_home" '
+  def system_files: [
+    "etc/shadow", "etc/shadow-", "etc/gshadow", "etc/gshadow-",
+    "etc/security/opasswd", "etc/security/opasswd.old", "etc/krb5.keytab",
+    "etc/ipsec.secrets", "var/lib/NetworkManager/secret_key", "var/lib/systemd/credential.secret",
+    "proc/kcore", "proc/vmcore", "dev/mem", "dev/port"
+  ] + (["rsa", "dsa", "ecdsa", "ed25519"] | map("etc/ssh/ssh_host_" + . + "_key"));
+  def system_trees: [
+    "etc/ssl/private", "etc/credstore", "etc/credstore.encrypted", "usr/lib/credstore",
+    "usr/lib/credstore.encrypted", "etc/cryptsetup-keys.d", "etc/NetworkManager/system-connections",
+    "usr/lib/NetworkManager/system-connections", "var/lib/iwd", "etc/wireguard", "etc/openvpn",
+    "etc/ipsec.d/private", "etc/samba/private", "var/lib/samba/private", "etc/pacman.d/gnupg",
+    "etc/letsencrypt", "var/lib/systemd/coredump", "var/crash", "sys/kernel/debug", "sys/kernel/tracing"
+  ];
+  def home_files: [
+    ".claude/.credentials.json", ".claude/history.jsonl", ".codex/auth.json", ".codex/config.toml",
+    ".codex/history.jsonl", ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml",
+    ".hermes/auth.json", ".hermes/.env", ".hermes/state.db", ".hermes/state.db-wal", ".hermes/state.db-shm",
+    ".local/share/opencode/auth.json", ".local/share/opencode/opencode.db",
+    ".local/share/opencode/opencode.db-wal", ".local/share/opencode/opencode.db-shm",
+    ".env", ".envrc", ".netrc", ".npmrc", ".pypirc", ".bash_history", ".zsh_history"
+  ];
+  def home_trees: [
+    ".aws", ".ssh", ".gnupg", ".kube", ".mozilla", ".password-store",
+    ".config/BraveSoftware", ".config/chromium", ".config/google-chrome", ".config/1Password",
+    ".config/Bitwarden", ".local/share/keyrings", ".claude/projects", ".claude/sessions",
+    ".claude/session-env", ".claude/tasks", ".claude/debug", ".codex/sessions", ".codex/archived_sessions",
+    ".hermes/sessions", ".hermes/logs", ".local/share/opencode/storage", ".local/share/opencode/log"
+  ];
+  def file_shapes: [
+    ".env", ".env.*", ".envrc", "*.key", "*.pem", "*.p12", "*.pfx", "*.keytab", "ssh_host_*_key",
+    "credentials", "credentials.*", "auth.json", ".credentials.json", ".netrc", ".npmrc", ".pypirc",
+    "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519"
+  ];
+  def file_rules($prefix; $paths): $paths | map("Read(" + $prefix + . + ")");
+  def tree_rules($prefix; $paths): $paths | map("Read(" + $prefix + . + ")", "Read(" + $prefix + . + "/**)");
   {
     env: {ANTHROPIC_DEFAULT_FABLE_MODEL: ""},
     permissions: {
       allow: ["Read(/" + $repo + "/**)"],
       deny: ([
         "Write", "Edit", "NotebookEdit", "Bash", "WebFetch", "WebSearch", "Task",
-        "Read(./.git)", "Read(./.git/**)", "Read(./**/.git)", "Read(./**/.git/**)",
-        "Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)",
-        "Read(./secrets)", "Read(./secrets/**)", "Read(./**/secrets)", "Read(./**/secrets/**)",
-        "Read(./**/*.key)", "Read(./**/*.pem)", "Read(./**/*.p12)", "Read(./**/*.pfx)",
-        "Read(./**/credentials)", "Read(./**/credentials.*)", "Read(./**/auth.json)",
-        "Read(./**/.netrc)", "Read(./**/.npmrc)", "Read(./**/.pypirc)",
-        "Read(./**/id_rsa)", "Read(./**/id_dsa)", "Read(./**/id_ecdsa)", "Read(./**/id_ed25519)",
-        "Read(/" + $home + "/.aws)", "Read(/" + $home + "/.aws/**)",
-        "Read(/" + $home + "/.claude/.credentials.json)",
-        "Read(/" + $home + "/.codex/auth.json)",
-        "Read(/" + $home + "/.hermes/config.yaml)",
-        "Read(/" + $home + "/.config/gh/hosts.yml)",
-        "Read(/" + $home + "/.docker/config.json)",
-        "Read(/" + $home + "/.gnupg)", "Read(/" + $home + "/.gnupg/**)",
-        "Read(/" + $home + "/.kube)", "Read(/" + $home + "/.kube/**)",
-        "Read(/" + $home + "/.local/share/opencode/auth.json)",
-        "Read(/" + $home + "/.netrc)", "Read(/" + $home + "/.npmrc)", "Read(/" + $home + "/.pypirc)",
-        "Read(/" + $home + "/.ssh)", "Read(/" + $home + "/.ssh/**)",
-        "Read(/" + $home + "/.bash_history)", "Read(/" + $home + "/.zsh_history)",
-        "Read(/" + $home + "/.config/BraveSoftware)", "Read(/" + $home + "/.config/BraveSoftware/**)",
-        "Read(/" + $home + "/.config/chromium)", "Read(/" + $home + "/.config/chromium/**)",
-        "Read(/" + $home + "/.local/share/keyrings)", "Read(/" + $home + "/.local/share/keyrings/**)",
-        "Read(/" + $home + "/.mozilla)", "Read(/" + $home + "/.mozilla/**)",
         "Read(/" + $repo + "/.git)", "Read(/" + $repo + "/.git/**)"
-      ] + ([".aws", ".ssh", ".gnupg", ".kube", ".mozilla", ".config/BraveSoftware", ".config/chromium", ".local/share/keyrings"] |
-        map(. as $store | ["./", "./**/"] | map("Read(" + . + $store + ")", "Read(" + . + $store + "/**)")) | flatten) +
-        ([".claude/.credentials.json", ".codex/auth.json", ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml", ".local/share/opencode/auth.json", ".bash_history", ".zsh_history",
-          "*.key", "*.pem", "*.p12", "*.pfx", "credentials", "credentials.*", "auth.json", ".netrc", ".npmrc", ".pypirc", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519"] |
-        map(. as $store | ["./", "./**/"] | map("Read(" + . + $store + ")")) | flatten))
+      ] + file_rules("//"; system_files) + tree_rules("//"; system_trees) +
+        file_rules("/" + $home + "/"; home_files) + tree_rules("/" + $home + "/"; home_trees) +
+        (["./", "./**/"] | map(
+          file_rules(.; system_files + home_files) +
+          tree_rules(.; system_trees + home_trees + file_shapes + [".git", "secrets"])) | flatten))
     }
   }
 ') || abort "cannot build isolated Claude settings"
