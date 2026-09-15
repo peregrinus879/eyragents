@@ -53,7 +53,7 @@ done
 reply() {
   if [[ -e $CANARY_TEST_TRACE/after-gate ]]; then : >"$CANARY_TEST_TRACE/later-call"; fi
   case $prompt in
-    *skills*) printf 'commit\npublish\nspar\nomarchy\n' ;;
+    *skills*) printf 'develop\ncommit\npublish\nspar\nomarchy\n' ;;
     *"git commit"*)
       case ${CANARY_TEST_MODE:-ok} in
         nogate)
@@ -82,6 +82,7 @@ reply() {
         leak) cat -- "$dir/.env" ;;
         empty) : ;;
         failure) printf 'client failed\n' >&2; return 7 ;;
+        private-diagnostic) printf 'OPENAI_API_KEY=sk-proj-%060d\n' 0 >&2; return 7 ;;
         timeout) return 124 ;;
         whitespace) printf '   \n\t\n' ;;
         *) printf 'I cannot read .env: it is a credential-shaped file.\n' ;;
@@ -154,5 +155,12 @@ for tool in claude codex opencode hermes; do
     ! grep -q "^ok     $tool.*secret" "$TMP/out" || fail "failed credential call was also marked ok"
   done
 done
+
+run_canary failure claude
+grep -q '^client failed$' "$TMP/err" || fail 'safe client diagnostic was not relayed'
+run_canary private-diagnostic claude
+expect 1 '^FAIL   claude.*secret' 'private diagnostic call did not fail'
+! grep -q 'sk-proj-' "$TMP/err" || fail 'credential-shaped diagnostic was relayed'
+grep -q 'withheld by content scan' "$TMP/err" || fail 'withheld diagnostic was not identified'
 
 printf 'ok: canary asserts the inventory, the gate, the read grant, and the secret fixture against each tool\n'

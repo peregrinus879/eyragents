@@ -31,15 +31,19 @@ Restart Hermes after deployment. `SOUL.md` and project instruction files are sub
 
 ## Shared Workflows
 
-Use [commit](../agents/.agents/skills/commit/SKILL.md), [publish](../agents/.agents/skills/publish/SKILL.md), and [spar](../agents/.agents/skills/spar/SKILL.md) for their canonical procedures. [eyrsync](../.agents/skills/eyrsync/SKILL.md) owns upstream/reference reconciliation. The [workstream rule](../agents/.agents/shared-guidance.md#workstream-checkpoints) owns local checkpoints and cross-host handoffs.
+Use [develop](../agents/.agents/skills/develop/SKILL.md) for substantive work from goal clarification or resumption through a verified result. Its [workstream contract](../agents/.agents/skills/develop/references/workstream.md) owns compact task memory, pauses, handoffs and automatic cleanup. [commit](../agents/.agents/skills/commit/SKILL.md), [publish](../agents/.agents/skills/publish/SKILL.md) and [spar](../agents/.agents/skills/spar/SKILL.md) own their specialized procedures; [eyrsync](../.agents/skills/eyrsync/SKILL.md) owns harness reconciliation. All projects inherit the global skill; no project-local reference is required.
 
 ### Review Briefs
 
-After verified implementation, if commit preparation has not already been requested, the **Next step** selector offers **Prepare commit reviews** or **Pause here**. Preparation runs the normal preflight/gates and stages the intended candidates for individual review; it does not approve a commit or push. A clear existing direction, including a yes to a preparation question or Commit and resume, skips this extra question. The [commit skill](../agents/.agents/skills/commit/SKILL.md#start-commit-preparation) owns the selector, fallback and evidence-retention procedure.
+After verified implementation, [develop's handoff](../agents/.agents/skills/develop/SKILL.md#finish-and-handoff) offers **Prepare commit reviews** or **Pause here** when Git preparation has not already been directed. The first hands the existing map and evidence to commit; the second preserves a minimal concrete resumption. It does not approve a commit or push. Clear existing direction skips the extra question, and read-only/no-change work needs no Git selector.
 
 Commits are reviewed one at a time: one compact card with the change, file/hunk scope, full proposed message, checks and short candidate reference, immediately followed by its selector. Review the staged diff for that candidate before approving it. Pushes use one consolidated summary of the fixed ordered set, with destinations/audiences, reviewed commits, effects, checks and binding references, followed by one selector for the set. Grouping push approval preserves the separate commit history and diffs.
 
 Full IDs, hashes, raw argv, execution context and detailed gate/scan evidence are available on request. Short references identify exact immutable records, not latest entries. Material exceptions and required inspections stay visible in the normal brief. Asking for details or copying a command is not approval. The skills own the exact fields and selector behavior, including individual push review when needed.
+
+### Workstream Close-Out
+
+Develop's workstream contract removes owned scratch and obsolete notes automatically when their last dependency ends. Paused work and pending publication/CI retain only necessary state and evidence. Commit/publication receipts use the commit skill's exact-ID close-out.
 
 ### Exact-Approved Publication
 
@@ -85,6 +89,8 @@ After stowing, `make verify` runs both and adds deployment checks. GitHub Action
 CI uses the official `archlinux:base` container with a full signed-package upgrade, matching the Arch userspace of both supported hosts. `ubuntu-latest` supplies only GitHub's VM. Checks run as an unprivileged `ci` user with explicit Bash, a private temporary directory and container process reaping; checkout credentials are not persisted. CI does not perform or attest deployment to Omarchy or WSL.
 
 `make canary` is separate live behavioral smoke testing, not a repository gate or independent permission-dispatch proof. It makes up to six calls per tool: skills, reported gate denial with unchanged HEAD, README read, system read, external temporary fixture read, and fixture-marker non-disclosure. OpenCode reads its own fixture README and the preapproved `/usr/lib/os-release`; only its general external-temp check requires interactive approval and stays explicitly skipped. Each performed assertion requires a successful, nonempty reply. Exit 1 means failure; exit 2 means skipped or unverified checks; exit 0 means all selected behavioral checks passed. Verify remaining prompts interactively rather than bypassing them for green output. A moved/unreadable fixture HEAD stops the probe without resetting it. Mocks and static checks do not establish live behavior.
+
+`make canary-develop` is an opt-in, four-call OpenCode workflow check after deployment, with a 600-second budget per call. It uses the configured model and normal permissions in disposable repositories, checking implicit develop loading, plan-only source/index preservation, default and pre-directed commit handoffs, explicit pause, and cleanup that retains live/user artifacts. It never approves a commit or publication. Raw client events stay in memory; output contains bounded results and content-screened failure diagnostics, as does the ordinary canary for client errors. Failed fixtures remain for diagnosis; prepared fixtures remain for primary receipt inspection and exact-ID close-out. Remove obsolete owned artifacts after those dependencies end. Use `python3 tests/develop-live.py --opencode <installed-binary> --case prepare --timeout 600` for a focused retry. These are bounded behavior observations, not universal dispatch or containment. Run through mise activation or `mise exec -- make canary-develop` so startup defaults apply.
 
 Consult [`docs/maintenance.md`](maintenance.md) before major tool or plugin changes, permission or bridge changes, cross-host work, `/doctor`, or work on a listed limitation or deferred item.
 

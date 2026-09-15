@@ -138,7 +138,7 @@
         "/skills"
       ],
       "source": "claude",
-      "detail": "List native and installed workflows. Shared EyrAgents skills include /commit, /publish and /spar.",
+      "detail": "List native and installed workflows. Shared EyrAgents skills include /develop, /commit, /publish and /spar.",
       "mode": "Claude Code prompt",
       "essential": false,
       "warning": "",
@@ -286,7 +286,7 @@
         "/skills"
       ],
       "source": "codex",
-      "detail": "Use file mentions, named skill mentions, or the skill picker. Shared skills: commit, publish and spar.",
+      "detail": "Use file mentions, named skill mentions, or the skill picker. Shared skills: develop, commit, publish and spar.",
       "mode": "Codex prompt",
       "essential": false,
       "warning": "",
@@ -469,12 +469,13 @@
       "title": "Select a workflow",
       "keys": [
         "/skills",
+        "/develop",
         "/commit",
         "/publish",
         "/spar"
       ],
       "source": "opencode-tui",
-      "detail": "Commit, publish and spar wrappers use Build; commit and publication retain their separate approval boundaries.",
+      "detail": "Develop preserves the current agent mode. Commit, publish and spar wrappers use Build; commit and publication retain their separate approval boundaries.",
       "mode": "OpenCode prompt",
       "essential": false,
       "warning": "",
@@ -985,7 +986,7 @@
   "workflows": [
     {
       "title": "Shared workflows",
-      "text": "Use commit after verified implementation for preparation, exact-candidate review and approval; when preparation has not already been directed, it offers Prepare commit reviews or Pause here. Publish owns review and approval of the exact publication set. Spar provides a read-only second opinion. Use the installed skill picker or name the relevant skill; procedures live in the skills, not this guide.",
+      "text": "Develop carries substantive work from its goal to a verified result with lightweight continuity. It offers Prepare commit reviews or Pause here when Git preparation has not already been directed. Commit and publish retain their separate exact approvals and reuse the same workstream. Use the installed skill picker or name the relevant skill; procedures live in the skills, not this guide.",
       "sources": [
         "agents"
       ]

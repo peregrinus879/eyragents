@@ -16,7 +16,7 @@ SHELLCHECK_FILES := claude-code/.claude/statusline.sh \
   $(filter-out %/spar-payload-scan %.py,$(wildcard agents/.agents/skills/*/scripts/*)) \
   $(wildcard scripts/*.sh tests/*.sh)
 
-.PHONY: help stow unstow dry-run restow require-clone check-skills install-gate migrate-codex-config migrate-hermes-config lint test check verify-deploy verify canary clean refs agent-guide
+.PHONY: help stow unstow dry-run restow require-clone check-skills install-gate migrate-codex-config migrate-hermes-config lint test check verify-deploy verify canary canary-develop clean refs agent-guide
 
 # Deployment goals and their guards must never race, including `make -j clean restow`.
 .NOTPARALLEL:
@@ -39,6 +39,7 @@ help:
 	@echo "  canary         Up to six live calls per tool; interactive-only OpenCode checks reported separately (not a gate)"
 	@echo "  refs           Refresh existing clones declared by this repository (preview with scripts/update-references.sh --dry-run)"
 	@echo "  agent-guide    Rebuild the standalone offline AI-client guide"
+	@echo "  canary-develop Four opt-in OpenCode workflow cases in disposable repositories"
 	@echo "  clean          Remove dangling links that point into this repository's packages"
 
 stow: clean
@@ -93,12 +94,13 @@ lint:
 	python3 -I -c 'import sys; [compile(open(p, "rb").read(), p, "exec") for p in sys.argv[1:]]' \
 	  agents/.agents/skills/spar/scripts/spar-payload-scan scripts/reconcile-codex-config.py scripts/reconcile-hermes-config.py scripts/update-references.py tests/reference-migration.py \
 	  hermes/.hermes/plugins/eyragents/__init__.py tests/hermes.py tests/hermes-runtime.py tests/hermes-live.py tests/hermes-live-fixtures.py tests/config-contracts.py \
-	  agents/.agents/skills/commit/scripts/governance.py tests/commit-governance.py docs/agent-guide-src/build.py
+	  agents/.agents/skills/commit/scripts/governance.py tests/commit-governance.py tests/develop-live.py tests/develop-live-fixtures.py docs/agent-guide-src/build.py
 	@set -e; for plugin in opencode/.config/opencode/plugins/*.js; do node --check "$$plugin"; done
 	@echo "ok:   lint"
 
 test:
 	python3 tests/config-contracts.py
+	python3 tests/develop-live-fixtures.py
 	bash tests/mise-env.sh
 	bash tests/update-references.sh
 	python3 tests/reference-migration.py
@@ -211,6 +213,9 @@ refs:
 
 agent-guide:
 	python3 docs/agent-guide-src/build.py
+
+canary-develop:
+	python3 tests/develop-live.py --opencode "$$(mise which opencode)"
 
 clean: check-skills
 	bash scripts/prepare-stow.sh

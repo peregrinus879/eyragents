@@ -394,7 +394,7 @@ require(claude_auditor.is_file(), "Claude Code auditor agent is missing")
 fields, nested = frontmatter(claude_auditor)
 require(fields.get("name") == "auditor", "Claude auditor agent name drifted")
 require(set(fields.get("tools", "").replace(",", " ").split()) == {"Read", "Grep", "Glob"}, "Claude auditor agent is not exactly Read, Grep, Glob")
-require(fields.get("model") == "fable" and fields.get("effort") == "xhigh", "Claude auditor agent is not the strongest model at xhigh")
+require(fields.get("model") == "fable" and fields.get("effort") == "xhigh", "Claude auditor agent does not use the configured Fable/xhigh preference")
 CLAUDE_AGENT_FIELDS = {"name", "description", "tools", "model", "effort"}
 require(set(fields) <= CLAUDE_AGENT_FIELDS, f"Claude auditor agent carries fields outside the permitted set: {set(fields) - CLAUDE_AGENT_FIELDS}")
 require(claude_auditor.read_text(encoding="utf-8").split("---\n", 2)[2].strip() == charter.strip(), "Claude auditor body differs from the shared charter")
@@ -531,6 +531,16 @@ require(references == {
 }, "harness reference identities differ from the reviewed four-tool set")
 
 # Skills stay portable: the name matches the directory and only standard frontmatter fields appear.
+develop_root = ROOT / "agents/.agents/skills/develop"
+require((develop_root / "SKILL.md").is_file(), "develop workflow is missing")
+for resource in ("SKILL.md", "references/workstream.md", "references/verification.md"):
+    deployed_source = ROOT / "claude-code/.claude/skills/develop" / resource
+    require(deployed_source.is_symlink() and deployed_source.resolve() == (develop_root / resource).resolve(),
+            f"Claude develop resource missing or drifted: {resource}")
+develop_command = ROOT / "opencode/.config/opencode/commands/develop.md"
+require(develop_command.is_file(), "OpenCode develop command is missing")
+require("agent:" not in develop_command.read_text(encoding="utf-8").split("---\n", 2)[1],
+        "develop command overrides the caller's planning/implementation agent mode")
 STANDARD_SKILL_FIELDS = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
 for skill_dir in sorted([*(ROOT / "agents/.agents/skills").iterdir(), *(ROOT / ".agents/skills").iterdir()]):
     text = (skill_dir / "SKILL.md").read_text(encoding="utf-8")

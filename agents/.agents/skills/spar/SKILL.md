@@ -17,7 +17,7 @@ The reviewer reads the repository except Git internals, credential-shaped paths 
 
 ## Procedure
 
-The primary keeps cross-vendor spar documents under `.eyr-plans/<workstream>/spar/`. In-tool audit documents belong separately under `audit/`, even though both can use `review-brief`. Follow shared guidance's [Workstream Checkpoints](../../shared-guidance.md#workstream-checkpoints) ownership, ignored/private-directory and cleanup rules. Reviewers never write these files. Bridge execution scratch remains separate and disposable; its automatic cleanup must not remove a still-needed workstream document.
+The primary keeps cross-vendor spar documents under `.eyr-plans/<workstream>/spar/`. In-tool audit documents belong separately under `audit/`, even though both can use `review-brief`. Follow develop's [workstream contract](../develop/references/workstream.md) for ownership, storage and cleanup. Reviewers never write these files. Bridge execution scratch remains separate and disposable; its automatic cleanup must not remove a still-needed workstream document.
 
 Repository-local plan output requires the normal Git index; alternate-index reviews use private scratch so a synthetic index cannot hide tracked output paths.
 

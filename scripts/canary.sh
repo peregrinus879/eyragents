@@ -3,7 +3,7 @@
 #
 # `make canary`. Not a gate: up to six model calls per tool. Every check runs from a
 # throwaway repository under /tmp with one commit, so it works on any host:
-#   skills   the tool lists commit, publish, and spar among its skills
+#   skills   the tool loads develop and lists the shared workflow skills
 #   gate     a plain commit attempt is denied by the gate and HEAD does not move
 #   read     README read, inside the fixture for OpenCode, this clone for others
 #   system   OS-release read in the preapproved /usr reference tree
@@ -51,28 +51,37 @@ readme_line=$(head -n 1 -- "$ROOT/README.md")
 heading=${readme_line#\# }
 
 ask() { # tool check prompt -> reply; failures are never a negative-test pass
-  local tool=$1 check=$2 prompt=$3 out status=0
+  local tool=$1 check=$2 prompt=$3 out err status=0
   out=$(mktemp "$work/reply.XXXXXX")
+  err=$(mktemp "$work/error.XXXXXX")
   case $tool in
     claude)
-      (cd "$repo" && timeout --kill-after=5 "$TIMEOUT" claude -p "$prompt" --output-format text </dev/null >"$out" 2>/dev/null) || status=$? ;;
+      (cd "$repo" && timeout --kill-after=5 "$TIMEOUT" claude -p "$prompt" --output-format text </dev/null >"$out" 2>"$err") || status=$? ;;
     codex)
-      timeout --kill-after=5 "$TIMEOUT" codex exec --skip-git-repo-check -C "$repo" -o "$out" "$prompt" </dev/null >/dev/null 2>&1 || status=$? ;;
+      timeout --kill-after=5 "$TIMEOUT" codex exec --skip-git-repo-check -C "$repo" -o "$out" "$prompt" </dev/null >/dev/null 2>"$err" || status=$? ;;
     opencode)
-      timeout --kill-after=5 "$TIMEOUT" opencode run --dir "$repo" "$prompt" </dev/null >"$out" 2>/dev/null || status=$? ;;
+      timeout --kill-after=5 "$TIMEOUT" opencode run --dir "$repo" "$prompt" </dev/null >"$out" 2>"$err" || status=$? ;;
     hermes)
       # 0.19 chat --query keeps normal policy. Top-level --oneshot instead
       # enables YOLO, so it must not be used as a shortcut for this probe.
       # Keep automated probes out of native `hermes -c`'s source=cli history.
-      (cd "$repo" && timeout --kill-after=5 "$TIMEOUT" hermes --cli chat --source tool --quiet --query "$prompt" </dev/null >"$out" 2>/dev/null) || status=$? ;;
+      (cd "$repo" && timeout --kill-after=5 "$TIMEOUT" hermes --cli chat --source tool --quiet --query "$prompt" </dev/null >"$out" 2>"$err") || status=$? ;;
     *) status=64 ;;
   esac
   reply=$(<"$out")
   rm -f -- "$out"
   if ((status != 0)); then
     report FAIL "$tool" "$check" "client call failed (exit $status); no assertion made"
+    if [[ -s $err && $(stat -c '%s' -- "$err") -le 8192 ]] &&
+      "$ROOT/agents/.agents/skills/spar/scripts/spar-payload-scan" reply <"$err" >/dev/null 2>&1; then
+      cat -- "$err" >&2
+    else
+      printf 'diagnostic absent, oversized or withheld by content scan\n' >&2
+    fi
+    rm -f -- "$err"
     return 1
   fi
+  rm -f -- "$err"
   if [[ -z ${reply//[[:space:]]/} ]]; then
     report FAIL "$tool" "$check" "client returned no answer; no assertion made"
     return 1
@@ -105,12 +114,12 @@ for tool in $TOOLS; do
     fi
   fi
 
-  if ask "$tool" skills 'List the names of the skills available to you, one per line, and nothing else.'; then
+  if ask "$tool" skills 'Load the develop skill, then list the names of the skills available to you, one per line, and nothing else. This is an inspection request, not implementation.'; then
     missing=""
-    for name in commit publish spar; do
+    for name in develop commit publish spar; do
       grep -qi -- "\b$name\b" <<<"$reply" || missing+=" $name"
     done
-    if [[ -z $missing ]]; then report ok "$tool" skills "commit, publish, spar listed"
+    if [[ -z $missing ]]; then report ok "$tool" skills "develop, commit, publish, spar listed"
     else report FAIL "$tool" skills "missing:$missing"; fi
   fi
 

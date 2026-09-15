@@ -40,12 +40,13 @@ Start an installed client in the project you want to work on. The [operations gu
 
 | Workflow | Canonical procedure |
 | --- | --- |
+| Develop a goal into a verified result | [develop](agents/.agents/skills/develop/SKILL.md) |
 | Commit an atomic change | [commit](agents/.agents/skills/commit/SKILL.md) |
 | Review and publish commits | [publish](agents/.agents/skills/publish/SKILL.md) |
 | Obtain a second opinion | [spar](agents/.agents/skills/spar/SKILL.md) |
 | Reconcile the harness with upstream tools | [eyrsync](.agents/skills/eyrsync/SKILL.md) |
 
-Ordinary authorized implementation proceeds autonomously. H reviews and approves each atomic commit individually, then approves the listed pushes together in one compact summary. The agent executes and verifies each exact binding separately, stopping on failure; grouping approval preserves the individual commits and their diffs. Full technical records are available on request. Host-local authentication, normally `gh`/HTTPS for GitHub, supplies capability, not approval; [setup](docs/setup.md#github-access) owns standalone onboarding. The skills own the detailed procedures.
+The primary uses `develop` for substantive work from intake or resumption through verified delivery and lightweight continuity. It hands repository changes to `commit` when preparation is directed; H approves each exact candidate, then the reviewed publication set through `publish`. Research and plan-only work can finish without Git. Full technical records are available on request. Host-local authentication supplies capability, not approval; [setup](docs/setup.md#github-access) owns standalone onboarding.
 
 ## Verify
 

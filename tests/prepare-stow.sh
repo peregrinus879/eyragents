@@ -19,6 +19,7 @@ fail() {
 make_clone() {
   local repo=$1
   mkdir -p "$repo/agents/.agents/skills/commit/scripts" "$repo/claude-code/.claude/skills/commit/scripts" \
+    "$repo/agents/.agents/skills/develop/references" "$repo/claude-code/.claude/skills/develop/references" \
     "$repo/agents/.agents/skills/publish/scripts" "$repo/claude-code/.claude/skills/publish/scripts" \
     "$repo/claude-code/.claude/skills/spar/scripts" \
     "$repo/agents/.agents/skills/spar/scripts" "$repo/codex/.codex" \
@@ -26,6 +27,12 @@ make_clone() {
     "$repo/scripts" "$repo/templates/codex" "$repo/templates/hooks" "$repo/templates/hermes"
   printf 'tracked\n' >"$repo/claude-code/.claude/settings.json"
   printf 'guidance\n' >"$repo/agents/.agents/shared-guidance.md"
+  cp -- "$ROOT/agents/.agents/skills/develop/SKILL.md" "$repo/agents/.agents/skills/develop/"
+  ln -s ../../../../agents/.agents/skills/develop/SKILL.md "$repo/claude-code/.claude/skills/develop/SKILL.md"
+  for resource in workstream verification; do
+    cp -- "$ROOT/agents/.agents/skills/develop/references/$resource.md" "$repo/agents/.agents/skills/develop/references/"
+    ln -s "../../../../../agents/.agents/skills/develop/references/$resource.md" "$repo/claude-code/.claude/skills/develop/references/$resource.md"
+  done
   printf 'skill\n' >"$repo/agents/.agents/skills/commit/SKILL.md"
   printf 'script\n' >"$repo/agents/.agents/skills/commit/scripts/commit-apply"
   ln -s ../../agents/.agents/shared-guidance.md "$repo/claude-code/.claude/CLAUDE.md"
@@ -123,10 +130,12 @@ case_no_folding() {
   for path in .claude .claude/skills/commit .claude/skills/commit/scripts .claude/skills/publish/scripts .codex .agents .agents/skills .claude/skills/spar/scripts .config/opencode .config/mise/conf.d; do
     [[ -d $home/$path && ! -L $home/$path ]] || fail "$path is not a real directory after no-folding stow"
   done
-  for name in commit publish spar; do
+  for name in develop commit publish spar; do
     [[ -L $home/.agents/skills/$name && $(readlink -f -- "$home/.agents/skills/$name") == "$repo/agents/.agents/skills/$name" ]] ||
       fail "skill directory $name is not one link into the clone"
   done
+  [[ $(readlink -f -- "$home/.claude/skills/develop/references/workstream.md") == "$repo/agents/.agents/skills/develop/references/workstream.md" ]] ||
+    fail "develop's workstream resource is unavailable through Claude's skill path"
   [[ $(readlink -f -- "$home/.agents/shared-guidance.md") == "$repo/agents/.agents/shared-guidance.md" ]] ||
     fail "leaf link does not resolve into the clone"
   [[ $(readlink -f -- "$home/.claude/CLAUDE.md") == "$repo/agents/.agents/shared-guidance.md" ]] ||
