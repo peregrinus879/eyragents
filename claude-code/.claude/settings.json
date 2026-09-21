@@ -40,7 +40,7 @@
       "Read(//var/lib/pacman/**)",
       "Read(//tmp/**)",
       "Read(//var/tmp/**)",
-      "Edit(~/Projects/scratch/**)"
+      "Edit(~/Projects/eyrie/scrape/**)"
     ],
     "deny": [
       "Bash(doas *)",
@@ -322,7 +322,7 @@
     ],
     "soft_deny": [
       "$defaults",
-      "Deleting files and restoring, resetting, or checking out paths from version control clear only on explicit instruction naming the paths; task-scoped creating, moving, copying, formatting, generating, or patching files inside the repository or ~/Projects/scratch is ordinary editing and is not this rule. Preserve unrelated and user-created work; a persistent scratch location does not authorize disposal.",
+      "Deleting files and restoring, resetting, or checking out paths from version control clear only on explicit instruction naming the paths; task-scoped creating, moving, copying, formatting, generating, or patching files inside the repository or ~/Projects/eyrie/scrape is ordinary editing and is not this rule. Preserve unrelated and user-created work; a persistent scratch location does not authorize disposal.",
       "git reset, git restore, git checkout on paths, git stash drop or clear, and git branch -D clear only on explicit instruction naming the target; a fresh candidate presented for approval is not such an instruction.",
       "Changing Git configuration at any scope, remotes, hooks, or attributes (git config writes, git remote set-url or add, core.hooksPath, credential.helper, core.pager, aliases) clears only on explicit instruction; reading configuration is not this rule. Task-required reference refreshes and same-project fetch-URL reconciliation through EyrAgents' maintained reference updater are already authorized under eyrsync's lifecycle when GitHub metadata for the declared and actual origin endpoints matches the reviewed repository ID. That workflow preserves local work, tags and explicit push URLs and refuses ambiguous identity or unsafe reconciliation. Other Git configuration changes retain the explicit-instruction requirement.",
       "gh api requests other than GET, and gh auth, secret, variable, ssh-key, gpg-key, repo delete, repo create, workflow run, and run cancel clear only on explicit instruction. A necessary gh run rerun for failed CI on the exact repository and commit H approved and successfully published is covered by that commit/publication approval under the publish skill's CI rerun procedure; it needs no additional instruction. Other reruns, including changed workflow effects or unrelated commits, require explicit instruction.",
@@ -331,7 +331,7 @@
     ],
     "allow": [
       "$defaults",
-      "Task-scoped ordinary implementation in ~/Projects/scratch is authorized on the same terms as repository editing. This does not authorize destructive operations, unrelated changes, protected-file access, Git configuration changes, or commits and publication without the exact approvals required by EyrAgents."
+      "Task-scoped ordinary implementation in ~/Projects/eyrie/scrape is authorized on the same terms as repository editing. This does not authorize destructive operations, unrelated changes, protected-file access, Git configuration changes, or commits and publication without the exact approvals required by EyrAgents."
     ]
   },
   "hooks": {

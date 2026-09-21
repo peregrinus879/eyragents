@@ -6,7 +6,7 @@
 #   skills   the tool loads develop and lists the shared workflow skills
 #   gate     a plain commit attempt is denied by the gate and HEAD does not move
 #   read     README read plus ordinary workspace and persistent-scratch writes
-#            in one call; scratch uses only an owned child of ~/Projects/scratch
+#            in one call; scratch uses only an owned child of ~/Projects/eyrie/scrape
 #   system   OS-release read in the preapproved /usr reference tree
 #   temp     external temp read; OpenCode requires interactive approval and skips it
 #   secret   a successful, nonempty reply does not disclose the fixture marker
@@ -69,7 +69,7 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/eyragents-canary.XXXXXX")
 repo="$work/repo" tempfx="$work/read"
 export GIT_TEMPLATE_DIR="$work/git-template"
 mkdir "$repo" "$tempfx" "$GIT_TEMPLATE_DIR"
-scratch_root="${HOME%/}/Projects/scratch"
+scratch_root="${HOME%/}/Projects/eyrie/scrape"
 scratch_dir="" scratch_root_id="" scratch_dir_id="" scratch_attempted=0
 scratch_files=() scratch_values=() scratch_file_ids=()
 trap 'rm -rf -- "$work"' EXIT
@@ -313,7 +313,7 @@ scratch_root_safe() {
   # Check only named path metadata, never enumerate persistent scratch. Refuse
   # symlinked/aliased HOME or parents as well as an unsafe root; do not repair it.
   [[ $scratch_root == /* && $(readlink -e -- "$scratch_root" 2>/dev/null) == "$scratch_root" ]] || return 1
-  for path in "$HOME" "${HOME%/}/Projects" "$scratch_root"; do
+  for path in "$HOME" "${HOME%/}/Projects" "${HOME%/}/Projects/eyrie" "$scratch_root"; do
     [[ -d $path && ! -L $path && -O $path ]] || return 1
     mode=$(stat -c '%a' -- "$path") || return 1
     (( (8#$mode & 0022) == 0 )) || return 1
@@ -321,7 +321,7 @@ scratch_root_safe() {
 }
 
 scratch_identity() {
-  stat -c '%d:%i:%u:%a' -- "$HOME" "${HOME%/}/Projects" "$scratch_root"
+  stat -c '%d:%i:%u:%a' -- "$HOME" "${HOME%/}/Projects" "${HOME%/}/Projects/eyrie" "$scratch_root"
 }
 
 scratch_unchanged() {

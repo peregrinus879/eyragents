@@ -85,7 +85,7 @@ export const ScratchPermissions = async ({ directory, worktree }) => {
       const roots = []
       // Persistent authority is independent of TMPDIR and creates no root,
       // ownership change, disposal entitlement or cleanup operation.
-      for (const path of [join(home, "Projects/scratch"), ...(join(tmpdir(), "opencode") === SCRATCH_ROOT ? [SCRATCH_ROOT] : [])]) {
+      for (const path of [join(home, "Projects/eyrie/scrape"), ...(join(tmpdir(), "opencode") === SCRATCH_ROOT ? [SCRATCH_ROOT] : [])]) {
         try {
           if (!classifiedMount(path, mounts)) continue
           const metadata = await bounded(lstat(path))

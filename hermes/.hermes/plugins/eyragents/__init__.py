@@ -362,13 +362,13 @@ def persistent_write(path: Path, home: Path, mounts) -> bool:
     """Eligibility only: never create, repair, clean up or enumerate user work.
 
     Inspect the real root and every traversed component before normalizing '..'.
-    HOME may have a lexical alias; Projects/scratch and its contents may not.
+    HOME may have a lexical alias; Projects/eyrie/scrape and its contents may not.
     Metadata checks are not a transaction against concurrent same-user writers.
     """
     homes = home_paths(home)
     real_home = resolve_target(home)
-    root = real_home / "Projects/scratch"
-    lexical_roots = {h / "Projects/scratch" for h in homes}
+    root = real_home / "Projects/eyrie/scrape"
+    lexical_roots = {h / "Projects/eyrie/scrape" for h in homes}
     containing = [r for r in lexical_roots if below(path, r)]
     resolved = resolve_target(path)
     if not containing or not below(resolved, root) or resolved == root:
@@ -382,7 +382,7 @@ def persistent_write(path: Path, home: Path, mounts) -> bool:
                 return False
             if info.st_mode & 0o022 and not (ancestor != real_home and info.st_mode & stat.S_ISVTX):
                 return False
-        for directory in (real_home, real_home / "Projects", root):
+        for directory in (real_home, real_home / "Projects", real_home / "Projects/eyrie", root):
             info = directory.lstat()
             if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022:
                 return False
@@ -530,7 +530,7 @@ def inspect(tool_name: str, args: dict, task_id="default") -> tuple[dict, dict |
         root = workspace(cwd)
         mounts = mount_table() if paths else None
         homes = home_paths(home)
-        scratch_roots = {h / "Projects/scratch" for h in homes}
+        scratch_roots = {h / "Projects/eyrie/scrape" for h in homes}
         external = []
         for path in paths:
             resolved = resolve_target(path)

@@ -74,7 +74,7 @@ const subjects = {
   read: ["README.md", "private/notes.md", "private/.env", ".env", "nested/.aws/ordinary.md", "public/notes.md", "docs/notes.md", "mcp:fixture:resource"],
   glob: ["**/*.md", "private/**", "public/*.md", "docs/*.js", "other/*"],
   external_directory: [
-    ...["Projects/*", "Projects/public/*", "Projects/private/*", "Projects/scratch/*", "Projects/scratch/session/*", "Projects/scratch-other/*", "Projects/scratch/.ssh/*", "Projects/scratch/copy/.aws/*", ".agents/skills/*", ".agents/skills/spar/scripts/*", ".ssh/*"].map((path) => join(process.env.HOME, path)),
+    ...["Projects/*", "Projects/public/*", "Projects/private/*", "Projects/eyrie/scrape/*", "Projects/eyrie/scrape/session/*", "Projects/scratch/*", "Projects/eyrie/*", "Projects/eyrie/sibling/*", "Projects/eyrie/scrape-other/*", "Projects/eyrie-other/scrape/*", "Projects/eyrie/scrape/.ssh/*", "Projects/eyrie/scrape/copy/.aws/*", ".agents/skills/*", ".agents/skills/spar/scripts/*", ".ssh/*"].map((path) => join(process.env.HOME, path)),
     "/usr/*", "/etc/*", "/opt/*", "/sys/*", "/var/lib/pacman/*", "/tmp/*", "/tmp/fixture/*", "/var/tmp/*", "/tmp/opencode/*", "/tmp/opencode/session/*", "/tmp/claude-1000/*", "/outside/*", truncation, truncation.replace("/*", "/nested/*"),
   ],
 }
@@ -134,7 +134,7 @@ const corpus = JSON.parse(await readFile(join(repo, "tests/safety-paths.json"), 
 const dangerous = [...corpus.system_files, ...corpus.raw_files,
   ...[...corpus.system_trees, ...corpus.raw_trees].map((name) => name + "/ordinary.txt"),
   "service.keytab", ".keytab", ".key", ".pem", "etc/ssh/ssh_host_ed25519_key", ".codex/config.toml", ".claude/projects/note"]
-for (const prefix of ["", "copy/deep/", "../scratch/", "../../tmp/fixture/"]) {
+for (const prefix of ["", "copy/deep/", "../scrape/", "../../eyrie/scrape/", "../../tmp/fixture/"]) {
   for (const name of dangerous) {
     const path = prefix + name
     assert.equal(evaluate("read", path, rules(configured.permission)), "deny", path)

@@ -19,10 +19,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 with tempfile.TemporaryDirectory(prefix="hermes-runtime-") as temporary:
     home = Path(temporary)
-    repo = home / "Projects/work"
+    repo = home / "Projects/eyrie/work"
     repo.mkdir(parents=True)
     (repo / ".git").mkdir()
-    persistent = home / "Projects/scratch"
+    persistent = home / "Projects/eyrie/scrape"
     persistent.mkdir()
     keep = persistent / "user-work.txt"
     keep.write_text("preserve unrelated persistent work")
@@ -67,6 +67,19 @@ with tempfile.TemporaryDirectory(prefix="hermes-runtime-") as temporary:
         mounts = policy.mount_table()
     assert mounts, "one stacked subtree disabled the complete mount table"
     policy.mount_table = lambda: mounts
+    for name in ("scratch", "eyrie", "eyrie/sibling", "eyrie/scrape-other", "eyrie-other/scrape"):
+        target = home / "Projects" / name / "boundary.txt"
+        decision = policy.pre_tool_call(tool_name="write_file", args={"path": str(target)})
+        assert decision and decision["action"] == "approve", f"scratch grant escaped to {name}"
+        assert not target.exists()
+    ancestor = home / "Projects/eyrie"
+    mode = ancestor.stat().st_mode & 0o777
+    ancestor.chmod(mode | 0o020)
+    try:
+        decision = policy.pre_tool_call(tool_name="write_file", args={"path": str(persistent / "unsafe-ancestor.txt")})
+        assert decision and decision["action"] == "approve", "unsafe eyrie ancestor received a scratch grant"
+    finally:
+        ancestor.chmod(mode)
     for target in ("/sys/fs/cgroup", "/sys/fs/cgroup/nested/status"):
         assert policy.pre_tool_call(tool_name="read_file", args={"path": target})["action"] == "approve"
     for ordered in (mounts, list(reversed(mounts))):

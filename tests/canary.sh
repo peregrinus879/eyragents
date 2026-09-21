@@ -131,7 +131,7 @@ reply() {
           printf '%s\n' "$write_mark" >"$write_path"
         fi
         if [[ -n $scratch_path ]]; then
-          [[ $scratch_path == "$HOME"/Projects/scratch/eyragents-canary.*/marker-*.txt && -n $scratch_mark ]] || return 9
+          [[ $scratch_path == "$HOME"/Projects/eyrie/scrape/eyragents-canary.*/marker-*.txt && -n $scratch_mark ]] || return 9
           scratch_dir=${scratch_path%/*}
           printf '%s\n' "$scratch_dir" >"$CANARY_TEST_TRACE/scratch-fixture"
           case $CANARY_TEST_MODE in
@@ -148,9 +148,15 @@ reply() {
               mkdir -- "$scratch_dir"
               printf 'preserve replacement\n' >"$scratch_dir/user-sentinel" ;;
             scratch-root-drift)
-              mv -- "$HOME/Projects/scratch" "$HOME/Projects/scratch.saved"
-              mkdir -- "$HOME/Projects/scratch"
-              printf 'preserve replacement\n' >"$HOME/Projects/scratch/user-sentinel" ;;
+              mv -- "$HOME/Projects/eyrie/scrape" "$HOME/Projects/eyrie/scrape.saved"
+              mkdir -- "$HOME/Projects/eyrie/scrape"
+              printf 'preserve replacement\n' >"$HOME/Projects/eyrie/scrape/user-sentinel" ;;
+            scratch-ancestor-drift)
+              # Keep the scratch root and child identities intact while only
+              # replacing eyrie, so the ancestor snapshot is the witness.
+              mv -- "$HOME/Projects/eyrie" "$HOME/Projects/eyrie.saved"
+              mkdir -- "$HOME/Projects/eyrie"
+              mv -- "$HOME/Projects/eyrie.saved/scrape" "$HOME/Projects/eyrie/scrape" ;;
           esac
         fi
         if [[ $CANARY_TEST_MODE == write-head ]]; then
@@ -341,23 +347,34 @@ run_canary() { # mode tools [default-profile|git-context|git-index|git-config]
   if [[ ${3:-} == default-profile ]]; then local -x HERMES_HOME="$HOME/.hermes"; fi
   export XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share" \
     XDG_CACHE_HOME="$HOME/.cache" XDG_STATE_HOME="$HOME/.local/state" XDG_RUNTIME_DIR="$HOME/runtime"
-  mkdir -p "$HOME/Projects/scratch/keep" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$XDG_STATE_HOME" "$XDG_RUNTIME_DIR"
-  sentinel="$HOME/Projects/scratch/keep/user-sentinel"
+  mkdir -p "$HOME/Projects/eyrie/scrape/keep" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$XDG_STATE_HOME" "$XDG_RUNTIME_DIR"
+  sentinel="$HOME/Projects/eyrie/scrape/keep/user-sentinel"
   printf 'preserve user scratch\n' >"$sentinel"
   case $1 in
     scratch-absent)
-      mv -- "$HOME/Projects/scratch" "$HOME/scratch-saved"
+      mv -- "$HOME/Projects/eyrie/scrape" "$HOME/scratch-saved"
       sentinel="$HOME/scratch-saved/keep/user-sentinel" ;;
+    scratch-old-root)
+      mv -- "$HOME/Projects/eyrie/scrape" "$HOME/Projects/scratch"
+      sentinel="$HOME/Projects/scratch/keep/user-sentinel" ;;
+    scratch-sibling)
+      mv -- "$HOME/Projects/eyrie/scrape" "$HOME/Projects/eyrie/sibling"
+      sentinel="$HOME/Projects/eyrie/sibling/keep/user-sentinel" ;;
     scratch-root-link)
-      mv -- "$HOME/Projects/scratch" "$HOME/scratch-target"
+      mv -- "$HOME/Projects/eyrie/scrape" "$HOME/scratch-target"
       sentinel="$HOME/scratch-target/keep/user-sentinel"
-      ln -s "$HOME/scratch-target" "$HOME/Projects/scratch" ;;
+      ln -s "$HOME/scratch-target" "$HOME/Projects/eyrie/scrape" ;;
     scratch-parent-link)
       mv -- "$HOME/Projects" "$HOME/projects-target"
-      sentinel="$HOME/projects-target/scratch/keep/user-sentinel"
+      sentinel="$HOME/projects-target/eyrie/scrape/keep/user-sentinel"
       ln -s "$HOME/projects-target" "$HOME/Projects" ;;
-    scratch-group-writable) chmod g+w "$HOME/Projects/scratch" ;;
+    scratch-ancestor-link)
+      mv -- "$HOME/Projects/eyrie" "$HOME/eyrie-target"
+      sentinel="$HOME/eyrie-target/scrape/keep/user-sentinel"
+      ln -s "$HOME/eyrie-target" "$HOME/Projects/eyrie" ;;
+    scratch-group-writable) chmod g+w "$HOME/Projects/eyrie/scrape" ;;
     scratch-parent-writable) chmod o+w "$HOME/Projects" ;;
+    scratch-ancestor-writable) chmod g+w "$HOME/Projects/eyrie" ;;
   esac
   if [[ ${3:-} == git-* ]]; then
     # Only synthetic caller state is injected. Its committed, staged and
@@ -416,12 +433,12 @@ HOOK
     [[ $(<"$HOME/git-trace") == 'preserve trace sentinel' ]] || fail 'canary used an inherited Git trace target'
     [[ ! -e $TMP/foreign-hook-ran ]] || fail 'canary executed a foreign Git hook'
   fi
-  if [[ $1 == scratch-root-drift ]]; then sentinel="$HOME/Projects/scratch.saved/keep/user-sentinel"; fi
+  if [[ $1 == scratch-root-drift ]]; then sentinel="$HOME/Projects/eyrie/scrape.saved/keep/user-sentinel"; fi
   [[ $(<"$sentinel") == 'preserve user scratch' ]] || fail 'canary changed the user scratch sentinel'
   if [[ -f $TMP/scratch-fixture ]]; then
     fixture=$(<"$TMP/scratch-fixture")
     case $1 in
-      scratch-wrong|scratch-symlink|scratch-hardlink|scratch-extra|scratch-dir-drift|scratch-root-drift|scratch-marker-drift|signal-HUP|stop-unconfirmed|supervisor-stopped) : ;;
+      scratch-wrong|scratch-symlink|scratch-hardlink|scratch-extra|scratch-dir-drift|scratch-root-drift|scratch-ancestor-drift|scratch-marker-drift|signal-HUP|stop-unconfirmed|supervisor-stopped) : ;;
       *) [[ ! -e $fixture && ! -L $fixture ]] || fail 'canary retained an unchanged owned scratch fixture' ;;
     esac
   fi
@@ -504,7 +521,7 @@ for mode in read-private read-oversized read-oversized-newlines; do
 done
 CANARY_CHECKS="read" run_canary scratch-root-link hermes
 expect 2 '^UNVER  hermes.*scratch' 'focused read accepted an unsafe scratch root'
-[[ -L $HOME/Projects/scratch ]] || fail 'focused read repaired scratch'
+[[ -L $HOME/Projects/eyrie/scrape ]] || fail 'focused read repaired scratch'
 CANARY_CHECKS="read" run_canary scratch-missing hermes
 expect 1 '^FAIL   hermes.*scratch' 'focused read omitted its scratch marker assertion'
 CANARY_CHECKS="read" run_canary signal-INT claude git-context
@@ -550,17 +567,19 @@ for mode in normal-descendant exception-descendant timeout-descendant stop-uncon
   [[ -f $TMP/liveness-checked ]] || fail "$mode lacked the child-liveness witness"
 done
 
-for mode in scratch-absent scratch-root-link scratch-parent-link scratch-group-writable scratch-parent-writable; do
+for mode in scratch-absent scratch-old-root scratch-sibling scratch-root-link scratch-parent-link scratch-ancestor-link scratch-group-writable scratch-parent-writable scratch-ancestor-writable; do
   run_canary "$mode" claude
   expect 2 '^UNVER  claude.*scratch.*existing scratch root' "canary passed a $mode root"
   grep -q '^ok     claude.*write ' "$TMP/out" || fail "$mode prevented the ordinary workspace check"
   [[ ! -e $TMP/scratch-fixture ]] || fail "$mode requested a persistent scratch write"
   case $mode in
-    scratch-absent) [[ ! -e $HOME/Projects/scratch ]] || fail 'canary created the absent scratch root' ;;
-    scratch-root-link) [[ -L $HOME/Projects/scratch ]] || fail 'canary repaired the symlinked scratch root' ;;
+    scratch-absent|scratch-old-root|scratch-sibling) [[ ! -e $HOME/Projects/eyrie/scrape ]] || fail 'canary created the absent scratch root' ;;
+    scratch-root-link) [[ -L $HOME/Projects/eyrie/scrape ]] || fail 'canary repaired the symlinked scratch root' ;;
     scratch-parent-link) [[ -L $HOME/Projects ]] || fail 'canary repaired the symlinked scratch parent' ;;
-    scratch-group-writable) [[ $(stat -c '%a' "$HOME/Projects/scratch") == 720 ]] || fail 'canary repaired root permissions' ;;
+    scratch-ancestor-link) [[ -L $HOME/Projects/eyrie ]] || fail 'canary repaired the symlinked intermediate ancestor' ;;
+    scratch-group-writable) [[ $(stat -c '%a' "$HOME/Projects/eyrie/scrape") == 720 ]] || fail 'canary repaired root permissions' ;;
     scratch-parent-writable) [[ $(stat -c '%a' "$HOME/Projects") == 702 ]] || fail 'canary repaired parent permissions' ;;
+    scratch-ancestor-writable) [[ $(stat -c '%a' "$HOME/Projects/eyrie") == 720 ]] || fail 'canary repaired intermediate ancestor permissions' ;;
   esac
 done
 
@@ -582,7 +601,7 @@ for tool in claude codex opencode hermes; do
   done
 done
 
-for mode in scratch-extra scratch-dir-drift scratch-root-drift scratch-marker-drift; do
+for mode in scratch-extra scratch-dir-drift scratch-root-drift scratch-ancestor-drift scratch-marker-drift; do
   run_canary "$mode" claude
   expect 2 '^UNVER  fixture.*cleanup retained' "canary silently removed or accepted $mode"
   case $mode in
@@ -592,7 +611,9 @@ for mode in scratch-extra scratch-dir-drift scratch-root-drift scratch-marker-dr
     scratch-dir-drift)
       [[ $(<"$fixture/user-sentinel") == 'preserve replacement' && -f $fixture.saved/marker-1.txt ]] || fail 'canary changed replacement or moved fixture' ;;
     scratch-root-drift)
-      [[ $(<"$HOME/Projects/scratch/user-sentinel") == 'preserve replacement' && -f $HOME/Projects/scratch.saved/${fixture##*/}/marker-1.txt ]] || fail 'canary changed replacement or moved root' ;;
+      [[ $(<"$HOME/Projects/eyrie/scrape/user-sentinel") == 'preserve replacement' && -f $HOME/Projects/eyrie/scrape.saved/${fixture##*/}/marker-1.txt ]] || fail 'canary changed replacement or moved root' ;;
+    scratch-ancestor-drift)
+      [[ -d $HOME/Projects/eyrie.saved && -f $fixture/marker-1.txt ]] || fail 'canary missed intermediate ancestor replacement' ;;
     scratch-marker-drift)
       cmp -s -- "$fixture/marker-1.txt" "$fixture/marker-saved.txt" || fail 'canary deleted same-content marker replacement'
       [[ ! $fixture/marker-1.txt -ef $fixture/marker-saved.txt ]] || fail 'replacement fixture did not change marker identity' ;;

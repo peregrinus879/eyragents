@@ -295,7 +295,7 @@
     },
     "external_directory": {
       "/tmp/opencode/*": "allow",
-      "~/Projects/scratch/**": "allow",
+      "~/Projects/eyrie/scrape/**": "allow",
       "~/Projects/quarry/**": "allow",
       "~/.agents/skills/**": "allow",
       "/usr/**": "allow",

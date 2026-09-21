@@ -28,7 +28,7 @@ H authorizes session-owned files under `/tmp` or `$TMPDIR` for this workflow, su
 
 Automatically remove workflow-owned scratch once its useful results are retained and no step needs it. Retain checkpoint/draft/evidence only for active work, a concrete pause, pending commit/publication/CI or recovery. Use the same state through those workflows. When its final dependency ends, remove the owned files and empty directories without an extra routine approval question. Promote lasting rules and unresolved issues to their canonical owners first; a generic deferred issue does not justify a completed-work archive.
 
-Preserve user/unknown files, other sessions' artifacts, reference clones, persistent project work and approved retention commitments. A pathname under `~/Projects/scratch/` does not make its contents disposable. Governance receipts use the commit skill's exact-ID close-out, never a directory or age sweep. Report anything retained with its concrete next use and removal condition.
+Preserve user/unknown files, other sessions' artifacts, reference clones, persistent project work and approved retention commitments. A pathname under `~/Projects/eyrie/scrape/` does not make its contents disposable. Governance receipts use the commit skill's exact-ID close-out, never a directory or age sweep. Report anything retained with its concrete next use and removal condition.
 
 ## Cross-Host Handoff
 

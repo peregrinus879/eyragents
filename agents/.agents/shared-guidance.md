@@ -31,7 +31,7 @@ Address user as 'H'. Domain: capital projects (civil eng, MBA); PMO, Project Con
 
 ### Edit Authority
 
-- An implementation request authorizes in-scope edits within the current repository (or the working directory outside a repository) and throughout `~/Projects/scratch/`. Other edits require H's explicit authorization naming the target, unless an H-authorized standing exception applies.
+- An implementation request authorizes in-scope edits within the current repository (or the working directory outside a repository) and throughout `~/Projects/eyrie/scrape/`. Other edits require H's explicit authorization naming the target, unless an H-authorized standing exception applies.
 - Preserve unrelated changes and user-created untracked files. If in-scope edits cannot be separated from existing work, ask H how to proceed.
 - Prefer native tools for hand edits; project automation and shell edits are also permitted. Review the resulting diff.
 

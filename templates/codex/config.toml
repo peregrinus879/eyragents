@@ -39,7 +39,7 @@ description = "Writable workspace and persistent scratch, scoped system/configur
 extends = ":workspace"
 
 [permissions.trusted-workspace.workspace_roots]
-"~/Projects/scratch" = true
+"~/Projects/eyrie/scrape" = true
 
 [permissions.trusted-workspace.filesystem]
 ":root" = "deny"

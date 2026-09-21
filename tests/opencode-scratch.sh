@@ -21,7 +21,7 @@ const [repo, tmp] = process.argv.slice(2)
 const root = join(tmp, "opencode")
 const worktree = join(tmp, "repo")
 const directory = join(worktree, "subdir")
-const persistent = join(process.env.HOME, "Projects/scratch")
+const persistent = join(process.env.HOME, "Projects/eyrie/scrape")
 const mountFile = join(tmp, "mountinfo")
 const ordinaryMounts = "10 1 8:1 / / rw - ext4 /dev/fixture rw\n"
 const metadataFailures = new Map()
@@ -197,7 +197,7 @@ await persistentHooks.config(persistentOnly)
 await probe({ config: persistentOnly, hooks: persistentHooks, wt: worktree, cwd: directory }, "write",
   { filePath: join(persistent, "independent.md"), content: "fixture" }, [add(join(persistent, "independent.md"))], "allow")
 assert.equal(evaluate("edit", relative(worktree, join(root, "not-granted.md")), persistentOnly.permission), "ask")
-for (const [name, expected] of [["scratch", "allow"], ["scratch-other", "ask"]]) {
+for (const [name, expected] of [["eyrie/scrape", "allow"], ["scratch", "ask"], ["eyrie/scrape-other", "ask"], ["eyrie/sibling", "ask"], ["eyrie", "ask"], ["eyrie-other/scrape", "ask"]]) {
   const path = join(process.env.HOME, "Projects", name, "note.md")
   assert.equal(evaluate("external_directory", dirname(path) + "/*", state.config.permission), expected)
   await probe(state, "write", { filePath: path, content: "fixture" }, [add(path)], expected)
@@ -306,7 +306,8 @@ try {
 } finally { await fs.rename(root + "-saved", root) }
 
 // Real worktree coordinates, including bounded nested-worktree grants.
-for (const wt of ["/", tmp, root, join(root, "nested/repo"), persistent, join(persistent, "nested/repo"), join(tmp, "worktree [with spaces]")]) {
+const siblingWorktree = join(process.env.HOME, "Projects/eyrie/eyragents")
+for (const wt of ["/", tmp, root, join(root, "nested/repo"), persistent, join(persistent, "nested/repo"), siblingWorktree, join(tmp, "worktree [with spaces]")]) {
   if (wt !== "/" && wt !== tmp) await fs.mkdir(wt, { recursive: true })
   const cwd = wt === "/" || wt === tmp ? directory : wt
   const located = await setup(structuredClone(base), wt, cwd)
@@ -318,6 +319,13 @@ for (const wt of ["/", tmp, root, join(root, "nested/repo"), persistent, join(pe
   const baseline = evaluate("edit", relative(wt, outside), base.permission)
   assert.equal(evaluate("edit", relative(wt, outside), located.config.permission), baseline)
   await probe(located, "write", { filePath: outside, content: "fixture" }, [add(outside)], wt === "/" ? "ask" : baseline)
+  if ([siblingWorktree, persistent, join(persistent, "nested/repo")].includes(wt)) {
+    for (const name of ["scratch", "eyrie", "eyrie/sibling", "eyrie/scrape-other", "eyrie-other/scrape"]) {
+      const path = join(process.env.HOME, "Projects", name, "boundary.md")
+      assert.equal(evaluate("edit", relative(wt, path), located.config.permission), "ask")
+      await probe(located, "write", { filePath: path, content: "fixture" }, [add(path)], "ask")
+    }
+  }
   if (wt === "/") {
     // No new grant fixes the documented non-Git '/' baseline limitation.
     const path = join(persistent, "root-worktree.md")
@@ -438,6 +446,18 @@ for (const text of ["bad\n", ordinaryMounts + `20 10 8:1 /elsewhere ${persistent
   assert.equal(evaluate("edit", relative(worktree, sentinel), cfg.permission), "ask")
 }
 await fs.writeFile(mountFile, ordinaryMounts)
+// A linked intermediate eyrie ancestor loses canonical-root eligibility even
+// when the scratch root inode is unchanged. Preserve native fallback handling.
+const ancestor = dirname(persistent)
+await fs.rename(ancestor, ancestor + "-saved")
+try {
+  await fs.symlink(ancestor + "-saved", ancestor)
+  const cfg = structuredClone(base)
+  await setup(cfg)
+  assert.equal(evaluate("edit", relative(worktree, sentinel), cfg.permission), "ask")
+  await probe(state, "write", { filePath: sentinel, content: "fixture" }, [edit(sentinel)], "refused")
+  await fs.unlink(ancestor)
+} finally { await fs.rename(ancestor + "-saved", ancestor) }
 await fs.rename(persistent, persistent + "-saved")
 try {
   await fs.mkdir(persistent)

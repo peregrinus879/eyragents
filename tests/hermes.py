@@ -376,8 +376,8 @@ class HermesTests(unittest.TestCase):
         home_mount = cases[0]
         mounts = [root, home_mount]
         self.assertTrue(policy.standing_read(self.home / ".bashrc", self.home, mounts))
-        scratch = self.home / "Projects/scratch"
-        scratch.mkdir()
+        scratch = self.home / "Projects/eyrie/scrape"
+        scratch.mkdir(parents=True)
         policy.mount_table = lambda: mounts
         self.assertIsNone(policy.pre_tool_call(tool_name="write_file", args={"path": str(scratch / "new.txt")}))
         mounts.append((Path("/media/disk"), *home_mount[1:]))
@@ -392,8 +392,8 @@ class HermesTests(unittest.TestCase):
 
     def test_unique_actual_root_survives_whole_root_mirrors(self):
         policy = self.policy()
-        scratch = self.home / "Projects/scratch"
-        scratch.mkdir()
+        scratch = self.home / "Projects/eyrie/scrape"
+        scratch.mkdir(parents=True)
         prospective = scratch / "prospective.txt"
         for filesystem, source_root, subvolume in (("ext4", "/", None), ("btrfs", "/@", "/@")):
             root = (Path("/"), source_root, filesystem, "8:1", subvolume)
@@ -423,8 +423,8 @@ class HermesTests(unittest.TestCase):
     def test_stacked_mount_ambiguity_is_local_to_its_subtree(self):
         policy = self.policy()
         parser = module("hermes_mount_policy", ROOT / "hermes/.hermes/plugins/eyragents/__init__.py").mount_table
-        scratch = self.home / "Projects/scratch"
-        scratch.mkdir()
+        scratch = self.home / "Projects/eyrie/scrape"
+        scratch.mkdir(parents=True)
         # gu605c's observed failure shape: one stacked point with a unique,
         # supported root. Use synthetic locations/options, not a host snapshot.
         base = "1 0 8:1 /@ / rw - btrfs /dev/fixture rw,subvol=/@\n"
@@ -456,8 +456,8 @@ class HermesTests(unittest.TestCase):
 
     def test_inaccessible_inventory_parent_preserves_literals_and_unrelated_work(self):
         policy = self.policy()
-        scratch = self.home / "Projects/scratch"
-        scratch.mkdir()
+        scratch = self.home / "Projects/eyrie/scrape"
+        scratch.mkdir(parents=True)
         private_parent = Path("/etc/ipsec.d")
         alias = self.repo / "outward-target"
         alias.symlink_to(private_parent / "ordinary-name")
@@ -517,14 +517,22 @@ class HermesTests(unittest.TestCase):
 
     def test_persistent_scratch_union_and_preservation(self):
         policy = self.policy()
-        scratch = self.home / "Projects/scratch"
-        scratch.mkdir()
+        scratch = self.home / "Projects/eyrie/scrape"
+        scratch.mkdir(parents=True)
         keep = scratch / "user-work.txt"
         keep.write_text("preserve this unrelated work")
         before = keep.read_bytes(), keep.stat().st_mtime_ns
         with patch.dict(os.environ, {"TMPDIR": str(self.base / "unrelated-temp")}):
             for path in (scratch / "new/note.txt", scratch / "new/../note.txt", self.repo / "new.txt"):
                 self.assertIsNone(policy.pre_tool_call(tool_name="write_file", args={"path": str(path)}))
+            sibling = scratch.parent / "eyragents"
+            sibling.mkdir()
+            (sibling / ".git").mkdir()
+            policy.context = lambda task: (sibling, self.home)
+            self.assertIsNone(policy.pre_tool_call(tool_name="write_file", args={"path": str(scratch / "sibling-worktree.txt")}))
+            for name in ("scratch", "eyrie", "eyrie/sibling", "eyrie/scrape-other", "eyrie-other/scrape"):
+                target = self.home / "Projects" / name / "boundary.txt"
+                self.assertEqual(policy.pre_tool_call(tool_name="write_file", args={"path": str(target)})["action"], "approve")
             # Nested workspace and persistent roots form a union.
             nested = scratch / "work"
             nested.mkdir()
@@ -540,10 +548,10 @@ class HermesTests(unittest.TestCase):
 
     def test_persistent_scratch_links_unsafe_ancestry_and_mounts(self):
         policy = self.policy()
-        scratch = self.home / "Projects/scratch"
+        scratch = self.home / "Projects/eyrie/scrape"
         # Missing persistent root receives no automatic creation permission.
         self.assertEqual(policy.pre_tool_call(tool_name="write_file", args={"path": str(scratch / "a")})["action"], "approve")
-        scratch.mkdir()
+        scratch.mkdir(parents=True)
         ordinary = scratch / "ordinary"
         ordinary.write_text("keep")
         (scratch / "link").symlink_to(ordinary)
@@ -558,14 +566,21 @@ class HermesTests(unittest.TestCase):
         scratch.chmod(0o777)
         self.assertEqual(policy.pre_tool_call(tool_name="write_file", args={"path": str(scratch / "a")})["action"], "approve")
         scratch.chmod(0o755)
+        ancestor = scratch.parent
+        mode = ancestor.stat().st_mode & 0o777
+        for unsafe_mode in (mode | 0o020, mode | 0o002):
+            ancestor.chmod(unsafe_mode)
+            self.assertEqual(policy.pre_tool_call(tool_name="write_file", args={"path": str(scratch / "a")})["action"], "approve")
+        ancestor.chmod(mode)
         original = Path.lstat
         def foreign_owner(path, *args, **kwargs):
             info = original(path, *args, **kwargs)
-            if path == scratch:
+            if path == foreign:
                 return types.SimpleNamespace(st_mode=info.st_mode, st_uid=os.getuid() + 1, st_nlink=info.st_nlink)
             return info
-        with patch.object(Path, "lstat", foreign_owner):
-            self.assertEqual(policy.pre_tool_call(tool_name="write_file", args={"path": str(scratch / "a")})["action"], "approve")
+        for foreign in (scratch, ancestor):
+            with patch.object(Path, "lstat", foreign_owner):
+                self.assertEqual(policy.pre_tool_call(tool_name="write_file", args={"path": str(scratch / "a")})["action"], "approve")
         policy.mount_table = lambda: [(Path("/"), "/", "ext4", "8:1", None), (scratch / "mounted", "/", "nfs", "0:2", None)]
         self.assertEqual(policy.pre_tool_call(tool_name="write_file", args={"path": str(scratch / "mounted/a")})["action"], "approve")
         policy.mount_table = lambda: None
@@ -574,16 +589,27 @@ class HermesTests(unittest.TestCase):
 
     def test_scratch_home_alias_and_root_redirect(self):
         policy = self.policy()
-        scratch = self.home / "Projects/scratch"
-        scratch.mkdir()
+        scratch = self.home / "Projects/eyrie/scrape"
+        scratch.mkdir(parents=True)
         alias = self.base / "home-alias"
         alias.symlink_to(self.home, target_is_directory=True)
         policy.context = lambda task: (self.repo, alias)
         for home in (alias, self.home):
-            self.assertIsNone(policy.pre_tool_call(tool_name="write_file", args={"path": str(home / "Projects/scratch/a")}))
+            self.assertIsNone(policy.pre_tool_call(tool_name="write_file", args={"path": str(home / "Projects/eyrie/scrape/a")}))
         scratch.rmdir()
         scratch.symlink_to(self.repo, target_is_directory=True)
         self.assertEqual(policy.pre_tool_call(tool_name="write_file", args={"path": str(scratch / "a")})["action"], "approve")
+
+    def test_scratch_intermediate_ancestor_redirect(self):
+        policy = self.policy()
+        scratch = self.home / "Projects/eyrie/scrape"
+        scratch.mkdir(parents=True)
+        ancestor = scratch.parent
+        saved = self.home / "Projects/eyrie-saved"
+        ancestor.rename(saved)
+        ancestor.symlink_to(saved, target_is_directory=True)
+        self.assertEqual(policy.pre_tool_call(tool_name="write_file", args={"path": str(scratch / "a")})["action"], "approve")
+        self.assertFalse((saved / "scrape/a").exists())
 
     def test_capability_preservation_and_execution_backstop(self):
         policy = self.policy()
@@ -657,7 +683,7 @@ def metadata_preflight():
                               ("projects_read", ROOT / "README.md")):
             report[label + "_eligible"] = (policy.path_denial(target, False, home) is None and
                                             policy.standing_read(target, home, mounts))
-        prospective = home / "Projects/scratch/.eyragents-hermes-metadata-probe"
+        prospective = home / "Projects/eyrie/scrape/.eyragents-hermes-metadata-probe"
         try:
             prospective.lstat()
             absent = False

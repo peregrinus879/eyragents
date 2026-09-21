@@ -301,10 +301,12 @@ for rule in permissions["allow"]:
     )
 for path in (*HOME_READ_PATHS, "Projects/sibling/README.md"):
     require(claude_file_action(permissions, "Read", FIXTURE_HOME + "/" + path) == "allow", f"Claude scoped home read is shadowed: {path}")
-require(claude_file_action(permissions, "Edit", FIXTURE_HOME + "/Projects/scratch/result.md") == "allow", "Claude lacks scoped persistent-scratch editing")
+require(claude_file_action(permissions, "Edit", FIXTURE_HOME + "/Projects/eyrie/scrape/result.md") == "allow", "Claude lacks scoped persistent-scratch editing")
 for target in ("/ordinary.md", FIXTURE_HOME + "/Documents/ordinary.md", "/home/other/.config/ordinary.md"):
     require(claude_file_action(permissions, "Read", target) != "allow", f"Claude adds an unreviewed broad read grant: {target}")
-for target in (FIXTURE_HOME + "/Projects/scratch-other/result.md", FIXTURE_HOME + "/Projects/quarry/result.md", FIXTURE_HOME + "/.bashrc"):
+for target in (FIXTURE_HOME + "/Projects/scratch/result.md", FIXTURE_HOME + "/Projects/eyrie/scrape-other/result.md",
+               FIXTURE_HOME + "/Projects/eyrie/result.md", FIXTURE_HOME + "/Projects/eyrie/sibling/result.md",
+               FIXTURE_HOME + "/Projects/eyrie-other/scrape/result.md", FIXTURE_HOME + "/Projects/quarry/result.md", FIXTURE_HOME + "/.bashrc"):
     require(claude_file_action(permissions, "Edit", target) != "allow", f"Claude scratch allowance reaches another edit scope: {target}")
 # Classifier prose is reviewed as policy, not simulated as deterministic matching.
 hard_denies = " ".join(claude["autoMode"]["hard_deny"])
@@ -325,7 +327,7 @@ def check_codex(config: dict, label: str) -> None:
     require("sandbox_mode" not in config, f"{label} mixes legacy sandbox with permission profile")
     profile = config["permissions"]["trusted-workspace"]
     require(profile.get("extends") == ":workspace", f"{label} lost inherited workspace metadata protections")
-    require(profile.get("workspace_roots") == {"~/Projects/scratch": True}, f"{label} persistent scratch is not the sole profile-defined workspace root")
+    require(profile.get("workspace_roots") == {"~/Projects/eyrie/scrape": True}, f"{label} persistent scratch is not the sole profile-defined workspace root")
     filesystem = profile["filesystem"]
     require(filesystem[":root"] == "deny", f"{label} filesystem root is not denied")
     require(filesystem.get(":minimal") == "read", f"{label} lacks normal runtime reads")
@@ -371,8 +373,8 @@ def check_codex(config: dict, label: str) -> None:
         require(filesystem.get("/" + path) == "deny", f"{label} missing literal system/raw exclusion: {path}")
     # This models configured masks only. Missing literals outside writable roots
     # are skipped by 0.154 bwrap; virtual /proc is mounted again after masks.
-    entries = list(codex_entries(filesystem, [FIXTURE_CWD, FIXTURE_HOME + "/Projects/scratch"]))
-    for scope in (FIXTURE_CWD, FIXTURE_HOME + "/Projects/scratch", FIXTURE_HOME + "/Projects/sibling"):
+    entries = list(codex_entries(filesystem, [FIXTURE_CWD, FIXTURE_HOME + "/Projects/eyrie/scrape"]))
+    for scope in (FIXTURE_CWD, FIXTURE_HOME + "/Projects/eyrie/scrape", FIXTURE_HOME + "/Projects/sibling"):
         for store in (*PROJECT_STORE_DIRECTORIES, "secrets", *SYSTEM_TREES):
             for suffix in ("/ordinary.txt", "/nested/ordinary.txt"):
                 target = scope + "/copy/" + store + suffix
@@ -382,12 +384,14 @@ def check_codex(config: dict, label: str) -> None:
             require(codex_file_action(entries, target) == "deny", f"{label} private-key shape mask missing: {target}")
     for path in HOME_READ_PATHS:
         require(codex_file_action(entries, FIXTURE_HOME + "/" + path) == "read", f"{label} scoped home read is shadowed: {path}")
-    for target in (FIXTURE_CWD + "/ordinary.md", FIXTURE_HOME + "/Projects/scratch/ordinary.md"):
+    for target in (FIXTURE_CWD + "/ordinary.md", FIXTURE_HOME + "/Projects/eyrie/scrape/ordinary.md"):
         require(codex_file_action(entries, target) == "write", f"{label} writable root lost: {target}")
-    for scope in (FIXTURE_CWD, FIXTURE_HOME + "/Projects/scratch"):
+    for scope in (FIXTURE_CWD, FIXTURE_HOME + "/Projects/eyrie/scrape"):
         for subpath in (".git/config", ".git/hooks/pre-commit"):
             require(codex_file_action(entries, scope + "/" + subpath) == "read", f"{label} writable Git configuration/hooks: {scope}/{subpath}")
-    for target in (FIXTURE_HOME + "/Projects/quarry/ordinary.md", FIXTURE_HOME + "/Projects/scratch-other/ordinary.md"):
+    for target in (FIXTURE_HOME + "/Projects/quarry/ordinary.md", FIXTURE_HOME + "/Projects/scratch/ordinary.md",
+                   FIXTURE_HOME + "/Projects/eyrie/scrape-other/ordinary.md", FIXTURE_HOME + "/Projects/eyrie/ordinary.md",
+                   FIXTURE_HOME + "/Projects/eyrie/sibling/ordinary.md", FIXTURE_HOME + "/Projects/eyrie-other/scrape/ordinary.md"):
         require(codex_file_action(entries, target) == "read", f"{label} scratch write leaked to a sibling: {target}")
     for target in (FIXTURE_HOME + "/Documents/ordinary.md", "/home/other/.config/ordinary.md", "/unlisted-system/ordinary.md"):
         require(codex_file_action(entries, target) == "deny", f"{label} unlisted region received a read grant: {target}")
@@ -452,7 +456,7 @@ require(edit_rules.get("../*") == "ask", "OpenCode edits outside a non-root work
 # Its fixture suite, not this untransformed map, verifies persistent writes.
 for subject in ("../../tmp/opencode/session/result.md", "../sibling/tmp/opencode/result.md"):
     require(evaluate("edit", subject, opencode["permission"]) == "ask", "OpenCode unsafe relative temp write exception reopened")
-for tree in ("scratch", "quarry"):
+for tree in ("eyrie/scrape", "quarry"):
     require(evaluate("edit", f"../{tree}/result.md", opencode["permission"]) == "ask", f"OpenCode {tree} location grant silently permits native edits")
     # Non-Git worktree '/' produces no ../ prefix; do not claim universal edit asks.
     require(evaluate("edit", f"fixture-home/Projects/{tree}/result.md", opencode["permission"]) == "allow", "OpenCode non-Git root-worktree edit behavior changed")
@@ -469,7 +473,7 @@ for label, rules in (("read", read_rules), ("edit", edit_rules), ("external_dire
     denies_come_last(rules, label)
 reference_trees = ("/usr", "/var/lib/pacman")
 require({path for path, action in external_rules.items() if action == "allow"} == {
-    "/tmp/opencode/*", "~/Projects/scratch/**", "~/Projects/quarry/**", "~/.agents/skills/**", "/usr/**", "/var/lib/pacman/**",
+    "/tmp/opencode/*", "~/Projects/eyrie/scrape/**", "~/Projects/quarry/**", "~/.agents/skills/**", "/usr/**", "/var/lib/pacman/**",
 }, "OpenCode external preapprovals differ from the reviewed location set")
 for tree in reference_trees:
     require(external_rules.get(f"{tree}/**") == "allow", f"OpenCode OS reference location is not preapproved: {tree}")
@@ -488,10 +492,14 @@ external_cases.update({
     "/var/lib/pacman-other/*": "ask",
     "/usr/share/.ssh/*": "deny",
     "/var/lib/pacman/.aws/*": "deny",
-    "/fixture-home/Projects/scratch/*": "allow",
-    "/fixture-home/Projects/scratch/session/deep/*": "allow",
-    "/fixture-home/Projects/scratch-other/*": "ask",
-    "/fixture-home/Projects/sibling/scratch/*": "ask",
+    "/fixture-home/Projects/eyrie/scrape/*": "allow",
+    "/fixture-home/Projects/eyrie/scrape/session/deep/*": "allow",
+    "/fixture-home/Projects/scratch/*": "ask",
+    "/fixture-home/Projects/eyrie/*": "ask",
+    "/fixture-home/Projects/eyrie/sibling/*": "ask",
+    "/fixture-home/Projects/eyrie/scrape-other/*": "ask",
+    "/fixture-home/Projects/eyrie-other/scrape/*": "ask",
+    "/fixture-home/Projects/sibling/eyrie/scrape/*": "ask",
     "/fixture-home/Projects/quarry/*": "allow",
     "/fixture-home/Projects/quarry/opencode/src/*": "allow",
     "/fixture-home/Projects/quarry-other/*": "ask",
@@ -728,7 +736,7 @@ safe_paths = tuple(dict.fromkeys([
     *(f"etc/ssh/ssh_host_{kind}_key.pub" for kind in ("rsa", "dsa", "ecdsa", "ed25519")),
 ]))
 codex_primary = list(codex_entries(codex_template["permissions"]["trusted-workspace"]["filesystem"],
-                                 [FIXTURE_CWD, FIXTURE_HOME + "/Projects/scratch"]))
+                                 [FIXTURE_CWD, FIXTURE_HOME + "/Projects/eyrie/scrape"]))
 bridge_fixtures = os.environ.get("SPAR_BRIDGE_FIXTURES")
 if bridge_fixtures:
     argv = (Path(bridge_fixtures) / "spar-claude.argv").read_bytes().decode().rstrip("\0").split("\0")
@@ -780,11 +788,11 @@ for prefix in ("", "copy/deep/"):
             require(scanned.returncode == (2 if denied else 0), f"scanner artifact corpus mismatch: {subject}")
 # Preapproved project roots retain persisted read/edit restrictions. Actual
 # guarded scratch exceptions are exercised in tests/opencode-scratch.sh.
-for tree in ("scratch", "quarry"):
+for tree, location in (("scratch", "eyrie/scrape"), ("quarry", "quarry")):
     for prefix in ("", "copy/deep/"):
         for name, denied in [(name, True) for name in corpus] + [(name, False) for name in safe_paths]:
-            target = f"/fixture-home/Projects/{tree}/" + prefix + name
-            subject = os.path.relpath(target, "/fixture-home/Projects/repo")
+            target = f"/fixture-home/Projects/{location}/" + prefix + name
+            subject = os.path.relpath(target, "/fixture-home/Projects/eyrie/repo")
             external = os.path.dirname(target) + "/*"
             for permissions in (opencode["permission"], derived_agents["auditor"]["permission"]):
                 require(evaluate("read", subject, permissions) == ("deny" if denied else "allow"), f"OpenCode {tree} read policy drifted: {subject}")
