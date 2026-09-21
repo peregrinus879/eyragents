@@ -16,7 +16,7 @@ SHELLCHECK_FILES := claude-code/.claude/statusline.sh \
   $(filter-out %/spar-payload-scan %.py,$(wildcard agents/.agents/skills/*/scripts/*)) \
   $(wildcard scripts/*.sh tests/*.sh)
 
-.PHONY: help stow unstow dry-run restow require-clone check-skills install-gate migrate-codex-config migrate-hermes-config lint test check verify-deploy verify canary canary-develop clean refs agent-guide
+.PHONY: help stow unstow dry-run restow require-clone check-skills install-gate migrate-codex-config migrate-hermes-config lint test check verify-deploy verify canary canary-develop clean refs workspace-guide
 
 # Deployment goals and their guards must never race, including `make -j clean restow`.
 .NOTPARALLEL:
@@ -38,7 +38,7 @@ help:
 	@echo "  verify         lint, check, and verify-deploy"
 	@echo "  canary         Up to six live calls per tool; interactive-only OpenCode checks reported separately (not a gate)"
 	@echo "  refs           Refresh existing clones declared by this repository (preview with scripts/update-references.sh --dry-run)"
-	@echo "  agent-guide    Rebuild the standalone offline AI-client guide"
+	@echo "  workspace-guide Rebuild the full offline workspace and AI-client guide for both hosts"
 	@echo "  canary-develop Four opt-in OpenCode workflow cases in disposable repositories"
 	@echo "  clean          Remove dangling links that point into this repository's packages"
 
@@ -94,7 +94,7 @@ lint:
 	python3 -I -c 'import sys; [compile(open(p, "rb").read(), p, "exec") for p in sys.argv[1:]]' \
 	  agents/.agents/skills/spar/scripts/spar-payload-scan scripts/reconcile-codex-config.py scripts/reconcile-hermes-config.py scripts/update-references.py tests/reference-migration.py \
 	  hermes/.hermes/plugins/eyragents/__init__.py tests/hermes.py tests/hermes-runtime.py tests/hermes-live.py tests/hermes-live-fixtures.py tests/config-contracts.py \
-	  agents/.agents/skills/commit/scripts/governance.py tests/commit-governance.py tests/develop-live.py tests/develop-live-fixtures.py docs/agent-guide-src/build.py
+	  agents/.agents/skills/commit/scripts/governance.py tests/commit-governance.py tests/develop-live.py tests/develop-live-fixtures.py docs/workspace-guide-src/build.py
 	@set -e; for plugin in opencode/.config/opencode/plugins/*.js opencode/.config/opencode/lib/*.mjs; do node --check "$$plugin"; done
 	@echo "ok:   lint"
 
@@ -120,18 +120,22 @@ test:
 	@echo "ok:   test"
 
 check:
-	python3 docs/agent-guide-src/build.py --check
+	python3 docs/workspace-guide-src/build.py --check
 	@fail=0; \
 	while IFS= read -r -d '' link; do \
 	  echo "FAIL: package symlink does not resolve: $$link"; fail=1; \
 	done < <(find $(PACKAGES) .agents .claude -type l -xtype l -print0); \
 	[[ $$fail -eq 0 ]] && echo "ok:   package and project symlinks resolve"; \
 	while IFS= read -r -d '' f; do \
+	  if [[ ! -e $$f ]]; then \
+	    deleted=$$(git ls-files --deleted -- "$$f") || exit 1; \
+	    [[ $$deleted == "$$f" ]] && continue; \
+	  fi; \
 	  case $$f in \
 	    *.toml) python3 -c 'import sys, tomllib; tomllib.load(open(sys.argv[1], "rb"))' "$$f" ;; \
 	    *) python3 -c 'import sys, json; json.load(open(sys.argv[1], encoding="utf-8"))' "$$f" ;; \
 	  esac && echo "ok:   $$f parses" || { echo "FAIL: $$f does not parse"; fail=1; }; \
-	done < <(git ls-files -z -- '*.json' '*.toml'); \
+	done < <(git ls-files -z --cached --others --exclude-standard -- '*.json' '*.toml'); \
 	exit $$fail
 	@$(MAKE) --no-print-directory test
 	@echo "ok:   check"
@@ -211,8 +215,8 @@ canary:
 refs:
 	bash scripts/update-references.sh
 
-agent-guide:
-	python3 docs/agent-guide-src/build.py
+workspace-guide:
+	python3 docs/workspace-guide-src/build.py
 
 canary-develop:
 	python3 tests/develop-live.py --opencode "$$(mise which opencode)"

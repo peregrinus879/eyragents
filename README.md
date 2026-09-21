@@ -10,6 +10,7 @@ This is a standalone personal harness. It owns AI-client configuration, startup 
 - Tool-specific access controls, with their differences documented in the [access policy](docs/access.md).
 - Exact-candidate commit approval, exact-approved agent publication, and optional read-only review.
 - Repeatable deployment checks and opt-in live smoke tests.
+- One offline development-workspace guide covering the host environment and all four AI clients.
 
 ## Tools And Layout
 
@@ -26,7 +27,7 @@ The [architecture guide](docs/design.md#configuration-ownership) explains linked
 
 ## Independence
 
-Clone this repository wherever you keep projects. Setup, checks, reference maintenance and the [offline AI guide](docs/agent-guide.html) are owned here. Other projects inherit the stowed global harness through their AI client; they need no local import or EyrAgents-specific configuration.
+Clone this repository wherever you keep projects. Setup, checks, reference maintenance and the [offline workspace guide](docs/workspace-guide.html) are owned here. Other projects inherit the stowed global harness through their AI client; they need no local import or EyrAgents-specific configuration.
 
 ## Setup
 
@@ -36,7 +37,7 @@ Start with the [setup guide](docs/setup.md): prerequisites, client installation 
 
 ## Usage
 
-Start an installed client in the project you want to work on. The [operations guide](docs/operations.md) covers continuation, model effort, native learning, and verification. The [offline AI guide](docs/agent-guide.html) provides searchable client controls and saved favorites.
+Start an installed client in the project you want to work on. The [operations guide](docs/operations.md) covers continuation, model effort, native learning, and verification. The [offline workspace guide](docs/workspace-guide.html) combines `hdw`, Herdr, editor/shell controls and AI-client workflows, with an Omarchy/Arch WSL selector and saved favorites. Open it locally in a browser; on GitHub, download the raw HTML first. [Guide maintenance](docs/workspace-guide-src/README.md) explains ownership and rebuilding.
 
 | Workflow | Canonical procedure |
 | --- | --- |
@@ -58,7 +59,7 @@ From the repository root, `make lint check` runs repository checks; `make restow
 | --- | --- |
 | Install, move, or adapt the harness | [Setup](docs/setup.md) |
 | Use the tools and run checks | [Operations](docs/operations.md) |
-| Look up AI-client controls offline | [AI guide](docs/agent-guide.html) |
+| Find workspace and AI-client controls offline | [Workspace guide](docs/workspace-guide.html) |
 | Understand configuration ownership and design | [Design](docs/design.md) |
 | Compare permissions or inspect an untrusted checkout | [Access policy](docs/access.md) |
 | Find unresolved issues or pending host work | [Maintenance ledger](docs/maintenance.md) |

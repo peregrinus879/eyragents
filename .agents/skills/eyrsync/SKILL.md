@@ -5,7 +5,7 @@ description: Reconcile Claude Code, Codex, OpenCode, and Hermes Agent configurat
 
 # Eyrsync
 
-Compare this harness's structure, configuration and instructions against current evidence for all four tools and the Agent Skills specification. EyrAgents owns its setup, references, verification and AI guide independently of host-dotfiles repositories.
+Compare this harness's structure, configuration and instructions against current evidence for all four tools and the Agent Skills specification. EyrAgents owns its setup, references, verification and full workspace-guide build independently of host-dotfiles repositories. This skill owns the guide's AI-client facts; host configuration work and each host's `/omasync` own its host facts.
 
 ## Sources
 
@@ -40,7 +40,7 @@ Read the [Agent Skills specification](https://agentskills.io/specification) and 
 - A required reference is missing, its role/freshness is unclear, or docs, release notes, source and observed behavior disagree.
 - Before a structural change to the packages, so the change lands on current conventions.
 - Periodically, when no trigger has fired for a while.
-- An AI-client control, launch/continuation recipe, skill or mode changed, including inherited defaults: reconcile this repository's `docs/agent-guide-src/` and operations reference.
+- An AI-client control, launch/continuation recipe, skill or mode changed, including inherited defaults: reconcile this repository's `docs/workspace-guide-src/client-reference.json` and operations reference. Review `host-reference.json` recipes too when a client change affects `hdw` launching or continuation.
 
 ## Workflow
 
@@ -52,7 +52,7 @@ The default pass covers all four tools. For an explicitly focused pass, inventor
 4. Classify each difference: a recorded intentional choice, implementation/documentation drift, an upstream change to follow, an evidence gap, or a capability worth discussing. Ask whether related use cases and dependencies still serve H's goal, not only whether a key still parses. Recommend material changes with their tradeoffs before acting; name the source, revision/date and evidence level for each.
 5. Apply approved changes through develop's implementation/verification flow, then the commit workflow when directed. Use the [shared verification contract](../../../agents/.agents/skills/develop/references/verification.md). After deployment or relevant interface changes, run `make canary`: up to six calls per tool, successful nonempty replies required, failure exit 1 and skipped/unverified exit 2. OpenCode performs the preapproved OS-release read; its general external-temp check stays interactive-only and skipped. Verify remaining prompts separately, never add an approval bypass. A success is behavioral smoke, not independent dispatch proof. Record unresolved checks/triggers, not a historical success log; update current ownership/setup/rationale in canonical docs.
 6. Summarize what was adopted, rejected, or kept different, with the sources.
-7. Reconcile affected AI-guide entries and evidence records, regenerate with `make agent-guide`, and verify the result. Host repositories have no required companion update.
+7. Follow `docs/workspace-guide-src/README.md` to reconcile affected client entries, workflows and evidence records, regenerate with `make workspace-guide`, and inspect both host profiles. Client-only changes stay in EyrAgents. If launcher behavior also needs changing, coordinate the host implementation twins within authorized scope; unavailable or unauthorized companion work remains explicit in the change owner's maintenance ledger. Preserve host evidence dates for components not reviewed.
 
 ## Access Reconciliation
 
@@ -74,4 +74,4 @@ The default pass covers all four tools. For an explicitly focused pass, inventor
 - Repository and host checks follow the shared verification contract, including exact-tested-state evidence reuse and explicit skips; documentation changes create no separate exemption. When deployed state changes, the ledger carries the other host's pass item. Use reviewed opaque host checks, never credential-bearing configuration output.
 - The ledger's dated evidence names the versions checked and the trigger for the next check.
 - When deployed shape or a relevant interface changed: run `make canary`, report passed/failed/incomplete accurately, and keep unresolved host verification in the ledger. Do not promote model-reported denial into independent permission-dispatch evidence.
-- When AI-client controls changed: matching entries and the generated AI guide are current, or outstanding source/runtime checks are recorded as incomplete. Generation checks establish file consistency, not live key delivery.
+- When AI-client controls changed: matching entries and the generated workspace guide are current, or outstanding source/runtime checks are recorded as incomplete. Generation checks establish file consistency, not live key delivery.

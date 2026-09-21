@@ -13,7 +13,7 @@ Run repository commands from the EyrAgents root. The client commands below run f
 | OpenCode | `opencode` | `opencode -c` |
 | Hermes Agent | `hermes` | `hermes -c` |
 
-Continuation follows each client's native session and working-directory rules. The [offline AI guide](agent-guide.html) owns client controls and workflow links. Use mise activation or shims for ordinary launches, and `mise exec -- <client>` for non-interactive launchers that need the configured environment. Restart a client after deploying its configuration.
+Continuation follows each client's native session and working-directory rules. The [offline workspace guide](workspace-guide.html) combines client controls and workflow links with `hdw`, Herdr, editor, shell and host references. Select Omarchy or Arch WSL in the browser. Its [source and maintenance contract](workspace-guide-src/README.md) live here; `make workspace-guide` rebuilds both profiles into one file, and `make check` rejects stale output. Use mise activation or shims for ordinary launches, and `mise exec -- <client>` for non-interactive launchers that need the configured environment. Restart a client after deploying its configuration.
 
 For untrusted projects, use the [documented restricted launches](access.md#untrusted-checkouts).
 

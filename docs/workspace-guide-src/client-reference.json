@@ -1,5 +1,5 @@
 {
-  "title": "AI Guide",
+  "title": "AI-client reference",
   "reviewed": "2026-09-15",
   "scope": "Standalone reference for Claude Code, Codex, OpenCode and Hermes Agent. Source baselines qualify each control; installed client help and configuration determine actual behavior.",
   "items": [
@@ -1013,7 +1013,7 @@
       "name": "EyrAgents",
       "host": "AI clients",
       "terminal": "Your terminal",
-      "open": "Open docs/agent-guide.html from this checkout in a browser.",
+      "open": "Open docs/workspace-guide.html from this checkout in a browser.",
       "notes": [
         "Global client configuration and shared skills apply in every project. A project needs no EyrAgents-specific import.",
         "Terminal and multiplexer interception can affect key delivery. Use the client-specific newline/editor controls and current on-screen help.",

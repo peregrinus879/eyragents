@@ -1,0 +1,5568 @@
+{
+  "title": "Workspace Guide",
+  "reviewed": "2026-09-12",
+  "scope": "Host reference for the terminal, workspace launcher, editor, shell and host controls. EyrArcHy and EyrWSL own the configuration and host evidence.",
+  "sources": {
+    "repo": {
+      "title": "Repository dotfiles",
+      "label": "Personal configuration",
+      "scope": "Personal source inspected 2026-09-12; shared behavior in both repositories.",
+      "url": "https://github.com/peregrinus879/{repo}"
+    },
+    "hdw": {
+      "title": "Personal hdw workspace helper",
+      "label": "Personal configuration",
+      "scope": "Personal source inspected 2026-09-12; shared behavior in both repositories.",
+      "url": "https://github.com/peregrinus879/{repo}/blob/main/bash/.config/bash/functions/hdw"
+    },
+    "git": {
+      "title": "Context-aware Git review mappings",
+      "label": "Personal configuration",
+      "scope": "Personal source inspected 2026-09-12; shared behavior in both repositories.",
+      "url": "https://github.com/peregrinus879/{repo}/blob/main/nvim/.config/nvim/lua/plugins/git-review.lua"
+    },
+    "herdr": {
+      "title": "Omarchy Herdr map",
+      "label": "Omarchy Herdr map",
+      "url": "https://github.com/omacom/omarchy/blob/0b670cd13e7220bf2e4ba381fc182cf5925f24d5/config/herdr/config.toml",
+      "scope": "Matches inspected Omarchy host config; WSL uses the map documented by its operations guide, not a live-host attestation."
+    },
+    "herdr-default": {
+      "title": "Herdr 0.8.2",
+      "label": "Herdr 0.8.2",
+      "url": "https://github.com/herdrdev/herdr/tree/v0.8.2/src/config",
+      "scope": "Installed herdr --default-config, inherited keys after Omarchy overrides."
+    },
+    "herdr-keys": {
+      "title": "Herdr keyboard guide",
+      "label": "Herdr keyboard guide",
+      "url": "https://herdr.dev/docs/keyboard/",
+      "scope": "Copy-mode and mouse controls checked against Herdr 0.8.2 defaults and official docs; generic prefix/close keys differ from Omarchy."
+    },
+    "omarchy": {
+      "title": "Omarchy desktop shortcuts",
+      "label": "Omarchy desktop",
+      "scope": "online manual • Linux / Hyprland",
+      "url": "https://omarchy.org/manual/hotkeys/"
+    },
+    "ghostty-omarchy": {
+      "title": "Omarchy Ghostty configuration",
+      "label": "Omarchy",
+      "scope": "quattro • config/ghostty/config",
+      "url": "https://github.com/omacom/omarchy/blob/quattro/config/ghostty/config"
+    },
+    "ghostty": {
+      "title": "Ghostty Linux default bindings",
+      "label": "Ghostty 1.3.1",
+      "scope": "v1.3.1 tag • src/config/Config.zig",
+      "url": "https://github.com/ghostty-org/ghostty/blob/v1.3.1/src/config/Config.zig"
+    },
+    "ghostty-routing": {
+      "title": "Ghostty keybinding dispatch",
+      "label": "Ghostty",
+      "scope": "performable bindings and event forwarding",
+      "url": "https://ghostty.org/docs/config/keybind"
+    },
+    "ghostty-list": {
+      "title": "Inspect Ghostty effective bindings",
+      "label": "Ghostty",
+      "scope": "v1.3.1 • list_keybinds.zig",
+      "url": "https://github.com/ghostty-org/ghostty/blob/v1.3.1/src/cli/list_keybinds.zig"
+    },
+    "ghostty-shell": {
+      "title": "Ghostty shell integration",
+      "label": "Ghostty",
+      "scope": "semantic prompt navigation",
+      "url": "https://ghostty.org/docs/features/shell-integration"
+    },
+    "lazyvim": {
+      "title": "LazyVim core",
+      "label": "LazyVim core",
+      "url": "https://github.com/LazyVim/LazyVim/blob/c10948c50b18fae7f256433afdef09e432410480/lua/lazyvim/config/keymaps.lua",
+      "scope": "Installed and WSL-locked LazyVim 16.0.0."
+    },
+    "lazyvim-docs": {
+      "title": "LazyVim plugin and LSP keymaps",
+      "label": "LazyVim",
+      "scope": "generated upstream documentation",
+      "url": "https://www.lazyvim.org/keymaps"
+    },
+    "picker": {
+      "title": "LazyVim picker",
+      "label": "LazyVim picker",
+      "url": "https://github.com/LazyVim/LazyVim/blob/c10948c50b18fae7f256433afdef09e432410480/lua/lazyvim/plugins/extras/editor/snacks_picker.lua",
+      "scope": "Same LazyVim commit on both hosts."
+    },
+    "neotree-extra": {
+      "title": "LazyVim Neo-tree",
+      "label": "LazyVim Neo-tree",
+      "url": "https://github.com/LazyVim/LazyVim/blob/c10948c50b18fae7f256433afdef09e432410480/lua/lazyvim/plugins/extras/editor/neo-tree.lua",
+      "scope": "Enabled Neo-tree extra; local overrides win over tree defaults."
+    },
+    "neotree": {
+      "title": "Neo-tree defaults",
+      "label": "Neo-tree defaults",
+      "url": "https://github.com/nvim-neo-tree/neo-tree.nvim/blob/0bd0eea2e445bcb110fd202526ccb14d04c74e15/lua/neo-tree/defaults.lua",
+      "scope": "Installed commit; inspected defaults also match WSL lock 5e076e5419b95b13c29383e1de29270a50df2d40."
+    },
+    "nvim-package": {
+      "title": "Omarchy Neovim extras",
+      "label": "Omarchy package",
+      "scope": "master • lazyvim.json enables Neo-tree",
+      "url": "https://github.com/omacom/omarchy-pkgs/blob/master/pkgbuilds/omarchy-nvim/lazyvim.json"
+    },
+    "snacks": {
+      "title": "Snacks picker",
+      "label": "Snacks picker",
+      "url": "https://github.com/folke/snacks.nvim/tree/882c996cf28183f4d63640de0b4c02ec886d01f2/lua/snacks/picker",
+      "scope": "Installed and WSL-locked source; picker-local actions differ by source."
+    },
+    "vim": {
+      "title": "Neovim user manual",
+      "label": "Neovim user manual",
+      "url": "https://neovim.io/doc/user/usr_toc.html",
+      "scope": "Core modal editing and Ex commands. :help inside Neovim is version-matched."
+    },
+    "obsidian": {
+      "title": "Personal vault mappings",
+      "label": "Personal vault mappings",
+      "url": "https://github.com/peregrinus879/{repo}/blob/main/nvim/.config/nvim/lua/plugins/obsidian.lua",
+      "scope": "Byte-identical personal specification in both repositories; inspected 2026-09-12."
+    },
+    "obsidian-default": {
+      "title": "Obsidian 3.16.6",
+      "label": "Obsidian 3.16.6",
+      "url": "https://github.com/obsidian-nvim/obsidian.nvim/tree/69fe7c6bf61a5222b5061a9a9dfc5023f2ec0fdc/lua/obsidian",
+      "scope": "Installed and WSL-locked smart actions and commands."
+    },
+    "markdown": {
+      "title": "render-markdown",
+      "label": "render-markdown",
+      "url": "https://github.com/MeanderingProgrammer/render-markdown.nvim/tree/4663eb3ecd538bd5062628fb6d95bbe6bdca78f6",
+      "scope": "Installed and WSL-locked command API; personal spec adds no keybinding."
+    },
+    "yazi": {
+      "title": "Yazi 26.9.1",
+      "label": "Yazi 26.9.1",
+      "url": "https://github.com/sxyazi/yazi/blob/v26.9.1/yazi-config/preset/keymap-default.toml",
+      "scope": "Source matched to installed package. Both repos inherit its keys and opener defaults."
+    },
+    "yazi-config": {
+      "title": "Personal Yazi config",
+      "label": "Personal Yazi config",
+      "url": "https://github.com/peregrinus879/{repo}/blob/main/yazi/.config/yazi/yazi.toml",
+      "scope": "Shared 2:4:4 layout, natural sort, directories first, hidden files shown."
+    },
+    "shell": {
+      "title": "Bash baseline",
+      "label": "Bash baseline",
+      "url": "https://github.com/omacom/omarchy/tree/e989b5b3ee1ee1babb2614655649341f80b7b323/default/bash",
+      "scope": "Inspected installed defaults and WSL-owned aliases/functions. Host-specific helper differences are listed separately."
+    },
+    "bash": {
+      "title": "Bash manual",
+      "label": "Bash manual",
+      "url": "https://www.gnu.org/software/bash/manual/bash.html",
+      "scope": "Readline editing, jobs, pipelines, redirection, and shell commands."
+    },
+    "fzf": {
+      "title": "fzf shell integration",
+      "label": "fzf shell integration",
+      "url": "https://github.com/junegunn/fzf#key-bindings-for-command-line",
+      "scope": "Both shell init paths load fzf bindings; checked installed /usr/share/fzf/key-bindings.bash."
+    },
+    "cli": {
+      "title": "Command-line tools",
+      "label": "Command-line tools",
+      "url": "https://github.com/peregrinus879/eyrwsl/blob/main/docs/setup.md#4-prerequisites",
+      "scope": "Shared terminal tools; each command --help or man page owns its complete syntax."
+    },
+    "operations": {
+      "title": "Repository operations",
+      "label": "Repository operations",
+      "url": "https://github.com/peregrinus879/{repo}/blob/main/docs/operations.md",
+      "scope": "Host-specific helper contracts, verification and maintenance."
+    },
+    "windows": {
+      "title": "Windows Terminal defaults",
+      "label": "Windows Terminal defaults",
+      "url": "https://github.com/microsoft/terminal/blob/main/src/cascadia/TerminalSettingsModel/defaults.json",
+      "scope": "Published upstream defaults reviewed 2026-09-12, merged with tracked settings. Not an actual Windows runtime check."
+    },
+    "windows-config": {
+      "title": "EyrWSL Terminal settings",
+      "label": "EyrWSL Terminal settings",
+      "url": "https://github.com/peregrinus879/eyrwsl/blob/main/windows-terminal/settings.json",
+      "scope": "Adds Ctrl+C copy, Ctrl+V paste, Alt+Shift+D duplicate pane, and unbinds Alt+Enter."
+    },
+    "maintenance": {
+      "title": "Repository maintenance",
+      "label": "Active limitations",
+      "url": "https://github.com/peregrinus879/{repo}/blob/main/docs/maintenance.md",
+      "scope": "Canonical owner of unresolved host checks and deferred vault behavior."
+    }
+  },
+  "items": [
+    {
+      "id": "h-launch",
+      "app": "terminal",
+      "category": "Session",
+      "title": "Launch or rejoin Herdr",
+      "keys": [
+        "Super+Ctrl+Enter"
+      ],
+      "source": "omarchy",
+      "detail": "Omarchy desktop launcher. This is the outer entry point for your session.",
+      "mode": "Desktop",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-focus",
+      "app": "herdr",
+      "category": "Panes",
+      "title": "Move between application panes",
+      "keys": [
+        "Ctrl+Alt+←/↓/↑/→"
+      ],
+      "source": "herdr",
+      "detail": "Move focus between AI, editor, and shell in the current Herdr tab.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "Outer terminal bindings can intercept this. Prefix → Tab cycles Herdr panes; Prefix → 1…9 selects Herdr tabs.",
+      "tags": "",
+      "extra": [
+        "ghostty"
+      ],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-cycle",
+      "app": "herdr",
+      "category": "Panes",
+      "title": "Cycle Herdr panes",
+      "keys": [
+        "Prefix > Tab",
+        "Prefix > Shift+Tab"
+      ],
+      "source": "herdr-default",
+      "detail": "Next pane, or previous pane with Shift. Inherited upstream mapping.",
+      "mode": "Herdr",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-last",
+      "app": "herdr",
+      "category": "Panes",
+      "title": "Return to previous pane",
+      "keys": [
+        "Prefix > ;"
+      ],
+      "source": "herdr",
+      "detail": "Toggle back to the last focused Herdr pane.",
+      "mode": "Herdr",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-zoom",
+      "app": "herdr",
+      "category": "Panes",
+      "title": "Zoom the active pane",
+      "keys": [
+        "Prefix > z"
+      ],
+      "source": "herdr",
+      "detail": "Give the AI transcript or editor the full tab; repeat to restore the layout.",
+      "mode": "Herdr",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-down",
+      "app": "herdr",
+      "category": "Panes",
+      "title": "Split a pane below",
+      "keys": [
+        "Prefix > h",
+        "Alt+Enter"
+      ],
+      "source": "herdr",
+      "detail": "Horizontal division creates an upper and a lower Herdr pane. This changes the current layout.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "In Omarchy, Prefix → h splits; it is not a left-navigation key.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-right",
+      "app": "herdr",
+      "category": "Panes",
+      "title": "Split a pane to the right",
+      "keys": [
+        "Prefix > v",
+        "Alt+Shift+Enter"
+      ],
+      "source": "herdr",
+      "detail": "Vertical division creates left and right Herdr panes. Ghostty’s Omarchy config forwards Alt+Shift+Enter.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [
+        "ghostty-omarchy"
+      ],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-resize",
+      "app": "herdr",
+      "category": "Panes",
+      "title": "Resize the active Herdr pane",
+      "keys": [
+        "Ctrl+Alt+Shift+←/↓/↑/→"
+      ],
+      "source": "herdr",
+      "detail": "Direct directional resizing of the Herdr pane.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-resize-mode",
+      "app": "herdr",
+      "category": "Panes",
+      "title": "Enter pane resize mode",
+      "keys": [
+        "Prefix > Ctrl+←/↓/↑/→"
+      ],
+      "source": "herdr",
+      "detail": "Use the resize-mode help shown by the installed Herdr build for follow-on controls.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-rename-pane",
+      "app": "herdr",
+      "category": "Panes",
+      "title": "Rename the current pane",
+      "keys": [
+        "Prefix > Shift+o"
+      ],
+      "source": "herdr",
+      "detail": "Label the AI, editor, or shell pane.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-close-pane",
+      "app": "herdr",
+      "category": "Panes",
+      "title": "Close the current pane",
+      "keys": [
+        "Prefix > x",
+        "Alt+Esc"
+      ],
+      "source": "herdr",
+      "detail": "Closes the selected Herdr pane.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "Omarchy sets confirm_close=false. Pane close can terminate the process running there; use Prefix → d to detach from the session instead.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-newtab",
+      "app": "herdr",
+      "category": "Tabs",
+      "title": "Create a Herdr tab",
+      "keys": [
+        "Prefix > c"
+      ],
+      "source": "herdr",
+      "detail": "A new tab inside the current Herdr workspace.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-tab",
+      "app": "herdr",
+      "category": "Tabs",
+      "title": "Jump to a Herdr tab",
+      "keys": [
+        "Prefix > 1…9",
+        "Alt+1…9"
+      ],
+      "source": "herdr",
+      "detail": "Select a numbered tab in the active Herdr workspace.",
+      "mode": "Herdr",
+      "essential": true,
+      "warning": "Outer terminal bindings can intercept this. Prefix → Tab cycles Herdr panes; Prefix → 1…9 selects Herdr tabs.",
+      "tags": "",
+      "extra": [
+        "ghostty"
+      ],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-nexttab",
+      "app": "herdr",
+      "category": "Tabs",
+      "title": "Previous / next Herdr tab",
+      "keys": [
+        "Prefix > p / Prefix > n",
+        "Alt+← / Alt+→"
+      ],
+      "source": "herdr",
+      "detail": "Move through tabs within the current workspace.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "Windows Terminal uses Alt+arrows for outer panes; use the prefix alternatives.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-movetab",
+      "app": "herdr",
+      "category": "Tabs",
+      "title": "Reorder the current Herdr tab",
+      "keys": [
+        "Alt+Shift+← / Alt+Shift+→"
+      ],
+      "source": "herdr",
+      "detail": "Move the tab one position backward or forward.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "Windows Terminal binds Alt+Shift+arrows to outer-pane resize. Use Herdr’s mouse menus when the chord is intercepted.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-renametab",
+      "app": "herdr",
+      "category": "Tabs",
+      "title": "Rename the current Herdr tab",
+      "keys": [
+        "Prefix > r"
+      ],
+      "source": "herdr",
+      "detail": "Changes the active tab name.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "Prefix → r is rename tab in Omarchy. Resizing uses Prefix → Ctrl+arrow or Ctrl+Alt+Shift+arrow.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-closetab",
+      "app": "herdr",
+      "category": "Tabs",
+      "title": "Close the entire Herdr tab",
+      "keys": [
+        "Prefix > k"
+      ],
+      "source": "herdr",
+      "detail": "Closes the tab and its panes.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "High impact: Omarchy sets confirm_close=false. Prefix → k is close tab, not “move up”.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-workspace",
+      "app": "herdr",
+      "category": "Workspaces",
+      "title": "Previous / next repo workspace",
+      "keys": [
+        "Prefix > Shift+p / Prefix > Shift+n",
+        "Alt+↑ / Alt+↓"
+      ],
+      "source": "herdr",
+      "detail": "Move between Herdr workspaces. Desktop workspaces are a separate layer.",
+      "mode": "Herdr",
+      "essential": true,
+      "warning": "Windows Terminal uses Alt+arrows for its own pane focus. Prefer the prefix alternatives.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-navigator",
+      "app": "herdr",
+      "category": "Workspaces",
+      "title": "Open the workspace navigator",
+      "keys": [
+        "Prefix > w"
+      ],
+      "source": "herdr-default",
+      "detail": "Choose an existing Herdr workspace. Inherited upstream mapping.",
+      "mode": "Herdr",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-newworkspace",
+      "app": "herdr",
+      "category": "Workspaces",
+      "title": "Create an empty workspace",
+      "keys": [
+        "Prefix > Shift+c"
+      ],
+      "source": "herdr",
+      "detail": "For your three-pane layout, run hdw from a shell in the desired directory instead.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [
+        "hdw"
+      ],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-renameworkspace",
+      "app": "herdr",
+      "category": "Workspaces",
+      "title": "Rename the current workspace",
+      "keys": [
+        "Prefix > Shift+r"
+      ],
+      "source": "herdr",
+      "detail": "Change the Herdr workspace name.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-closeworkspace",
+      "app": "herdr",
+      "category": "Workspaces",
+      "title": "Close the entire workspace",
+      "keys": [
+        "Prefix > Shift+k"
+      ],
+      "source": "herdr",
+      "detail": "Closes the workspace and its contents.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "High impact: Omarchy sets confirm_close=false. Detach with Prefix → d to leave the session running.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-detach",
+      "app": "herdr",
+      "category": "Session",
+      "title": "Detach and keep the session",
+      "keys": [
+        "Prefix > d"
+      ],
+      "source": "herdr",
+      "detail": "Leave the Herdr client while preserving the native session for reattachment.",
+      "mode": "Herdr",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [
+        "herdr-keys"
+      ],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-sessions",
+      "app": "herdr",
+      "category": "Session",
+      "title": "Open the goto picker",
+      "keys": [
+        "Prefix > g"
+      ],
+      "source": "herdr-default",
+      "detail": "Inherited Herdr goto action; choose a destination from the running picker.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-sidebar",
+      "app": "herdr",
+      "category": "Session",
+      "title": "Toggle the Herdr sidebar",
+      "keys": [
+        "Prefix > b"
+      ],
+      "source": "herdr-default",
+      "detail": "Show or hide the workspace sidebar.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-copy",
+      "app": "herdr",
+      "category": "Scrollback",
+      "title": "Enter pane copy mode",
+      "keys": [
+        "Prefix > ["
+      ],
+      "source": "herdr",
+      "detail": "Review and select output from the focused Herdr pane. Use this layer for an individual AI transcript.",
+      "mode": "Herdr",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-copy-move",
+      "app": "herdr",
+      "category": "Scrollback",
+      "title": "Move within pane history",
+      "keys": [
+        "h/j/k/l"
+      ],
+      "source": "herdr-keys",
+      "detail": "Vim-style movement in Herdr copy mode; Ctrl+u / Ctrl+d move by half pages.",
+      "mode": "Copy mode",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-copy-select",
+      "app": "herdr",
+      "category": "Scrollback",
+      "title": "Start a copy-mode selection",
+      "keys": [
+        "v",
+        "Space"
+      ],
+      "source": "herdr-keys",
+      "detail": "Anchor a selection, then move to extend it.",
+      "mode": "Copy mode",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-copy-yank",
+      "app": "herdr",
+      "category": "Scrollback",
+      "title": "Copy the selected text",
+      "keys": [
+        "y",
+        "Enter"
+      ],
+      "source": "herdr-keys",
+      "detail": "Copy the selection from Herdr pane history.",
+      "mode": "Copy mode",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-copy-search",
+      "app": "herdr",
+      "category": "Scrollback",
+      "title": "Search pane history",
+      "keys": [
+        "/",
+        "?"
+      ],
+      "source": "herdr-keys",
+      "detail": "Forward search with /, backward with ?. Use n / Shift+n for next / previous match.",
+      "mode": "Copy mode",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-copy-exit",
+      "app": "herdr",
+      "category": "Scrollback",
+      "title": "Leave copy mode",
+      "keys": [
+        "q",
+        "Esc"
+      ],
+      "source": "herdr-keys",
+      "detail": "Esc first clears an active selection or search; q leaves copy mode.",
+      "mode": "Copy mode",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-help",
+      "app": "herdr",
+      "category": "Help",
+      "title": "Show current Herdr bindings",
+      "keys": [
+        "Prefix > ?"
+      ],
+      "source": "herdr",
+      "detail": "Runtime help is the authority for the installed, merged configuration. The help overlay supports / to filter.",
+      "mode": "Herdr",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [
+        "herdr-keys"
+      ],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-reload",
+      "app": "herdr",
+      "category": "Help",
+      "title": "Reload Herdr configuration",
+      "keys": [
+        "Prefix > q"
+      ],
+      "source": "herdr",
+      "detail": "Apply configuration changes in Herdr.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "Prefix → q reloads. Use Prefix → d to detach.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-desktop-help",
+      "app": "terminal",
+      "category": "Help",
+      "title": "Open Omarchy’s Herdr help",
+      "keys": [
+        "Super+Ctrl+k"
+      ],
+      "source": "omarchy",
+      "detail": "Desktop-level Herdr reference. Prefix → ? shows the running application’s bindings.",
+      "mode": "Desktop",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-tree",
+      "app": "lazyvim",
+      "category": "Explorer",
+      "title": "Toggle Neo-tree at repo root",
+      "keys": [
+        "Space > e",
+        "Space > f > e"
+      ],
+      "source": "neotree-extra",
+      "detail": "Both editor baselines enable the Neo-tree extra. Root means LazyVim’s detected project root.",
+      "mode": "Normal",
+      "essential": true,
+      "warning": "",
+      "tags": "neotree file tree files explorer",
+      "extra": [
+        "nvim-package"
+      ],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-tree-cwd",
+      "app": "lazyvim",
+      "category": "Explorer",
+      "title": "Toggle Neo-tree at working directory",
+      "keys": [
+        "Space > Shift+e",
+        "Space > f > Shift+e"
+      ],
+      "source": "neotree-extra",
+      "detail": "Open the tree relative to the current working directory rather than LazyVim’s detected root.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree cwd",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-tree-git",
+      "app": "lazyvim",
+      "category": "Explorer",
+      "title": "Open Neo-tree Git status",
+      "keys": [
+        "Space > g > e"
+      ],
+      "source": "neotree-extra",
+      "detail": "Shows the Neo-tree git_status source. Space → g → s is your custom Snacks Git status picker.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-tree-buffers",
+      "app": "lazyvim",
+      "category": "Explorer",
+      "title": "Open Neo-tree buffers",
+      "keys": [
+        "Space > b > e"
+      ],
+      "source": "neotree-extra",
+      "detail": "Shows the Neo-tree buffers source.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-find",
+      "app": "lazyvim",
+      "category": "Find & search",
+      "title": "Find a project file",
+      "keys": [
+        "Space > Space",
+        "Space > f > f"
+      ],
+      "source": "picker",
+      "detail": "Fuzzy file picker at LazyVim’s detected project root.",
+      "mode": "Normal",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-find-cwd",
+      "app": "lazyvim",
+      "category": "Find & search",
+      "title": "Find files at working directory",
+      "keys": [
+        "Space > f > Shift+f"
+      ],
+      "source": "picker",
+      "detail": "Use the current working directory as the picker scope.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-grep",
+      "app": "lazyvim",
+      "category": "Find & search",
+      "title": "Search text across the project",
+      "keys": [
+        "Space > /",
+        "Space > s > g"
+      ],
+      "source": "picker",
+      "detail": "Live grep at LazyVim’s detected project root.",
+      "mode": "Normal",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-grep-cwd",
+      "app": "lazyvim",
+      "category": "Find & search",
+      "title": "Search text at working directory",
+      "keys": [
+        "Space > s > Shift+g"
+      ],
+      "source": "picker",
+      "detail": "Live grep scoped to the current working directory.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-word",
+      "app": "lazyvim",
+      "category": "Find & search",
+      "title": "Search the current word / selection",
+      "keys": [
+        "Space > s > w"
+      ],
+      "source": "picker",
+      "detail": "Search the word under the cursor, or the selected text in Visual mode.",
+      "mode": "Normal / Visual",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-recent",
+      "app": "lazyvim",
+      "category": "Find & search",
+      "title": "Open a recent file",
+      "keys": [
+        "Space > f > r"
+      ],
+      "source": "picker",
+      "detail": "Recent-file picker.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-resume",
+      "app": "lazyvim",
+      "category": "Find & search",
+      "title": "Reopen the previous picker",
+      "keys": [
+        "Space > s > Shift+r"
+      ],
+      "source": "picker",
+      "detail": "Resume the last Snacks picker.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-replace",
+      "app": "lazyvim",
+      "category": "Find & search",
+      "title": "Search and replace",
+      "keys": [
+        "Space > s > r"
+      ],
+      "source": "lazyvim-docs",
+      "detail": "Open the Grug Far search-and-replace interface.",
+      "mode": "Normal / Visual",
+      "essential": false,
+      "warning": "Replacement operations change files; review the scope and matches before applying.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-windows",
+      "app": "lazyvim",
+      "category": "Windows & buffers",
+      "title": "Move between editor windows",
+      "keys": [
+        "Ctrl+h/j/k/l"
+      ],
+      "source": "lazyvim",
+      "detail": "Left, down, up, right inside Neovim, including Neo-tree and file windows. Press Esc first to ensure Normal mode.",
+      "mode": "Normal",
+      "essential": true,
+      "warning": "In Insert mode, Ctrl+k can show signature help. Use Ctrl+Alt+arrows for Herdr application panes.",
+      "tags": "neotree focus navigation",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-resize",
+      "app": "lazyvim",
+      "category": "Windows & buffers",
+      "title": "Resize an editor window",
+      "keys": [
+        "Ctrl+←/↓/↑/→"
+      ],
+      "source": "lazyvim",
+      "detail": "Resize the current Neovim window. This is the editor layer, within a single Herdr pane.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-buffers",
+      "app": "lazyvim",
+      "category": "Windows & buffers",
+      "title": "Choose an open buffer",
+      "keys": [
+        "Space > ,",
+        "Space > f > b"
+      ],
+      "source": "picker",
+      "detail": "Pick an already open editor buffer.",
+      "mode": "Normal",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-buffer-prevnext",
+      "app": "lazyvim",
+      "category": "Windows & buffers",
+      "title": "Previous / next file buffer",
+      "keys": [
+        "Shift+h / Shift+l",
+        "[ > b / ] > b"
+      ],
+      "source": "lazyvim",
+      "detail": "Cycle editor buffers.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "With Neo-tree focused, Shift+h is the tree’s hidden-file toggle. Use this in an editing window.",
+      "tags": "buffer tabs",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-altbuffer",
+      "app": "lazyvim",
+      "category": "Windows & buffers",
+      "title": "Switch to the alternate buffer",
+      "keys": [
+        "Space > b > b"
+      ],
+      "source": "lazyvim",
+      "detail": "Jump back to the previously active buffer.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-closebuffer",
+      "app": "lazyvim",
+      "category": "Windows & buffers",
+      "title": "Close a buffer, keep the layout",
+      "keys": [
+        "Space > b > d"
+      ],
+      "source": "lazyvim",
+      "detail": "Delete the current buffer with Snacks while preserving the editor’s window layout.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-otherbuffers",
+      "app": "lazyvim",
+      "category": "Windows & buffers",
+      "title": "Close other buffers",
+      "keys": [
+        "Space > b > o"
+      ],
+      "source": "lazyvim",
+      "detail": "Close buffers other than the active buffer. Save changes as prompted.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-splitdown",
+      "app": "lazyvim",
+      "category": "Windows & buffers",
+      "title": "Split the editor below",
+      "keys": [
+        "Space > -"
+      ],
+      "source": "lazyvim",
+      "detail": "Create another Neovim window below the current one.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-splitright",
+      "app": "lazyvim",
+      "category": "Windows & buffers",
+      "title": "Split the editor to the right",
+      "keys": [
+        "Space > |"
+      ],
+      "source": "lazyvim",
+      "detail": "Create another Neovim window to the right.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-closewindow",
+      "app": "lazyvim",
+      "category": "Windows & buffers",
+      "title": "Close an editor window",
+      "keys": [
+        "Space > w > d"
+      ],
+      "source": "lazyvim",
+      "detail": "Close the Neovim window, rather than the Herdr pane.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-zoom",
+      "app": "lazyvim",
+      "category": "Windows & buffers",
+      "title": "Zoom the current editor window",
+      "keys": [
+        "Space > w > m"
+      ],
+      "source": "lazyvim",
+      "detail": "Toggle the current Neovim window’s zoom. Prefix → z zooms the whole Herdr pane.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-save",
+      "app": "lazyvim",
+      "category": "Edit & code",
+      "title": "Save the current file",
+      "keys": [
+        "Ctrl+s"
+      ],
+      "source": "lazyvim",
+      "detail": "Save from an editor file buffer; also available in Insert and Visual modes.",
+      "mode": "File buffer",
+      "essential": true,
+      "warning": "Focus the editing buffer first. Ctrl+S means quick jump in Neo-tree and open a split in a Snacks picker.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-format",
+      "app": "lazyvim",
+      "category": "Edit & code",
+      "title": "Format file / selected range",
+      "keys": [
+        "Space > c > f"
+      ],
+      "source": "lazyvim-docs",
+      "detail": "Run the configured formatter on the file or Visual selection.",
+      "mode": "Normal / Visual",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-rename",
+      "app": "lazyvim",
+      "category": "Edit & code",
+      "title": "Rename a code symbol",
+      "keys": [
+        "Space > c > r"
+      ],
+      "source": "lazyvim-docs",
+      "detail": "Requires an attached LSP server with rename support.",
+      "mode": "Normal",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-codeaction",
+      "app": "lazyvim",
+      "category": "Edit & code",
+      "title": "Show code actions",
+      "keys": [
+        "Space > c > a"
+      ],
+      "source": "lazyvim-docs",
+      "detail": "Requires a provider for code actions, usually an attached LSP.",
+      "mode": "Normal / Visual",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-definition",
+      "app": "lazyvim",
+      "category": "Edit & code",
+      "title": "Go to definition",
+      "keys": [
+        "g > d"
+      ],
+      "source": "lazyvim-docs",
+      "detail": "Requires definition support from the attached LSP.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "Plain g → d navigates code. Space → g → d opens your contextual Git diff picker.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-references",
+      "app": "lazyvim",
+      "category": "Edit & code",
+      "title": "Find references",
+      "keys": [
+        "g > r"
+      ],
+      "source": "lazyvim-docs",
+      "detail": "Requires references support from the attached LSP.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-hover",
+      "app": "lazyvim",
+      "category": "Edit & code",
+      "title": "Show symbol documentation",
+      "keys": [
+        "Shift+k"
+      ],
+      "source": "lazyvim-docs",
+      "detail": "Hover information from a capable attached LSP.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-diagnostics",
+      "app": "lazyvim",
+      "category": "Edit & code",
+      "title": "Previous / next diagnostic",
+      "keys": [
+        "[ > d / ] > d"
+      ],
+      "source": "lazyvim",
+      "detail": "Navigate diagnostics in the current file.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-diagnostic-line",
+      "app": "lazyvim",
+      "category": "Edit & code",
+      "title": "Show diagnostics for this line",
+      "keys": [
+        "Space > c > d"
+      ],
+      "source": "lazyvim",
+      "detail": "Open the line diagnostic message.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-wrap",
+      "app": "lazyvim",
+      "category": "Edit & code",
+      "title": "Toggle line wrapping",
+      "keys": [
+        "Space > u > w"
+      ],
+      "source": "lazyvim",
+      "detail": "Toggle wrapping in the current editing window.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-autofmt",
+      "app": "lazyvim",
+      "category": "Edit & code",
+      "title": "Toggle autoformat for this buffer",
+      "keys": [
+        "Space > u > Shift+f"
+      ],
+      "source": "lazyvim",
+      "detail": "Buffer-specific autoformat toggle; lowercase Space → u → f is the global toggle.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-gitdiff",
+      "app": "lazyvim",
+      "category": "Git review",
+      "title": "Review changed hunks",
+      "keys": [
+        "Space > g > d"
+      ],
+      "source": "git",
+      "detail": "Your custom Snacks Git diff picker, covering staged and unstaged hunks. Repository follows the current file or selected Neo-tree node; tree root is the fallback for a node without a path.",
+      "mode": "Normal",
+      "essential": true,
+      "warning": "",
+      "tags": "personal personal contextual repository neotree ai review",
+      "extra": [
+        "repo"
+      ],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-gitbase",
+      "app": "lazyvim",
+      "category": "Git review",
+      "title": "Review grouped diff against origin",
+      "keys": [
+        "Space > g > Shift+d"
+      ],
+      "source": "git",
+      "detail": "Personal mapping passes base=\"origin\" and group=true. Snacks compares from git merge-base with origin, grouped by file. Same contextual repository resolver as Space g d; no fetch is performed.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "The repository must resolve the ref “origin”. This is not a hard-coded origin/main comparison.",
+      "tags": "personal personal base branch neotree",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-gitstatus",
+      "app": "lazyvim",
+      "category": "Git review",
+      "title": "Review Git status + untracked files",
+      "keys": [
+        "Space > g > s"
+      ],
+      "source": "git",
+      "detail": "Your contextual Snacks Git status picker. Selected Neo-tree paths, real paths, and worktrees are handled; special buffers use the window working directory.",
+      "mode": "Normal",
+      "essential": true,
+      "warning": "",
+      "tags": "personal personal untracked neotree",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-lazygit",
+      "app": "lazyvim",
+      "category": "Git review",
+      "title": "Open Lazygit at project root",
+      "keys": [
+        "Space > g > g"
+      ],
+      "source": "lazyvim",
+      "detail": "Open Lazygit using LazyVim’s root logic. Your contextual Git override applies specifically to gd, gD, and gs leader mappings.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "Git tools can stage, restore, or otherwise modify repository state. Review the selected action.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-gitfile",
+      "app": "lazyvim",
+      "category": "Git review",
+      "title": "Show Git history for this file",
+      "keys": [
+        "Space > g > f"
+      ],
+      "source": "picker",
+      "detail": "Use the current file’s Git history picker.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "Preview freely, but Enter checks out the selected historical version of this file into the working tree.",
+      "tags": "",
+      "extra": [
+        "snacks"
+      ],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-keymaps",
+      "app": "lazyvim",
+      "category": "Help",
+      "title": "Search current key mappings",
+      "keys": [
+        "Space > s > k"
+      ],
+      "source": "picker",
+      "detail": "Search the active Neovim keymap list. Useful for resolving version or plugin differences.",
+      "mode": "Normal",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-localhelp",
+      "app": "lazyvim",
+      "category": "Help",
+      "title": "Show buffer-local mappings",
+      "keys": [
+        "Space > ?"
+      ],
+      "source": "lazyvim-docs",
+      "detail": "Which-key buffer-local mapping view. Inside Neo-tree, plain ? opens tree help.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-whichkey",
+      "app": "lazyvim",
+      "category": "Help",
+      "title": "Discover leader-key groups",
+      "keys": [
+        "Space > pause"
+      ],
+      "source": "lazyvim-docs",
+      "detail": "Press Space, then wait for which-key’s available next keys.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "n-quit",
+      "app": "lazyvim",
+      "category": "Help",
+      "title": "Quit the Neovim instance",
+      "keys": [
+        "Space > q > q"
+      ],
+      "source": "lazyvim",
+      "detail": "Quit all editor windows. Neovim’s modified-buffer checks apply.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-open",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Open a file or folder",
+      "keys": [
+        "l",
+        "Enter"
+      ],
+      "source": "neotree-extra",
+      "detail": "Open the selected node. LazyVim overrides the tree’s l mapping.",
+      "mode": "Tree focused",
+      "essential": true,
+      "warning": "",
+      "tags": "neotree ai path",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-collapse",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Collapse the selected folder",
+      "keys": [
+        "h"
+      ],
+      "source": "neotree-extra",
+      "detail": "Close the selected tree node.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree ai path",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-path",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Copy the full path for an AI prompt",
+      "keys": [
+        "Shift+y"
+      ],
+      "source": "neotree-extra",
+      "detail": "Copies the selected node’s full path as text to the system clipboard. Move to the AI pane and paste with Ctrl+Shift+V.",
+      "mode": "Tree focused",
+      "essential": true,
+      "warning": "",
+      "tags": "neotree ai path",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-preview",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Toggle file preview",
+      "keys": [
+        "Shift+p"
+      ],
+      "source": "neotree-extra",
+      "detail": "Toggle the preview within the editor window using LazyVim’s use_float=false override.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree ai path",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-create",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Create a file",
+      "keys": [
+        "a"
+      ],
+      "source": "neotree",
+      "detail": "Create an item under the selected location.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-mkdir",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Create a directory",
+      "keys": [
+        "Shift+a"
+      ],
+      "source": "neotree",
+      "detail": "Create a folder under the selected location.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-rename",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Rename the selected item",
+      "keys": [
+        "r"
+      ],
+      "source": "neotree",
+      "detail": "Rename the chosen filesystem item.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-copy",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Copy a filesystem item",
+      "keys": [
+        "y"
+      ],
+      "source": "neotree",
+      "detail": "Place the item in Neo-tree’s file clipboard; p pastes it.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "Lowercase y copies a filesystem item. Shift+y copies its path as text to the system clipboard.",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-cut",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Cut a filesystem item",
+      "keys": [
+        "x"
+      ],
+      "source": "neotree",
+      "detail": "Prepare the selected item for a move through Neo-tree’s file clipboard.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-paste",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Paste a filesystem item",
+      "keys": [
+        "p"
+      ],
+      "source": "neotree",
+      "detail": "Paste a copied or cut item at the selected location.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "Pasting a cut item moves it on disk.",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-delete",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Delete the selected item",
+      "keys": [
+        "d"
+      ],
+      "source": "neotree",
+      "detail": "Invoke Neo-tree’s deletion action for the selected item.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "Destructive filesystem action. Check the path and confirmation carefully.",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-split",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Open in a vertical editor split",
+      "keys": [
+        "s"
+      ],
+      "source": "neotree",
+      "detail": "Open the selected file in a side-by-side Neovim split.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-hsplit",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Open in a horizontal editor split",
+      "keys": [
+        "Shift+s"
+      ],
+      "source": "neotree",
+      "detail": "Open the selected file in a stacked Neovim split.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-hidden",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Toggle hidden / filtered files",
+      "keys": [
+        "Shift+h"
+      ],
+      "source": "neotree",
+      "detail": "Show or hide filtered entries in the tree.",
+      "mode": "Tree focused",
+      "essential": true,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-refresh",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Refresh the file tree",
+      "keys": [
+        "Shift+r"
+      ],
+      "source": "neotree",
+      "detail": "Refresh Neo-tree’s current source.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-search",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Fuzzy-find a tree entry",
+      "keys": [
+        "/"
+      ],
+      "source": "neotree",
+      "detail": "Find filenames inside the tree. Space → / searches project file contents.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-parent",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Navigate to the parent directory",
+      "keys": [
+        "Backspace"
+      ],
+      "source": "neotree",
+      "detail": "Move the tree to its parent directory.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-root",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Use the selected folder as tree root",
+      "keys": [
+        "."
+      ],
+      "source": "neotree",
+      "detail": "Set the selected directory as the tree root.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-close",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Close the Neo-tree window",
+      "keys": [
+        "q"
+      ],
+      "source": "neotree",
+      "detail": "Close the explorer window and return to editing.",
+      "mode": "Tree focused",
+      "essential": false,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "t-help",
+      "app": "lazyvim",
+      "category": "Neo-tree",
+      "title": "Show Neo-tree local help",
+      "keys": [
+        "?"
+      ],
+      "source": "neotree",
+      "detail": "Display the mappings active in the focused tree.",
+      "mode": "Tree focused",
+      "essential": true,
+      "warning": "",
+      "tags": "neotree explorer filesystem",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-copy",
+      "app": "terminal",
+      "category": "Clipboard",
+      "title": "Copy terminal selection",
+      "keys": [
+        "Ctrl+Shift+c"
+      ],
+      "source": "ghostty",
+      "detail": "Copy Ghostty’s current text selection to the system clipboard.",
+      "mode": "Ghostty",
+      "essential": true,
+      "warning": "Ctrl+c is normally an interrupt for the foreground terminal process, not clipboard copy.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-paste",
+      "app": "terminal",
+      "category": "Clipboard",
+      "title": "Paste into the focused application",
+      "keys": [
+        "Ctrl+Shift+v",
+        "Shift+Insert"
+      ],
+      "source": "ghostty",
+      "detail": "Paste the system clipboard into the active AI, shell, or editor pane. Omarchy explicitly maps Shift+Insert to clipboard paste.",
+      "mode": "Ghostty",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [
+        "ghostty-omarchy"
+      ],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-copyinsert",
+      "app": "terminal",
+      "category": "Clipboard",
+      "title": "Copy with the Insert-key alternative",
+      "keys": [
+        "Ctrl+Insert"
+      ],
+      "source": "ghostty-omarchy",
+      "detail": "Omarchy explicitly maps Ctrl+Insert to system clipboard copy.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-fontup",
+      "app": "terminal",
+      "category": "Display",
+      "title": "Increase terminal font size",
+      "keys": [
+        "Ctrl+="
+      ],
+      "source": "ghostty",
+      "detail": "Enlarge the text on the current Ghostty surface.",
+      "mode": "Ghostty",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-fontdown",
+      "app": "terminal",
+      "category": "Display",
+      "title": "Decrease terminal font size",
+      "keys": [
+        "Ctrl+-"
+      ],
+      "source": "ghostty",
+      "detail": "Reduce the text on the current Ghostty surface.",
+      "mode": "Ghostty",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-fontreset",
+      "app": "terminal",
+      "category": "Display",
+      "title": "Reset terminal font size",
+      "keys": [
+        "Ctrl+0"
+      ],
+      "source": "ghostty",
+      "detail": "Restore the configured font size.",
+      "mode": "Ghostty",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-fullscreen",
+      "app": "terminal",
+      "category": "Display",
+      "title": "Toggle outer window fullscreen",
+      "keys": [
+        "Ctrl+Enter"
+      ],
+      "source": "ghostty",
+      "detail": "Ghostty window fullscreen. Prefix → z instead zooms a Herdr pane.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-palette",
+      "app": "terminal",
+      "category": "Help",
+      "title": "Open the command palette",
+      "keys": [
+        "Ctrl+Shift+p"
+      ],
+      "source": "ghostty",
+      "detail": "Search Ghostty actions. Available in Ghostty 1.2 and later.",
+      "mode": "Ghostty",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-config",
+      "app": "terminal",
+      "category": "Help",
+      "title": "Open Ghostty configuration",
+      "keys": [
+        "Ctrl+,"
+      ],
+      "source": "ghostty",
+      "detail": "Open the Ghostty configuration in the configured editor.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-reload",
+      "app": "terminal",
+      "category": "Help",
+      "title": "Reload Ghostty configuration",
+      "keys": [
+        "Ctrl+Shift+,"
+      ],
+      "source": "ghostty",
+      "detail": "Apply reloadable Ghostty settings after editing its configuration.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-search",
+      "app": "terminal",
+      "category": "Scrollback",
+      "title": "Search Ghostty’s terminal history",
+      "keys": [
+        "Ctrl+Shift+f"
+      ],
+      "source": "ghostty",
+      "detail": "Native outer-terminal search, available in Ghostty 1.3 and later. Use Herdr copy mode to target one Herdr pane’s transcript.",
+      "mode": "Ghostty",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-scroll",
+      "app": "terminal",
+      "category": "Scrollback",
+      "title": "Page through outer scrollback",
+      "keys": [
+        "Shift+PageUp / Shift+PageDown"
+      ],
+      "source": "ghostty",
+      "detail": "Scroll Ghostty’s terminal history. The focused Herdr pane maintains its own history.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-historyends",
+      "app": "terminal",
+      "category": "Scrollback",
+      "title": "Go to history beginning / end",
+      "keys": [
+        "Shift+Home / Shift+End"
+      ],
+      "source": "ghostty",
+      "detail": "Jump to the top or bottom of Ghostty’s scrollback.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-prompts",
+      "app": "terminal",
+      "category": "Scrollback",
+      "title": "Previous / next shell prompt",
+      "keys": [
+        "Ctrl+Shift+PageUp / Ctrl+Shift+PageDown"
+      ],
+      "source": "ghostty",
+      "detail": "Ghostty 1.3.1 default. Semantic prompt navigation depends on shell integration and is most useful in a direct Ghostty shell.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "This shortcut is version-sensitive. Inspect ghostty +list-keybinds on the installed build.",
+      "tags": "",
+      "extra": [
+        "ghostty-shell"
+      ],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-newwindow",
+      "app": "terminal",
+      "category": "Outer windows & tabs",
+      "title": "Create an outer terminal window",
+      "keys": [
+        "Ctrl+Shift+n"
+      ],
+      "source": "ghostty",
+      "detail": "Create a Ghostty window, a separate desktop window from the current Herdr client.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-newtab",
+      "app": "terminal",
+      "category": "Outer windows & tabs",
+      "title": "Create an outer terminal tab",
+      "keys": [
+        "Ctrl+Shift+t"
+      ],
+      "source": "ghostty",
+      "detail": "Create a Ghostty tab. For repo organization inside Herdr, use Herdr workspaces instead.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-tabs",
+      "app": "terminal",
+      "category": "Outer windows & tabs",
+      "title": "Previous / next Ghostty tab",
+      "keys": [
+        "Ctrl+Shift+← / Ctrl+Shift+→",
+        "Ctrl+Shift+Tab / Ctrl+Tab"
+      ],
+      "source": "ghostty",
+      "detail": "Navigate Ghostty’s outer tabs rather than tabs within a Herdr workspace.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-numbertab",
+      "app": "terminal",
+      "category": "Outer windows & tabs",
+      "title": "Select an outer Ghostty tab",
+      "keys": [
+        "Alt+1…8"
+      ],
+      "source": "ghostty",
+      "detail": "Select an outer tab by number when the action is performable.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "Herdr also binds Alt+digits. Use Prefix → 1…9 for Herdr tabs.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-lasttab",
+      "app": "terminal",
+      "category": "Outer windows & tabs",
+      "title": "Select the last Ghostty tab",
+      "keys": [
+        "Alt+9"
+      ],
+      "source": "ghostty",
+      "detail": "Alt+9 selects the last outer Ghostty tab, rather than necessarily tab number nine.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "Herdr also binds Alt+9. Prefer Prefix → 9 when targeting Herdr.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-closetab",
+      "app": "terminal",
+      "category": "Outer windows & tabs",
+      "title": "Close the current Ghostty tab",
+      "keys": [
+        "Ctrl+Shift+w"
+      ],
+      "source": "ghostty",
+      "detail": "The Linux 1.3.1 default closes the whole outer tab.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "Omarchy sets confirm-close-surface=false. Use Prefix → d for a deliberate Herdr detach before closing the outer terminal.",
+      "tags": "",
+      "extra": [
+        "ghostty-omarchy"
+      ],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-quit",
+      "app": "terminal",
+      "category": "Outer windows & tabs",
+      "title": "Quit Ghostty",
+      "keys": [
+        "Ctrl+Shift+q"
+      ],
+      "source": "ghostty",
+      "detail": "Quit the terminal application.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "Broad action affecting outer terminal windows. Use Herdr’s Prefix → d when the goal is just to leave that session.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-splitright",
+      "app": "terminal",
+      "category": "Outer splits",
+      "title": "Create an outer split on the right",
+      "keys": [
+        "Ctrl+Shift+o"
+      ],
+      "source": "ghostty",
+      "detail": "Create a Ghostty split outside Herdr. Recommendation: let Herdr own your three-pane layout.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-splitdown",
+      "app": "terminal",
+      "category": "Outer splits",
+      "title": "Create an outer split below",
+      "keys": [
+        "Ctrl+Shift+e"
+      ],
+      "source": "ghostty",
+      "detail": "Create a stacked Ghostty split outside Herdr.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-splitfocus",
+      "app": "terminal",
+      "category": "Outer splits",
+      "title": "Focus an outer terminal split",
+      "keys": [
+        "Ctrl+Alt+←/↓/↑/→"
+      ],
+      "source": "ghostty",
+      "detail": "Directional Ghostty split navigation, marked performable in the Linux defaults.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "When Ghostty can perform this action, it can consume the chord before Herdr receives it.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-splitzoom",
+      "app": "terminal",
+      "category": "Outer splits",
+      "title": "Zoom an outer Ghostty split",
+      "keys": [
+        "Ctrl+Shift+Enter"
+      ],
+      "source": "ghostty",
+      "detail": "Zoom the Ghostty split. Prefix → z is the Herdr pane zoom.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-splitresize",
+      "app": "terminal",
+      "category": "Outer splits",
+      "title": "Resize an outer split by 10",
+      "keys": [
+        "Super+Ctrl+Shift+←/↓/↑/→"
+      ],
+      "source": "ghostty",
+      "detail": "Resize the Ghostty split in the chosen direction. Super is the desktop logo key.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-splitresizebig",
+      "app": "terminal",
+      "category": "Outer splits",
+      "title": "Resize an outer split by 100",
+      "keys": [
+        "Super+Ctrl+Alt+Shift+←/↓/↑/→"
+      ],
+      "source": "ghostty-omarchy",
+      "detail": "Omarchy adds the larger-step Ghostty split resize shortcut.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "g-shiftenter",
+      "app": "terminal",
+      "category": "AI input",
+      "title": "Forward a distinct Shift+Enter",
+      "keys": [
+        "Shift+Enter"
+      ],
+      "source": "ghostty-omarchy",
+      "detail": "Omarchy sends CSI 13;2u to the terminal application. The focused agent decides what that event means.",
+      "mode": "Ghostty",
+      "essential": false,
+      "warning": "Newline and submission behavior is agent-specific. Treat the agent’s own input help as authoritative.",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-settings",
+      "app": "herdr",
+      "category": "Native controls",
+      "title": "Open Herdr settings",
+      "keys": [
+        "Prefix > s"
+      ],
+      "source": "herdr-default",
+      "detail": "Inspect or change native Herdr settings in its own interface.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-notification",
+      "app": "herdr",
+      "category": "Native controls",
+      "title": "Jump to a notification target",
+      "keys": [
+        "Prefix > o"
+      ],
+      "source": "herdr-default",
+      "detail": "Focus the target associated with a notification.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-worktree",
+      "app": "herdr",
+      "category": "Native controls",
+      "title": "Create a native Git worktree",
+      "keys": [
+        "Prefix > Shift+g"
+      ],
+      "source": "herdr-default",
+      "detail": "Herdr’s native new-worktree action. This creates Git state; it is separate from hdw and the shell ga helper.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-edit-history",
+      "app": "herdr",
+      "category": "Native controls",
+      "title": "Open pane scrollback in an editor",
+      "keys": [
+        "Prefix > e"
+      ],
+      "source": "herdr-default",
+      "detail": "Inspect the focused pane’s scrollback in an editor.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-mouse",
+      "app": "herdr",
+      "category": "Native controls",
+      "title": "Use panes, borders and menus",
+      "keys": [
+        "Click / drag / right-click"
+      ],
+      "source": "herdr-default",
+      "detail": "Click panes/tabs/workspaces, drag borders to resize, right-click for native menus. Pane applications can also capture the mouse.",
+      "mode": "Herdr",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-copy-page",
+      "app": "herdr",
+      "category": "Scrollback",
+      "title": "Page through pane history",
+      "keys": [
+        "Ctrl+u / Ctrl+d",
+        "PageUp / PageDown"
+      ],
+      "source": "herdr-keys",
+      "detail": "Move by half pages or full pages in copy mode. The pane’s process keeps running.",
+      "mode": "Copy mode",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "h-help-filter",
+      "app": "herdr",
+      "category": "Help",
+      "title": "Filter Herdr help",
+      "keys": [
+        "/"
+      ],
+      "source": "herdr-keys",
+      "detail": "Type an action or shortcut after /. Backspace edits; Ctrl+U clears the filter.",
+      "mode": "Herdr help",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "s-hdw",
+      "app": "shell",
+      "category": "Workspace launcher",
+      "title": "Create an AI/editor/shell workspace",
+      "keys": [
+        "hdw <cc|cx|oc|ha> [-c]"
+      ],
+      "source": "hdw",
+      "detail": "Choose exactly one selector and optionally -c. Run from an existing Herdr shell in the desired physical directory. Each invocation creates a new workspace. The editor receives ${EDITOR:-nvim} .; AI gets focus. Bare hdw prints usage.",
+      "mode": "Bash prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-herdr",
+      "app": "shell",
+      "category": "Workspace launcher",
+      "title": "Open or rejoin Herdr",
+      "keys": [
+        "herdr"
+      ],
+      "source": "operations",
+      "detail": "Run in a normal shell outside Herdr, then navigate inside the session and call hdw. To return to an already-open workspace, use the Herdr workspace navigator.",
+      "mode": "Bash prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "v-normal",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Return to Normal mode",
+      "keys": [
+        "Esc"
+      ],
+      "source": "vim",
+      "detail": "Leave Insert or Visual mode before using leader shortcuts.",
+      "mode": "Insert / Visual",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "v-insert",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Start writing",
+      "keys": [
+        "i",
+        "a",
+        "o"
+      ],
+      "source": "vim",
+      "detail": "i inserts before the cursor; a after it; o opens a line below. Esc returns to Normal mode.",
+      "mode": "Normal",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "v-move",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Move through text",
+      "keys": [
+        "h/j/k/l",
+        "w / b",
+        "0 / $",
+        "g > g / Shift+g"
+      ],
+      "source": "vim",
+      "detail": "Left/down/up/right; next/previous word; line start/end; file start/end. A count repeats movement, e.g. 5j.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "v-visual",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Select text, lines or a block",
+      "keys": [
+        "v",
+        "Shift+v",
+        "Ctrl+v"
+      ],
+      "source": "vim",
+      "detail": "Character, line, or block selection. Windows Terminal’s Ctrl+V paste can intercept block selection; use Ctrl+Q as Neovim’s alternative when delivered.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "v-operators",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Copy, delete, change and paste text",
+      "keys": [
+        "y > y",
+        "d > d",
+        "c > i > w",
+        "p"
+      ],
+      "source": "vim",
+      "detail": "yy yanks a line; dd deletes it to a register; ciw replaces the word; p pastes after the cursor. With a Visual selection, y/d/c act on that selection.",
+      "mode": "Normal / Visual",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "v-undo",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Undo or redo edits",
+      "keys": [
+        "u",
+        "Ctrl+r"
+      ],
+      "source": "vim",
+      "detail": "Undo the last edit or redo an undone change.",
+      "mode": "Normal",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "v-repeat",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Repeat the last change",
+      "keys": [
+        "."
+      ],
+      "source": "vim",
+      "detail": "Repeat the last text-changing action at a new location.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "v-search",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Search within this file",
+      "keys": [
+        "/text",
+        "n / Shift+n"
+      ],
+      "source": "vim",
+      "detail": "Enter /text then Enter to search; n repeats in the same direction and Shift+N reverses it.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "v-clipboard",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Copy selected text to system clipboard",
+      "keys": [
+        "\" > + > y"
+      ],
+      "source": "vim",
+      "detail": "Select text, then type double quote, plus, y. Uses the system + register, distinct from Neo-tree’s file clipboard.",
+      "mode": "Visual",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "v-paste-register",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Paste the system clipboard",
+      "keys": [
+        "\" > + > p"
+      ],
+      "source": "vim",
+      "detail": "Paste from the system + register. Windows integration is supplied by the configured Neovim provider.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "v-jumps",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Go back or forward after a jump",
+      "keys": [
+        "Ctrl+o",
+        "Ctrl+i"
+      ],
+      "source": "vim",
+      "detail": "Navigate the jump list, useful after following a definition.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "v-write",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Write the file",
+      "keys": [
+        ":w"
+      ],
+      "source": "vim",
+      "detail": "Write the current buffer to disk.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "v-write-quit",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Save and close this editor window",
+      "keys": [
+        ":wq"
+      ],
+      "source": "vim",
+      "detail": "Write, then close the current editor window.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "v-quit",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Close this editor window",
+      "keys": [
+        ":q"
+      ],
+      "source": "vim",
+      "detail": "Close the current Neovim window; modified-buffer checks apply.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "v-discard",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Discard unsaved edits and close",
+      "keys": [
+        ":q!"
+      ],
+      "source": "vim",
+      "detail": "Force-close this editor window, discarding its unsaved changes when the buffer is abandoned.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "v-help",
+      "app": "lazyvim",
+      "category": "Editing basics",
+      "title": "Read the editor manual",
+      "keys": [
+        ":help"
+      ],
+      "source": "vim",
+      "detail": "Use :help topic for a specific feature, e.g. :help user-manual or :help registers.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "p-move",
+      "app": "lazyvim",
+      "category": "Picker controls",
+      "title": "Navigate picker results",
+      "keys": [
+        "Ctrl+j / Ctrl+k"
+      ],
+      "source": "snacks",
+      "detail": "Move down/up in results without leaving the input.",
+      "mode": "Picker input",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "p-confirm",
+      "app": "lazyvim",
+      "category": "Picker controls",
+      "title": "Open the selected result",
+      "keys": [
+        "Enter"
+      ],
+      "source": "snacks",
+      "detail": "Confirm the selected result. The action depends on the picker: Git file history checks out that version.",
+      "mode": "Picker input",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "p-close",
+      "app": "lazyvim",
+      "category": "Picker controls",
+      "title": "Leave a picker",
+      "keys": [
+        "Esc > Esc"
+      ],
+      "source": "snacks",
+      "detail": "First Escape leaves Insert mode; Escape in Normal mode closes the picker.",
+      "mode": "Picker input",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "p-help",
+      "app": "lazyvim",
+      "category": "Picker controls",
+      "title": "Inspect picker-local actions",
+      "keys": [
+        "?"
+      ],
+      "source": "snacks",
+      "detail": "Show the current picker’s controls.",
+      "mode": "Picker Normal mode",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "p-scope",
+      "app": "lazyvim",
+      "category": "Picker controls",
+      "title": "Toggle hidden, ignored or root scope",
+      "keys": [
+        "Alt+h",
+        "Alt+i",
+        "Alt+c"
+      ],
+      "source": "snacks",
+      "detail": "Toggle hidden files, ignored files, or root/cwd scope in applicable pickers.",
+      "mode": "Picker input",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "p-open",
+      "app": "lazyvim",
+      "category": "Picker controls",
+      "title": "Open in a split, vertical split or tab",
+      "keys": [
+        "Ctrl+s",
+        "Ctrl+v",
+        "Ctrl+t"
+      ],
+      "source": "snacks",
+      "detail": "These are picker actions, not save/paste. Outer-terminal interception still applies.",
+      "mode": "Picker input",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "p-stage",
+      "app": "lazyvim",
+      "category": "Picker controls",
+      "title": "Stage or unstage a Git item",
+      "keys": [
+        "Tab"
+      ],
+      "source": "snacks",
+      "detail": "Git diff/status picker override. Changes the index; ordinary pickers use Tab for selection.",
+      "mode": "Git diff/status picker input",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "p-restore",
+      "app": "lazyvim",
+      "category": "Picker controls",
+      "title": "Restore a Git item",
+      "keys": [
+        "Ctrl+r"
+      ],
+      "source": "snacks",
+      "detail": "Git diff/status picker override requests restore/discard with confirmation. Changes file content; inspect the target.",
+      "mode": "Git diff/status picker input",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-0",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "List links in this note",
+      "keys": [
+        "Space > o > a"
+      ],
+      "source": "obsidian",
+      "detail": "Collect links from the current note.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-1",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Find backlinks",
+      "keys": [
+        "Space > o > b"
+      ],
+      "source": "obsidian",
+      "detail": "Find notes linking to the current note.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-2",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Browse the note’s contents",
+      "keys": [
+        "Space > o > c"
+      ],
+      "source": "obsidian",
+      "detail": "Table-of-contents picker for headings.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-3",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Find tags",
+      "keys": [
+        "Space > o > f"
+      ],
+      "source": "obsidian",
+      "detail": "Browse tags in the vault.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-4",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Paste an image into the vault",
+      "keys": [
+        "Space > o > i"
+      ],
+      "source": "obsidian",
+      "detail": "Insert an image from the clipboard into 6-assets. Actual Windows image paste remains unverified; use the host note in Sources & workflow.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-5",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Create a permanent note",
+      "keys": [
+        "Space > o > n"
+      ],
+      "source": "obsidian",
+      "detail": "New note using permanent.md in 2-permanent. Templates live in 5-templates.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-6",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Create a note from a chosen template",
+      "keys": [
+        "Space > o > Shift+n"
+      ],
+      "source": "obsidian",
+      "detail": "Pick a template to create a note; template customizations determine its note-type folder.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-7",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Switch vault notes",
+      "keys": [
+        "Space > o > o"
+      ],
+      "source": "obsidian",
+      "detail": "Quick-switch notes inside Neovim; this does not open the Obsidian desktop app.",
+      "mode": "Normal, vault note",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-8",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Rename a vault note",
+      "keys": [
+        "Space > o > r"
+      ],
+      "source": "obsidian",
+      "detail": "Invoke Obsidian’s rename operation. The vault’s reference-safe rename/promotion redesign remains deferred.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-9",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Search the vault",
+      "keys": [
+        "Space > o > s"
+      ],
+      "source": "obsidian",
+      "detail": "Search note contents in the configured vault.",
+      "mode": "Normal, vault note",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-10",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Insert a template into this note",
+      "keys": [
+        "Space > o > t"
+      ],
+      "source": "obsidian",
+      "detail": "Choose a template and insert it into the current note.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-11",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Delete this vault note",
+      "keys": [
+        "Space > o > d"
+      ],
+      "source": "obsidian",
+      "detail": "Confirms with No as default, then deletes the file directly rather than using trash. Loaded buffers are force-closed after deletion.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-12",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Pick a vault note to delete",
+      "keys": [
+        "Space > o > Shift+d"
+      ],
+      "source": "obsidian",
+      "detail": "Choose a note, then confirm direct file deletion. This is not a trash operation.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-13",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Promote a note to another type",
+      "keys": [
+        "Space > o > p"
+      ],
+      "source": "obsidian",
+      "detail": "Pick a destination note type, move the file, and reapply normalization. Multi-step operation, not an atomic/reference-safe guarantee.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-14",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Normalize this note’s slug",
+      "keys": [
+        "Space > o > Space"
+      ],
+      "source": "obsidian",
+      "detail": "Saves, derives a slug from the first body H1 or filename, renames if necessary, then normalizes. No confirmation; non-ASCII letters are stripped by the current slugger.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-link-new",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Link selected text to a new note",
+      "keys": [
+        "Space > o > l"
+      ],
+      "source": "obsidian",
+      "detail": "Requires a single-line selection; creates a new note and replaces the text with its link.",
+      "mode": "Visual, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-link-existing",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Link selected text to an existing note",
+      "keys": [
+        "Space > o > Shift+l"
+      ],
+      "source": "obsidian",
+      "detail": "Requires a single-line selection; pick the existing note to link.",
+      "mode": "Visual, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-extract",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Extract text into a new note",
+      "keys": [
+        "Space > o > x"
+      ],
+      "source": "obsidian",
+      "detail": "Move the selected text into a new note and replace it with a link. Multiline selections are supported.",
+      "mode": "Visual, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-enter",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Follow a link or use the note’s smart action",
+      "keys": [
+        "Enter"
+      ],
+      "source": "obsidian-default",
+      "detail": "Follow a link, inspect a tag, fold a heading/frontmatter, or otherwise toggle/create a checkbox. On ordinary text it can create a task. Checkbox cycle: empty → ~ → ! → > → x → empty.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-links",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Previous or next note link",
+      "keys": [
+        "[ > o / ] > o"
+      ],
+      "source": "obsidian-default",
+      "detail": "Move between links in a vault note.",
+      "mode": "Normal, vault note",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "o-app",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Open this note in Obsidian",
+      "keys": [
+        ":Obsidian open"
+      ],
+      "source": "obsidian-default",
+      "detail": "Open through the configured desktop URI handler. Requires the Obsidian app and vault registration on that host.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "o-render",
+      "app": "lazyvim",
+      "category": "Vault notes",
+      "title": "Toggle Markdown rendering",
+      "keys": [
+        ":RenderMarkdown toggle",
+        ":RenderMarkdown buf_toggle"
+      ],
+      "source": "markdown",
+      "detail": "Toggle rendering globally or for this buffer. The personal spec adds no shortcut. Normal-mode decorations give way to editable source in Insert/Visual mode and near the cursor.",
+      "mode": "Normal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "y-move",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Navigate directories and files",
+      "keys": [
+        "h/j/k/l"
+      ],
+      "source": "yazi",
+      "detail": "Parent/down/up/enter directory. H/L go back/forward in directory history.",
+      "mode": "Yazi manager",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-open",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Open a file or choose its opener",
+      "keys": [
+        "Enter",
+        "Shift+o"
+      ],
+      "source": "yazi",
+      "detail": "Enter opens; Shift+O chooses an opener. Text opens with $EDITOR in this pane, not in the existing top-right Neovim.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-select",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Select items or a range",
+      "keys": [
+        "Space",
+        "v / Shift+v"
+      ],
+      "source": "yazi",
+      "detail": "Space toggles and advances; v/V starts select/unselect range mode.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-copy",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Copy, cut and paste files",
+      "keys": [
+        "y / x",
+        "p"
+      ],
+      "source": "yazi",
+      "detail": "y copies, x cuts, p pastes. Shift+Y cancels yank. Shift+P overwrites existing destination files.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-path",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Copy a file path for the AI",
+      "keys": [
+        "c > c"
+      ],
+      "source": "yazi",
+      "detail": "Copy the path as text; c d copies the directory, c f the filename. Clipboard delivery depends on terminal/provider support.",
+      "mode": "Yazi manager",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-create",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Create a file or directory",
+      "keys": [
+        "a"
+      ],
+      "source": "yazi",
+      "detail": "Enter the name. A trailing slash creates a directory.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-rename",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Rename an item",
+      "keys": [
+        "r"
+      ],
+      "source": "yazi",
+      "detail": "Rename the hovered or selected item.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-trash",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Move files to trash",
+      "keys": [
+        "d"
+      ],
+      "source": "yazi",
+      "detail": "Trash the selected files; inspect the selected paths.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-delete",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Permanently delete files",
+      "keys": [
+        "Shift+d"
+      ],
+      "source": "yazi",
+      "detail": "Permanently delete the selected files, bypassing trash.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-search",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Search names or file contents",
+      "keys": [
+        "s",
+        "Shift+s"
+      ],
+      "source": "yazi",
+      "detail": "s uses fd for filename search; Shift+S uses ripgrep for contents.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-filter",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Filter or find in the current listing",
+      "keys": [
+        "f",
+        "/ / ?"
+      ],
+      "source": "yazi",
+      "detail": "f filters the listing. / and ? find forward/backward; question mark is not Yazi help.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-jump",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Jump with fzf or zoxide",
+      "keys": [
+        "z",
+        "Shift+z"
+      ],
+      "source": "yazi",
+      "detail": "Use fzf or zoxide for navigation.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-hidden",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Toggle hidden files",
+      "keys": [
+        "."
+      ],
+      "source": "yazi",
+      "detail": "Both repositories show hidden files by default.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-tab",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Create or switch Yazi tabs",
+      "keys": [
+        "t > t",
+        "[ / ]"
+      ],
+      "source": "yazi",
+      "detail": "t then t creates a new tab. Brackets switch tabs. These are Yazi tabs inside one Herdr pane.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-tasks",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Inspect background file tasks",
+      "keys": [
+        "w"
+      ],
+      "source": "yazi",
+      "detail": "Open the task manager to inspect file operations.",
+      "mode": "Yazi manager",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-help",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Show Yazi help",
+      "keys": [
+        "~",
+        "F1"
+      ],
+      "source": "yazi",
+      "detail": "Live local keymap help, including controls for the active component.",
+      "mode": "Yazi manager",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "y-quit",
+      "app": "yazi",
+      "category": "File manager",
+      "title": "Return to the shell in this directory",
+      "keys": [
+        "q",
+        "Shift+q"
+      ],
+      "source": "yazi",
+      "detail": "With the y shell wrapper, q changes the shell to the last visited directory; Shift+Q exits without changing shell cwd.",
+      "mode": "Yazi manager",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "s-yazi",
+      "app": "shell",
+      "category": "Files & navigation",
+      "title": "Browse files with cd-on-exit",
+      "keys": [
+        "y"
+      ],
+      "source": "yazi-config",
+      "detail": "Open Yazi using the shell wrapper. q returns in the visited directory; Shift+Q keeps the original shell directory.",
+      "mode": "Bash prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-cd",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Navigate to a directory",
+      "keys": [
+        "cd \"path/to/project\""
+      ],
+      "source": "shell",
+      "detail": "Existing directories use literal navigation; otherwise the zd/zoxide helper searches known locations. pwd -P shows the physical directory hdw will use.",
+      "mode": "Bash prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-up",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Go up one, two or three directories",
+      "keys": [
+        "..",
+        "...",
+        "...."
+      ],
+      "source": "shell",
+      "detail": "Directory-navigation aliases.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-list",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "List files or show a shallow tree",
+      "keys": [
+        "ls / lsa",
+        "lt / lta"
+      ],
+      "source": "shell",
+      "detail": "eza aliases, directories first. The a variants include hidden files; trees are two levels deep.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-edit",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Open Neovim here or on a file",
+      "keys": [
+        "n",
+        "n README.md"
+      ],
+      "source": "shell",
+      "detail": "n without arguments opens nvim . directly, independent of your chosen $EDITOR.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-find",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Fuzzy-find or edit a file",
+      "keys": [
+        "ff",
+        "eff"
+      ],
+      "source": "shell",
+      "detail": "fzf with bat preview; eff opens the selected result through $EDITOR.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-rg",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Search project text",
+      "keys": [
+        "rg -n \"pattern\" ."
+      ],
+      "source": "cli",
+      "detail": "Recursive ripgrep search with line numbers. Respects ignore rules by default; rg --help explains scope switches.",
+      "mode": "Bash prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-fd",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Find paths by name",
+      "keys": [
+        "fd \"pattern\""
+      ],
+      "source": "cli",
+      "detail": "Search file and directory names. fd --help lists hidden/ignored and type filters.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-bat",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Read a file with highlighting",
+      "keys": [
+        "bat README.md"
+      ],
+      "source": "cli",
+      "detail": "Read with syntax highlighting and a pager. q exits the pager.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-json",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Read or query JSON",
+      "keys": [
+        "jq . data.json"
+      ],
+      "source": "cli",
+      "detail": "Pretty-print JSON. Use jq filters to select or transform values; redirecting output writes a file.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-status",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Inspect Git changes",
+      "keys": [
+        "git status --short",
+        "git diff",
+        "git diff --staged"
+      ],
+      "source": "shell",
+      "detail": "Read worktree status and unstaged/staged diffs. The Neovim contextual pickers provide the same review loop with file navigation.",
+      "mode": "Bash prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-git",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Open the Git terminal UI",
+      "keys": [
+        "lazygit"
+      ],
+      "source": "cli",
+      "detail": "Interactive repository status, staging, commits, branches and history. Use its displayed key help; selected actions can change files and Git state.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-monitor",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Inspect processes or host summary",
+      "keys": [
+        "btop",
+        "fastfetch"
+      ],
+      "source": "cli",
+      "detail": "btop opens resource monitoring; fastfetch prints a host summary. Killing a process is a separate btop action.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-archive",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Create or extract a tar.gz archive",
+      "keys": [
+        "compress directory",
+        "decompress archive.tar.gz"
+      ],
+      "source": "shell",
+      "detail": "compress creates a tar.gz; decompress extracts with tar -xzf into the current directory.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-sync",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Watch and synchronize a directory",
+      "keys": [
+        "rsw \"source-directory\" \"destination\""
+      ],
+      "source": "shell",
+      "detail": "Start rsync and keep watching. Destination-only files remain; neither implementation uses --delete. WSL tracks logs/retries/reconciliation; Omarchy’s simpler watcher has different guarantees. Remote destinations write to that host.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-watches",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "List or stop synchronization watches",
+      "keys": [
+        "lsw",
+        "dsw"
+      ],
+      "source": "shell",
+      "detail": "lsw lists; dsw stops helper-managed watches. WSL uses owned watcher records; see this host’s operations before relying on older watcher state.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-scp",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Pick and send a file",
+      "keys": [
+        "sff user@host:path"
+      ],
+      "source": "shell",
+      "detail": "Select a file with fzf and copy it via SCP to the chosen remote destination.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-forward",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Manage SSH port forwards",
+      "keys": [
+        "fip host port [port...]",
+        "lip",
+        "dip port [port...]"
+      ],
+      "source": "shell",
+      "detail": "Start local forwards, list them, or stop requested ports. dip uses process-pattern matching; inspect the host/ports before stopping.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-ssh",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Connect with reconnect support",
+      "keys": [
+        "ssh user@host"
+      ],
+      "source": "shell",
+      "detail": "The wrapper retries eligible long-running interactive disconnects. Ctrl+C stops retries; explicit remote commands are not intentionally replayed.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-update",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Update mise-managed tools",
+      "keys": [
+        "mup"
+      ],
+      "source": "shell",
+      "detail": "Updates mise-managed tools including AI clients. WSL retains mise’s release cooldown; Omarchy’s stock helper overrides it. System package updates are separate.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-help",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Discover any command’s complete interface",
+      "keys": [
+        "type command-name",
+        "command-name --help",
+        "man command-name"
+      ],
+      "source": "cli",
+      "detail": "type identifies aliases/functions/executables. Substitute a real command for command-name; --help or man supplies its full interface.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-history",
+      "app": "shell",
+      "category": "Prompt controls",
+      "title": "Search shell history",
+      "keys": [
+        "Ctrl+r"
+      ],
+      "source": "fzf",
+      "detail": "fzf history picker. Inspect the selected command before executing it.",
+      "mode": "Bash prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "s-paths",
+      "app": "shell",
+      "category": "Prompt controls",
+      "title": "Insert selected paths",
+      "keys": [
+        "Ctrl+t"
+      ],
+      "source": "fzf",
+      "detail": "fzf file/path picker inserts a selection at the prompt.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "s-jump",
+      "app": "shell",
+      "category": "Prompt controls",
+      "title": "Pick a directory",
+      "keys": [
+        "Alt+c"
+      ],
+      "source": "fzf",
+      "detail": "fzf directory picker changes the shell directory.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "s-complete",
+      "app": "shell",
+      "category": "Prompt controls",
+      "title": "Complete commands and paths",
+      "keys": [
+        "Tab / Shift+Tab"
+      ],
+      "source": "shell",
+      "detail": "Cycle completion forwards/backwards with the configured Readline bindings.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "s-cursor",
+      "app": "shell",
+      "category": "Prompt controls",
+      "title": "Move to the beginning or end of input",
+      "keys": [
+        "Ctrl+a / Ctrl+e"
+      ],
+      "source": "bash",
+      "detail": "Readline line editing at a Bash prompt.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "s-kill-line",
+      "app": "shell",
+      "category": "Prompt controls",
+      "title": "Erase and recover prompt text",
+      "keys": [
+        "Ctrl+u / Ctrl+k",
+        "Ctrl+y"
+      ],
+      "source": "bash",
+      "detail": "Kill text before/after the cursor; Ctrl+Y yanks killed text back into the input.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "s-interrupt",
+      "app": "shell",
+      "category": "Prompt controls",
+      "title": "Interrupt the foreground command",
+      "keys": [
+        "Ctrl+c"
+      ],
+      "source": "bash",
+      "detail": "Send an interrupt. In Windows Terminal an active outer text selection can make this copy instead; clear the selection first.",
+      "mode": "Bash prompt",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "s-suspend",
+      "app": "shell",
+      "category": "Prompt controls",
+      "title": "Suspend and resume a shell job",
+      "keys": [
+        "Ctrl+z",
+        "fg"
+      ],
+      "source": "bash",
+      "detail": "Ctrl+Z suspends a foreground job; type jobs to inspect jobs, then fg to resume. Detaching Herdr is usually better for leaving the whole workspace running.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "s-screen",
+      "app": "shell",
+      "category": "Prompt controls",
+      "title": "Redraw the shell prompt",
+      "keys": [
+        "Ctrl+l"
+      ],
+      "source": "bash",
+      "detail": "Clear/redraw the display; this does not delete the shell history.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy",
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "s-worktrees-eyrarchy",
+      "app": "shell",
+      "category": "Host helpers",
+      "title": "Create or remove a Git worktree",
+      "keys": [
+        "ga branch-name",
+        "gd"
+      ],
+      "source": "shell",
+      "detail": "Stock Omarchy helper: ga derives its worktree path from the current directory and calls mise trust. gd uses forced worktree removal and branch -D. Inspect the helper and preserve work before removal; WSL’s refusal guarantees do not apply.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrarchy"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "s-worktrees-eyrwsl",
+      "app": "shell",
+      "category": "Host helpers",
+      "title": "Create or remove a Git worktree",
+      "keys": [
+        "ga branch-name",
+        "gd"
+      ],
+      "source": "operations",
+      "detail": "ga resolves the checkout root, creates a sibling linked worktree and enters it. gd confirms the actual path/branch, refuses dirty or unmerged work, and removes without force. Its HEAD must be contained in the primary checkout’s HEAD.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
+      "id": "wt-copy",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Copy an outer-terminal selection",
+      "keys": [
+        "Ctrl+Shift+c",
+        "Ctrl+Insert"
+      ],
+      "source": "windows",
+      "detail": "Copy selected terminal text. The tracked settings also bind Ctrl+C; with no selection it passes through to the application.",
+      "mode": "Outer terminal",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-paste",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Paste into the focused pane",
+      "keys": [
+        "Ctrl+Shift+v",
+        "Shift+Insert"
+      ],
+      "source": "windows",
+      "detail": "Paste the system clipboard into the focused application. Tracked Ctrl+V also pastes and can intercept Neovim block selection.",
+      "mode": "Outer terminal",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-font",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Increase, decrease or reset font size",
+      "keys": [
+        "Ctrl+Plus",
+        "Ctrl+Minus",
+        "Ctrl+0"
+      ],
+      "source": "windows",
+      "detail": "Changes the outer terminal font size, affecting the whole displayed Herdr layout.",
+      "mode": "Outer terminal",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-search",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Search outer-terminal history",
+      "keys": [
+        "Ctrl+Shift+f"
+      ],
+      "source": "windows",
+      "detail": "Search Windows Terminal scrollback. Herdr copy mode targets one pane’s history.",
+      "mode": "Outer terminal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-palette",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Open the command palette",
+      "keys": [
+        "Ctrl+Shift+p"
+      ],
+      "source": "windows",
+      "detail": "Search available Windows Terminal actions.",
+      "mode": "Outer terminal",
+      "essential": true,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-settings",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Open settings or the default keymap",
+      "keys": [
+        "Ctrl+,",
+        "Ctrl+Alt+,"
+      ],
+      "source": "windows",
+      "detail": "Settings UI or installed defaults file. Inspect inherited keys there.",
+      "mode": "Outer terminal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-tabs",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Create or switch outer-terminal tabs",
+      "keys": [
+        "Ctrl+Shift+t",
+        "Ctrl+Tab / Ctrl+Shift+Tab"
+      ],
+      "source": "windows",
+      "detail": "Windows Terminal tabs, separate from Herdr tabs/workspaces.",
+      "mode": "Outer terminal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-window",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Open another terminal window",
+      "keys": [
+        "Ctrl+Shift+n"
+      ],
+      "source": "windows",
+      "detail": "Create a Windows Terminal window.",
+      "mode": "Outer terminal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-split",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Duplicate an outer-terminal pane",
+      "keys": [
+        "Alt+Shift+d"
+      ],
+      "source": "windows",
+      "detail": "Tracked duplicate-pane action. This creates an outer split, not a Herdr pane.",
+      "mode": "Outer terminal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-focus",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Move between outer-terminal panes",
+      "keys": [
+        "Alt+←/↓/↑/→",
+        "Ctrl+Alt+←"
+      ],
+      "source": "windows",
+      "detail": "Defaults use Alt+arrows for directional focus and Ctrl+Alt+Left for previous pane. They overlap Herdr navigation.",
+      "mode": "Outer terminal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-resize",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Resize an outer-terminal pane",
+      "keys": [
+        "Alt+Shift+←/↓/↑/→"
+      ],
+      "source": "windows",
+      "detail": "Default resize actions overlap Herdr’s tab-reordering chords.",
+      "mode": "Outer terminal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-scroll",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Scroll outer-terminal history",
+      "keys": [
+        "Ctrl+Shift+PageUp / Ctrl+Shift+PageDown",
+        "Ctrl+Shift+Home / Ctrl+Shift+End"
+      ],
+      "source": "windows",
+      "detail": "Page through history or go to its beginning/end.",
+      "mode": "Outer terminal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-fullscreen",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Toggle terminal fullscreen",
+      "keys": [
+        "F11"
+      ],
+      "source": "windows",
+      "detail": "Alt+Enter is deliberately unbound in EyrWSL so Herdr receives its split-pane key.",
+      "mode": "Outer terminal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    },
+    {
+      "id": "wt-close",
+      "app": "terminal",
+      "category": "Windows Terminal",
+      "title": "Close the outer-terminal pane",
+      "keys": [
+        "Ctrl+Shift+w"
+      ],
+      "source": "windows",
+      "detail": "Closes the Windows Terminal pane. Prefix d detaches Herdr deliberately while leaving work running.",
+      "mode": "Outer terminal",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "keys"
+    }
+  ],
+  "recipes": [
+    {
+      "name": "Claude Code",
+      "selector": "cc",
+      "command": "hdw cc",
+      "resume": "hdw cc -c",
+      "launch": "claude",
+      "resumes": "claude -c",
+      "source": "hdw"
+    },
+    {
+      "name": "Codex",
+      "selector": "cx",
+      "command": "hdw cx",
+      "resume": "hdw cx -c",
+      "launch": "codex",
+      "resumes": "codex resume --last",
+      "source": "hdw"
+    },
+    {
+      "name": "OpenCode",
+      "selector": "oc",
+      "command": "hdw oc",
+      "resume": "hdw oc -c",
+      "launch": "opencode",
+      "resumes": "opencode -c",
+      "source": "hdw"
+    },
+    {
+      "name": "Hermes",
+      "selector": "ha",
+      "command": "hdw ha",
+      "resume": "hdw ha -c",
+      "launch": "hermes",
+      "resumes": "hermes -c",
+      "source": "hdw"
+    }
+  ],
+  "profiles": {
+    "eyrarchy": {
+      "name": "EyrArcHy",
+      "host": "Omarchy · Linux",
+      "terminal": "Ghostty",
+      "open": "xdg-open docs/workspace-guide.html",
+      "notes": [
+        "Open Herdr with herdr or Super+Ctrl+Enter. The inspected host uses Herdr 0.8.2 and Ghostty 1.3.1-arch2.",
+        "Omarchy owns the Herdr map, outer terminal and base editor. hdw invokes ${EDITOR:-nvim} .; the chosen default editor can change what appears in the top-right pane.",
+        "Stock c/cx/cy launch OpenCode/Claude Code/Codex with stock flags. hdw cc/cx/oc/ha sends full client commands. In particular, bare cx is Claude Code; hdw cx is Codex.",
+        "Ghostty can consume Ctrl+Alt+arrows and Alt+digits when an outer split/tab action is performable. Prefer Prefix Tab and prefix tab/workspace navigation.",
+        "Ghostty explicitly forwards Shift+Enter, but its meaning still depends on the AI client. Herdr consumes Alt+Enter and Alt+Shift+Enter for splits.",
+        "Omarchy’s worktree and watcher helpers are upstream-owned. Their removal/retry behavior differs from the WSL implementations; see Host helpers and Files & tools."
+      ]
+    },
+    "eyrwsl": {
+      "name": "EyrWSL",
+      "host": "Arch WSL2 · Windows",
+      "terminal": "Windows Terminal",
+      "open": "explorer.exe \"$(wslpath -w \"$PWD/docs/workspace-guide.html\")\"",
+      "notes": [
+        "Open herdr from a normal-user Arch shell in Windows Terminal. This guide follows the Omarchy-style Herdr map documented by EyrWSL operations, not an inspected WSL session.",
+        "Herdr configuration/keymap is retained host state, outside Stow. Check Ctrl+Space then ? on the actual host. A clean upstream Herdr instead defaults to Ctrl+B and different close/detach keys; do not assume the maps are interchangeable.",
+        "Windows Terminal defaults intercept Alt+arrows, Alt+Shift+arrows and Ctrl+Alt+Left for outer panes. Prefix Tab, prefix p/n and prefix Shift+P/N are clearer Herdr targets.",
+        "Alt+Enter passes through Windows Terminal but Herdr consumes it to split below. Tracked settings add no Shift+Enter mapping. Use the client’s own multiline/editor controls.",
+        "Ctrl+C copies when an outer selection exists; otherwise it reaches the application. Ctrl+V pastes at the terminal layer. Ctrl+Shift+C/V is the shared clipboard pair.",
+        "Neovim uses PowerShell for the + and * clipboard registers; paste removes CR characters. Autoformat starts off here. Actual Windows clipboard/image and generic Yazi opener behavior need the existing host acceptance checks.",
+        "For vault images, use the documented Windows-save-and-embed workaround. The pinned plugin has a PowerShell image path, but its actual WSL path/clipboard behavior is not established.",
+        "No stock Omarchy AI aliases or h/t/hdl launch recipes are supplied. Use herdr and full hdw commands. WSL worktree removal refuses dirty/unmerged work; watchers keep owned logs and retry/reconcile."
+      ]
+    }
+  },
+  "workflows": [
+    {
+      "title": "Start, continue, or return",
+      "text": "In Herdr, cd to the project and run hdw with one of the four selectors. -c resumes the AI in a new layout; Prefix w returns to an existing workspace. Detach with Prefix d to leave processes running. Detach is not a guarantee of surviving a machine reboot.",
+      "sources": [
+        "hdw",
+        "herdr"
+      ]
+    },
+    {
+      "title": "Move a file into the AI conversation",
+      "text": "Space e opens Neo-tree. Select the file and press Shift+Y to copy its path. Prefix Tab moves between application panes; paste with Ctrl+Shift+V into the AI prompt. For actual file contents, use that client’s file mention or ask it to read the path. Neo-tree y/p copies files; Yazi c c copies paths.",
+      "sources": [
+        "neotree-extra",
+        "yazi"
+      ]
+    },
+    {
+      "title": "Review the agent’s changes",
+      "text": "Return to Neovim. Space g d reviews hunks; Space g D compares from the merge base with origin; Space g s includes untracked files. The current file or selected Neo-tree item determines the repository. Git picker Tab stages/unstages; Ctrl+R requests restoration. Enter in file-history checkout changes the working file.",
+      "sources": [
+        "git",
+        "snacks"
+      ]
+    },
+    {
+      "title": "Read and write vault notes",
+      "text": "Vault default: ~/Projects/vault, overridable with OBSIDIAN_VAULT. Space o o switches notes; Space o s searches; Space o n creates a permanent note. Editing, template, linking, promotion, deletion and rendering controls are under Vault notes. Rename/promotion/reference-safety limitations remain documented in maintenance.",
+      "sources": [
+        "obsidian",
+        "markdown",
+        "maintenance"
+      ]
+    },
+    {
+      "title": "Understand the layers",
+      "text": "A keybinding is one shortcut; a keymap is the collection. The desktop routes keys to the outer terminal, then Herdr, then the focused AI/editor/shell. Herdr panes contain applications; Neovim windows contain buffers. A browser search shortcut in this guide never runs a terminal command.",
+      "sources": [
+        "herdr-keys",
+        "vim"
+      ]
+    },
+    {
+      "title": "Use the correct help",
+      "text": "Prefix ? shows Herdr’s merged keys. Space s k searches Neovim mappings; ? helps in Neo-tree, but ~ or F1 helps in Yazi. AI help differs by client. Ctrl+Space is Herdr’s prefix before it can reach Neovim completion/selection; Alt+Enter splits before an AI can use it for a newline.",
+      "sources": [
+        "herdr",
+        "lazyvim",
+        "yazi"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "app": "Herdr",
+      "command": "herdr --version\nherdr --default-config",
+      "text": "Shell: version and upstream defaults. Inside Herdr, Prefix ? displays the effective map; / filters it. This guide’s map is Omarchy-style Ctrl+Space."
+    },
+    {
+      "app": "Neovim / Neo-tree",
+      "command": ":verbose nmap <leader>gd\n:verbose nmap <leader>e\n:verbose nmap <C-h>",
+      "text": "Run inside Neovim with the relevant file/tree loaded. Space s k searches maps; ? opens Neo-tree local help. :Lazy shows installed plugin versions."
+    },
+    {
+      "app": "Yazi / shell",
+      "command": "yazi --version\ntype hdw y ga gd rsw",
+      "text": "Use ~ or F1 inside Yazi. type shows which shell functions/aliases actually own these names; tool --help opens a command’s full interface."
+    }
+  ],
+  "apps": {
+    "herdr": {
+      "name": "Herdr",
+      "sub": "Workspaces · tabs · application panes"
+    },
+    "lazyvim": {
+      "name": "Neovim",
+      "sub": "LazyVim · Neo-tree · Git · vault"
+    },
+    "shell": {
+      "name": "Shell",
+      "sub": "Bash · search · Git · helper commands"
+    },
+    "yazi": {
+      "name": "Yazi",
+      "sub": "Files · paths · navigation"
+    },
+    "terminal": {
+      "name": "Outer terminal",
+      "sub": "Clipboard · display · host routing"
+    }
+  },
+  "retired_ids": [
+    "ai-claude-code-help",
+    "ai-claude-code-new",
+    "ai-claude-code-model",
+    "ai-claude-code-plan",
+    "ai-claude-code-context",
+    "ai-claude-code-files",
+    "ai-claude-code-skills",
+    "ai-claude-code-exit",
+    "ai-codex-help",
+    "ai-codex-new",
+    "ai-codex-model",
+    "ai-codex-plan",
+    "ai-codex-context",
+    "ai-codex-files",
+    "ai-codex-shell",
+    "ai-codex-exit",
+    "ai-opencode-help",
+    "ai-opencode-new",
+    "ai-opencode-model",
+    "ai-opencode-plan",
+    "ai-opencode-context",
+    "ai-opencode-files",
+    "ai-opencode-skills",
+    "ai-opencode-undo",
+    "ai-opencode-exit",
+    "ai-hermes-help",
+    "ai-hermes-new",
+    "ai-hermes-model",
+    "ai-hermes-context",
+    "ai-hermes-files",
+    "ai-hermes-steer",
+    "ai-hermes-skills",
+    "ai-hermes-history",
+    "ai-hermes-plan",
+    "ai-hermes-exit",
+    "ai-cc-newline",
+    "ai-cc-stop",
+    "ai-cx-newline",
+    "ai-cx-stop",
+    "ai-oc-newline",
+    "ai-oc-stop",
+    "ai-ha-newline",
+    "ai-ha-stop"
+  ]
+}
