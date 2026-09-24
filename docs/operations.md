@@ -21,7 +21,7 @@ The configured primary OpenCode model defaults to `xhigh`. In `/variants`, `Defa
 
 ## Shared Workflows
 
-[ship](../agents/.agents/skills/ship/SKILL.md) commits and publishes: every card of a round comes first in the chat, then one native prompt commits the round; publication waits for H's go, then one push command prompts too. [spar](../agents/.agents/skills/spar/SKILL.md) owns independent review and [eyrsync](../.agents/skills/eyrsync/SKILL.md) harness reconciliation. Work that spans several steps or sessions keeps one live plan file in `~/Projects/eyrie/scrape/plans/`, as global guidance's Continuity rule describes. All projects inherit the global skills; OpenCode also offers each skill as a slash command, such as `/ship`.
+[ship](../agents/.agents/skills/ship/SKILL.md) commits and publishes: the round's cards end a turn, then H's reply brings one native prompt that commits the round; publication waits for H's go, then one push command prompts too. [spar](../agents/.agents/skills/spar/SKILL.md) owns independent review and [eyrsync](../.agents/skills/eyrsync/SKILL.md) harness reconciliation. Work that spans several steps or sessions keeps one live plan file in `~/Projects/eyrie/scrape/plans/`, as global guidance's Continuity rule describes. All projects inherit the global skills; OpenCode also offers each skill as a slash command, such as `/ship`.
 
 GitHub uses HTTPS with the host-local `gh` credential helper; follow [standalone setup](setup.md#github-access). Authentication supplies capability, not approval.
 
