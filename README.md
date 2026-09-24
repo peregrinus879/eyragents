@@ -43,7 +43,7 @@ Start an installed client in the project you want to work on. The [operations gu
 | Obtain a second opinion | [spar](agents/.agents/skills/spar/SKILL.md) |
 | Reconcile the harness with upstream tools | [eyrsync](.agents/skills/eyrsync/SKILL.md) |
 
-Long work keeps a live plan file, as global guidance's Continuity rule describes. `ship` shows a card before each commit, and H approves the `git commit` at the native prompt; publication waits for H's go, then each `git push` prompts too. Host-local authentication supplies capability, not approval; [setup](docs/setup.md#github-access) owns standalone onboarding.
+Long work keeps a live plan file, as global guidance's Continuity rule describes. `ship` shows every card of a round, then runs one command that commits each repository, and H approves the set at the native prompt. Publication waits for H's go, then one push command prompts the same way. Host-local authentication supplies capability, not approval; [setup](docs/setup.md#github-access) owns standalone onboarding.
 
 ## Verify
 

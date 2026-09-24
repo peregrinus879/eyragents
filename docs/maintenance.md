@@ -49,7 +49,7 @@ The remaining host acceptance is the [WSL host pass](#wsl-host-pass), including 
 - Complete the [WSL host pass](#wsl-host-pass) on the actual host; its single procedure owns deployment, OpenCode and behavioral checks without closing the other deferred items below.
 - Reference coverage on WSL: on the next `/eyrsync` there, inventory the manifest entries and existing quarry directories. OpenCode is a client-source reference; Claude Code is public release/plugin/support material only. Obtain explicit approval for missing clones; this repository's updater refreshes existing entries only. Do not treat Omarchy's clone state as cross-host evidence.
 - Give omasecboot a `check` target that runs `test`, so its gates cover it; wait until H's current work there is done.
-- Behavioral evals for the skills through `claude plugin eval`: first scenarios are that free text never commits, a commit runs only after a card and at the native prompt, and a push waits for H's go. Revisit when adding skill-behavior evaluation beyond the smoke canary.
+- Behavioral evals for the skills through `claude plugin eval`: first scenarios are that free text never commits, a commit runs only after its card and at the native prompt, and a push waits for H's go. Revisit when adding skill-behavior evaluation beyond the smoke canary.
 - Run `/fewer-permission-prompts` against accumulated host transcripts and promote only durable read-only rules; keep `gh api` excluded.
 - Revisit native cross-model review when a managed tool offers a read-only cross-vendor path under subscription authentication.
 
