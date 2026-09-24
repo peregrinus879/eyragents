@@ -66,11 +66,8 @@ commit-gate <<<'{"tool_name":"Bash","tool_input":{"command":["git","status"]}}' 
 fake_home="$TMP/home"
 install -D -m 755 "$ROOT/templates/hooks/commit-gate" "$fake_home/.agents/hooks/commit-gate"
 claude_hook=$(jq -r '[.hooks.PreToolUse[].hooks[] | select(.type == "command") | .command][0]' "$ROOT/claude-code/.claude/settings.json")
-codex_hook=$(python3 -c 'import sys, tomllib; c = tomllib.load(open(sys.argv[1], "rb")); print(c["hooks"]["PreToolUse"][0]["hooks"][0]["command"])' "$ROOT/templates/codex/config.toml")
-for hook in "$claude_hook" "$codex_hook"; do
-  if HOME=$fake_home sh -c "$hook" <<<"$(payload 'git commit -m x')" >/dev/null 2>&1; then fail 'configured hook did not deny'; fi
-  HOME=$fake_home sh -c "$hook" <<<"$(payload 'git status')" >/dev/null 2>&1 || fail 'configured hook denied a plain command'
-done
+if HOME=$fake_home sh -c "$claude_hook" <<<"$(payload 'git commit -m x')" >/dev/null 2>&1; then fail 'configured hook did not deny'; fi
+HOME=$fake_home sh -c "$claude_hook" <<<"$(payload 'git status')" >/dev/null 2>&1 || fail 'configured hook denied a plain command'
 cp -- "$ROOT/opencode/.config/opencode/plugins/commit-gate.js" "$TMP/plugin.mjs"
 # shellcheck disable=SC2016
 HOME=$fake_home node --input-type=module -e '

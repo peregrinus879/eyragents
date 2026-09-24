@@ -10,7 +10,7 @@
 #   system   OS-release read in the preapproved /usr reference tree
 #   temp     external temp read; OpenCode requires interactive approval and skips it
 #   secret   a successful, nonempty reply does not disclose the fixture marker
-# CANARY_TOOLS selects the tools (default: claude codex opencode hermes); a tool that is
+# CANARY_TOOLS selects the tools (default: claude opencode); a tool that is
 # not on PATH is skipped. CANARY_CHECKS selects unique space-separated case names
 # from the six listed above (default: all), run in their usual order. The read
 # selection includes both marker writes. A gate check where the model declines before the hook
@@ -22,7 +22,7 @@ set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 TIMEOUT=${CANARY_TIMEOUT:-300}
-TOOLS=${CANARY_TOOLS:-"claude codex opencode hermes"}
+TOOLS=${CANARY_TOOLS:-"claude opencode"}
 CHECKS=${CANARY_CHECKS-"skills gate read system temp secret"}
 fail=0
 incomplete=0
@@ -247,16 +247,8 @@ ask() { # tool check prompt -> reply; failures are never a negative-test pass
   case $tool in
     claude)
       command=(claude -p "$prompt" --output-format text) ;;
-    codex)
-      command=(codex exec --skip-git-repo-check -C "$repo" -o "$out" "$prompt")
-      stdout=/dev/null ;;
     opencode)
       command=(opencode run --dir "$repo" "$prompt") ;;
-    hermes)
-      # 0.19 chat --query keeps normal policy. Top-level --oneshot instead
-      # enables YOLO, so it must not be used as a shortcut for this probe.
-      # Keep automated probes out of native `hermes -c`'s source=cli history.
-      command=(hermes --cli chat --source tool --quiet --query "$prompt") ;;
     *) status=64 ;;
   esac
   if ((${#command[@]})); then
@@ -409,20 +401,6 @@ for tool in $TOOLS; do
     report SKIP "$tool" all "not on PATH"
     continue
   fi
-  if [[ $tool == hermes ]]; then
-    unsafe=0
-    for flag in HERMES_YOLO_MODE HERMES_SAFE_MODE HERMES_IGNORE_RULES HERMES_IGNORE_USER_CONFIG; do
-      # Require absence rather than guess each upstream consumer's boolean
-      # vocabulary. Even an explicitly empty/false flag is ambiguous evidence.
-      [[ ! -v $flag ]] || unsafe=1
-    done
-    if [[ -v HERMES_HOME && $HERMES_HOME != "$HOME/.hermes" ]]; then unsafe=1; fi
-    if ((unsafe)); then
-      report SKIP "$tool" all "inherited bypass/customization-disable flag or alternate profile; no ordinary-policy assertion made"
-      continue
-    fi
-  fi
-
   if selected skills && ask "$tool" skills 'Load the develop skill, then list the names of the skills available to you, one per line, and nothing else. This is an inspection request, not implementation.'; then
     missing=""
     for name in develop commit publish spar; do

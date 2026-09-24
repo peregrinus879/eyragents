@@ -2996,7 +2996,7 @@
       "category": "Workspace launcher",
       "title": "Create an AI/editor/shell workspace",
       "keys": [
-        "hdw <cc|cx|oc|ha> [-c]"
+        "hdw <cc|oc> [-c]"
       ],
       "source": "hdw",
       "detail": "Choose exactly one selector and optionally -c. Run from an existing Herdr shell in the desired physical directory. Each invocation creates a new workspace. The editor receives ${EDITOR:-nvim} .; AI gets focus. Bare hdw prints usage.",
@@ -5370,30 +5370,12 @@
       "source": "hdw"
     },
     {
-      "name": "Codex",
-      "selector": "cx",
-      "command": "hdw cx",
-      "resume": "hdw cx -c",
-      "launch": "codex",
-      "resumes": "codex resume --last",
-      "source": "hdw"
-    },
-    {
       "name": "OpenCode",
       "selector": "oc",
       "command": "hdw oc",
       "resume": "hdw oc -c",
       "launch": "opencode",
       "resumes": "opencode -c",
-      "source": "hdw"
-    },
-    {
-      "name": "Hermes",
-      "selector": "ha",
-      "command": "hdw ha",
-      "resume": "hdw ha -c",
-      "launch": "hermes",
-      "resumes": "hermes -c",
       "source": "hdw"
     }
   ],
@@ -5406,7 +5388,7 @@
       "notes": [
         "Open Herdr with herdr or Super+Ctrl+Enter. The inspected host uses Herdr 0.8.2 and Ghostty 1.3.1-arch2.",
         "Omarchy owns the Herdr map, outer terminal and base editor. hdw invokes ${EDITOR:-nvim} .; the chosen default editor can change what appears in the top-right pane.",
-        "Stock c/cx/cy launch OpenCode/Claude Code/Codex with stock flags. hdw cc/cx/oc/ha sends full client commands. In particular, bare cx is Claude Code; hdw cx is Codex.",
+        "Stock c and cx launch OpenCode and Claude Code with stock flags; hdw cc and hdw oc send full client commands.",
         "Ghostty can consume Ctrl+Alt+arrows and Alt+digits when an outer split/tab action is performable. Prefer Prefix Tab and prefix tab/workspace navigation.",
         "Ghostty explicitly forwards Shift+Enter, but its meaning still depends on the AI client. Herdr consumes Alt+Enter and Alt+Shift+Enter for splits.",
         "Omarchy’s worktree and watcher helpers are upstream-owned. Their removal/retry behavior differs from the WSL implementations; see Host helpers and Files & tools."
@@ -5432,7 +5414,7 @@
   "workflows": [
     {
       "title": "Start, continue, or return",
-      "text": "In Herdr, cd to the project and run hdw with one of the four selectors. -c resumes the AI in a new layout; Prefix w returns to an existing workspace. Detach with Prefix d to leave processes running. Detach is not a guarantee of surviving a machine reboot.",
+      "text": "In Herdr, cd to the project and run hdw cc or hdw oc. -c resumes the AI in a new layout; Prefix w returns to an existing workspace. Detach with Prefix d to leave processes running. Detach is not a guarantee of surviving a machine reboot.",
       "sources": [
         "hdw",
         "herdr"
@@ -5529,14 +5511,6 @@
     "ai-claude-code-files",
     "ai-claude-code-skills",
     "ai-claude-code-exit",
-    "ai-codex-help",
-    "ai-codex-new",
-    "ai-codex-model",
-    "ai-codex-plan",
-    "ai-codex-context",
-    "ai-codex-files",
-    "ai-codex-shell",
-    "ai-codex-exit",
     "ai-opencode-help",
     "ai-opencode-new",
     "ai-opencode-model",
@@ -5546,23 +5520,9 @@
     "ai-opencode-skills",
     "ai-opencode-undo",
     "ai-opencode-exit",
-    "ai-hermes-help",
-    "ai-hermes-new",
-    "ai-hermes-model",
-    "ai-hermes-context",
-    "ai-hermes-files",
-    "ai-hermes-steer",
-    "ai-hermes-skills",
-    "ai-hermes-history",
-    "ai-hermes-plan",
-    "ai-hermes-exit",
     "ai-cc-newline",
     "ai-cc-stop",
-    "ai-cx-newline",
-    "ai-cx-stop",
     "ai-oc-newline",
-    "ai-oc-stop",
-    "ai-ha-newline",
-    "ai-ha-stop"
+    "ai-oc-stop"
   ]
 }

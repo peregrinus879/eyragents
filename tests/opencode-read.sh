@@ -158,7 +158,7 @@ await check(true, { args: { filePath: dirname(file) }, isDirectory: true })
 await check(true, { tool: "glob", args: { pattern: "**/*.toml", path: dirname(file) }, isDirectory: true })
 await check(true, { args: { filePath: file, limit: 10 }, message: (m) => { m.parts[0].state.input = { limit: 10, filePath: file } } })
 for (const name of [".bashrc", ".profile", ".some-editor/preferences.conf", ".cargo/registry/source.rs",
-                    ".local/share/mise/installs/pipx-hermes-agent/9.9/hermes-agent/lib/python3.13/site-packages/agent/auth.py",
+                    ".local/share/mise/installs/opencode/9.9/lib/python3.13/site-packages/agent/auth.py",
                     ".local/share/nvim/lazy/plugin/lua/config.lua"]) {
   const path = join(home, name)
   await mkdir(dirname(path), { recursive: true })
@@ -166,8 +166,8 @@ for (const name of [".bashrc", ".profile", ".some-editor/preferences.conf", ".ca
   await check(true, { path })
 }
 for (const name of [".env", ".npmrc", "auth.json", "private.key", ".ssh/config", ".claude/projects/session.jsonl",
-                    ".codex/sessions/history.jsonl", ".codex/config.toml", ".hermes/config.yaml",
-                    ".hermes/logs/latest.log", ".local/share/opencode/history", ".config/BraveSoftware/Profile/config"]) {
+                    ".codex/sessions/history.jsonl", ".codex/config.toml",
+                    ".local/share/opencode/history", ".config/BraveSoftware/Profile/config"]) {
   const path = join(home, name)
   // Real fixture targets containing only synthetic non-secret text, so an
   // absent file cannot make a broken exclusion appear to work.
@@ -315,7 +315,7 @@ await symlink(join(system, "missing-target"), dangling)
 await check(false, { path: dangling, hard: true })
 await check(false, { path: join(home, ".config/demo/missing-ordinary"), hard: false })
 // Older no-adaptation distinctions are not elevated to hard material vetoes.
-for (const name of [".config/git/settings", ".hermes/memories/note", ".local/state/editor/note", ".local/share/opencode/tool-output/note", ".claude.json", ".docker/ordinary", ".config/demo/shadow"]) {
+for (const name of [".config/git/settings", ".local/state/editor/note", ".local/share/opencode/tool-output/note", ".claude.json", ".docker/ordinary", ".config/demo/shadow"]) {
   const path = join(home, name)
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, "ordinary no-adaptation fixture\n")

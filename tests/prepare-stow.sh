@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deployment preparation: dangling managed links are removed, everything else
-# is preserved, no-folding Stow keeps every parent real, and Codex config
-# migration produces a host-local owner-only file from the right source.
+# is preserved (retired packages included), no-folding Stow keeps every parent
+# real, skill directories deploy as single links, and the gate stays guarded.
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
@@ -22,9 +22,9 @@ make_clone() {
     "$repo/agents/.agents/skills/develop/references" "$repo/claude-code/.claude/skills/develop/references" \
     "$repo/agents/.agents/skills/publish/scripts" "$repo/claude-code/.claude/skills/publish/scripts" \
     "$repo/claude-code/.claude/skills/spar/scripts" \
-    "$repo/agents/.agents/skills/spar/scripts" "$repo/codex/.codex" \
+    "$repo/agents/.agents/skills/spar/scripts" \
     "$repo/opencode/.config/opencode" "$repo/opencode/.config/mise/conf.d" \
-    "$repo/scripts" "$repo/templates/codex" "$repo/templates/hooks" "$repo/templates/hermes"
+    "$repo/scripts" "$repo/templates/hooks"
   printf 'tracked\n' >"$repo/claude-code/.claude/settings.json"
   printf 'guidance\n' >"$repo/agents/.agents/shared-guidance.md"
   cp -- "$ROOT/agents/.agents/skills/develop/SKILL.md" "$repo/agents/.agents/skills/develop/"
@@ -42,56 +42,39 @@ make_clone() {
   cp -- "$ROOT/agents/.agents/skills/publish/scripts/publish-apply" "$repo/agents/.agents/skills/publish/scripts/publish-apply"
   ln -s ../../../../../agents/.agents/skills/publish/scripts/publish-apply "$repo/claude-code/.claude/skills/publish/scripts/publish-apply"
   printf 'tracked\n' >"$repo/agents/.agents/skills/spar/scripts/spar-claude"
-  printf 'tracked\n' >"$repo/codex/.codex/config.toml"
-  ln -s ../../agents/.agents/shared-guidance.md "$repo/codex/.codex/AGENTS.md"
-  printf 'tracked\n' >"$repo/agents/.agents/skills/spar/scripts/spar-codex"
   printf 'tracked\n' >"$repo/agents/.agents/skills/spar/scripts/spar-payload-scan"
   printf 'tracked\n' >"$repo/agents/.agents/skills/spar/scripts/review-brief"
-  for tool in review-brief spar-claude spar-codex spar-payload-scan; do
+  for tool in review-brief spar-claude spar-payload-scan; do
     ln -s "../../../../../agents/.agents/skills/spar/scripts/$tool" "$repo/claude-code/.claude/skills/spar/scripts/$tool"
   done
   printf '{}\n' >"$repo/opencode/.config/opencode/opencode.json"
   cp -- "$ROOT/opencode/.config/mise/conf.d/eyragents-opencode.toml" "$repo/opencode/.config/mise/conf.d/"
   cp -- "$ROOT/scripts/prepare-stow.sh" "$repo/scripts/prepare-stow.sh"
-  cp -- "$ROOT/scripts/reconcile-codex-config.py" "$repo/scripts/reconcile-codex-config.py"
-  cp -- "$ROOT/scripts/reconcile-hermes-config.py" "$repo/scripts/reconcile-hermes-config.py"
-  cp -- "$ROOT/templates/hermes/config.yaml" "$repo/templates/hermes/config.yaml"
-  mkdir -p "$repo/hermes/.hermes/plugins/eyragents"
-  cp -- "$ROOT/hermes/.hermes/plugins/eyragents/plugin.yaml" "$repo/hermes/.hermes/plugins/eyragents/plugin.yaml"
-  cp -- "$ROOT/hermes/.hermes/plugins/eyragents/__init__.py" "$repo/hermes/.hermes/plugins/eyragents/__init__.py"
-  cp -- "$ROOT/templates/codex/config.toml" "$repo/templates/codex/config.toml"
   cp -- "$ROOT/templates/hooks/commit-gate" "$repo/templates/hooks/commit-gate"
   cp -- "$ROOT/Makefile" "$repo/Makefile"
   git -C "$repo" init -q
 }
 
-toml_value() { # file dotted.key
-  python3 -c 'import sys, tomllib
-data = tomllib.load(open(sys.argv[1], "rb"))
-for part in sys.argv[2].split("."):
-    data = data[part]
-print(data)' "$1" "$2"
-}
-
 prepare() { HOME=$1 bash "$2/scripts/prepare-stow.sh"; }
-migrate() { HOME=$1 bash "$2/scripts/prepare-stow.sh" --migrate-codex-config; }
 deploy() {
-  HOME=$1 stow --no-folding -R -d "$2" -t "$1" claude-code codex opencode hermes &&
+  HOME=$1 stow --no-folding -R -d "$2" -t "$1" claude-code opencode &&
     HOME=$1 stow --no-folding --ignore='\.agents/skills' -R -d "$2" -t "$1" agents &&
     HOME=$1 bash "$2/scripts/prepare-stow.sh" --link-skills
 }
 undeploy() {
-  HOME=$1 stow --no-folding -D -d "$2" -t "$1" claude-code codex opencode hermes &&
+  HOME=$1 stow --no-folding -D -d "$2" -t "$1" claude-code opencode &&
     HOME=$1 stow --no-folding --ignore='\.agents/skills' -D -d "$2" -t "$1" agents &&
     HOME=$1 bash "$2/scripts/prepare-stow.sh" --unlink-skills
 }
 
 case_clean_links() {
   local home="$TMP/clean/home" repo="$TMP/clean/eyragents" old="$TMP/clean/old/eyragents"
-  mkdir -p "$home/.claude/skills" "$home/.codex" "$home/.agents/skills" "$home/.local/bin" "$home/.config/opencode"
+  mkdir -p "$home/.claude/skills" "$home/.codex" "$home/.agents/skills" "$home/.local/bin" "$home/.config/opencode" "$home/.hermes/plugins/eyragents"
   make_clone "$repo"
   ln -s "$old/claude-code/.claude/hooks" "$home/.claude/hooks"
+  # Links left by the retired codex and hermes packages.
   ln -s "$old/codex/.codex/config.toml" "$home/.codex/config.toml"
+  ln -s "$old/hermes/.hermes/plugins/eyragents/__init__.py" "$home/.hermes/plugins/eyragents/__init__.py"
   ln -s "../../Projects/renamed-clone/agents/.agents/skills/retired" "$home/.agents/skills/retired"
   ln -s "$repo/claude-code/.claude/settings.json" "$home/.claude/settings.json"
   ln -s /usr/share/nothing/here "$home/.claude/skills/vendor"
@@ -108,7 +91,8 @@ case_clean_links() {
   [[ ! -e $home/.claude/rules ]] || fail "emptied retired directory ~/.claude/rules remains"
   [[ ! -e $home/.config/opencode/skills ]] || fail "emptied retired directory ~/.config/opencode/skills remains"
   [[ ! -e $home/.claude/hooks && ! -L $home/.claude/hooks ]] || fail "dangling managed directory link remains"
-  [[ ! -L $home/.codex/config.toml ]] || fail "dangling managed leaf link remains"
+  [[ ! -L $home/.codex/config.toml ]] || fail "dangling link into the retired codex package remains"
+  [[ ! -L $home/.hermes/plugins/eyragents/__init__.py ]] || fail "dangling link into the retired hermes package remains"
   [[ ! -L $home/.agents/skills/retired ]] || fail "dangling link from a renamed clone remains"
   [[ -L $home/.claude/settings.json ]] || fail "resolving managed link was removed"
   [[ -L $home/.claude/skills/vendor ]] || fail "unmanaged dangling link was removed"
@@ -127,7 +111,7 @@ case_no_folding() {
   ln -s ../../eyragents/opencode/.config/opencode "$home/.config/opencode"
   prepare "$home" "$repo"
   deploy "$home" "$repo" >/dev/null 2>&1 || fail "restow could not replace folded links"
-  for path in .claude .claude/skills/commit .claude/skills/commit/scripts .claude/skills/publish/scripts .codex .agents .agents/skills .claude/skills/spar/scripts .config/opencode .config/mise/conf.d; do
+  for path in .claude .claude/skills/commit .claude/skills/commit/scripts .claude/skills/publish/scripts .agents .agents/skills .claude/skills/spar/scripts .config/opencode .config/mise/conf.d; do
     [[ -d $home/$path && ! -L $home/$path ]] || fail "$path is not a real directory after no-folding stow"
   done
   for name in develop commit publish spar; do
@@ -140,8 +124,6 @@ case_no_folding() {
     fail "leaf link does not resolve into the clone"
   [[ $(readlink -f -- "$home/.claude/CLAUDE.md") == "$repo/agents/.agents/shared-guidance.md" ]] ||
     fail "Claude user instructions symlink did not deploy"
-  [[ $(readlink -f -- "$home/.codex/AGENTS.md") == "$repo/agents/.agents/shared-guidance.md" ]] ||
-    fail "package symlink did not deploy"
   [[ $(readlink -f -- "$home/.claude/skills/commit/SKILL.md") == "$repo/agents/.agents/skills/commit/SKILL.md" ]] ||
     fail "Claude skill symlink did not deploy"
   [[ $(readlink -f -- "$home/.claude/skills/commit/scripts/commit-apply") == "$repo/agents/.agents/skills/commit/scripts/commit-apply" ]] ||
@@ -149,7 +131,7 @@ case_no_folding() {
   [[ -x $home/.agents/skills/publish/scripts/publish-apply &&
      $(readlink -f -- "$home/.claude/skills/publish/scripts/publish-apply") == "$repo/agents/.agents/skills/publish/scripts/publish-apply" ]] ||
     fail "exact-publication wrapper did not deploy through both skill paths"
-  for tool in review-brief spar-claude spar-codex spar-payload-scan; do
+  for tool in review-brief spar-claude spar-payload-scan; do
     [[ $(readlink -f -- "$home/.claude/skills/spar/scripts/$tool") == "$repo/agents/.agents/skills/spar/scripts/$tool" ]] ||
       fail "Claude spar link for $tool does not reach its own source"
   done
@@ -253,7 +235,7 @@ fi
 exec /bin/bash "$@"
 SH
   chmod +x "$bin/bash"
-  for target in stow unstow restow clean install-gate migrate-codex-config 'clean restow' 'restow clean'; do
+  for target in stow unstow restow clean install-gate 'clean restow' 'restow clean'; do
     : >"$TMP/make/events"
     local -a goals=()
     read -r -a goals <<<"$target"
@@ -264,7 +246,7 @@ SH
     [[ $(<"$TMP/make/events") != *write* ]] || fail "cleanup started before the clone guard refused: $target"
     [[ -L $home/.claude/hooks && $(readlink -- "$home/.claude/settings.json") == "$other/claude-code/.claude/settings.json" ]] || fail "Make changed links before refusal: $target"
   done
-  for target in '' --link-skills --unlink-skills --migrate-codex-config; do
+  for target in '' --link-skills --unlink-skills; do
     local -a args=()
     [[ -z $target ]] || args=("$target")
     if HOME=$home bash "$repo/scripts/prepare-stow.sh" "${args[@]}" >/dev/null 2>&1; then fail "direct preparation accepted a wrong clone: $target"; fi
@@ -351,194 +333,10 @@ SH
   [[ ! -e $home/.agents ]] || fail "gate verification created directories"
 }
 
-case_migration() {
-  local home="$TMP/migrate/home" repo="$TMP/migrate/eyragents" config
-  mkdir -p "$home/.codex"
-  make_clone "$repo"
-  config="$home/.codex/config.toml"
-  # The clone carries a Git history of the template: one past version that set
-  # the tier after the reasoning summary, where the real templates kept it, and
-  # one that appended it after the last root key, the shape a merge that keeps
-  # a host choice would produce without its marker. Residue detection reads
-  # this history.
-  local old="$TMP/migrate/old-template.toml" appended="$TMP/migrate/appended-template.toml" current="$TMP/migrate/current-template.toml"
-  cp -- "$repo/templates/codex/config.toml" "$current"
-  sed 's/^model_reasoning_summary = "auto"$/&\nservice_tier = "fast"/' "$current" >"$old"
-  git -C "$repo" init -q
-  cp -- "$old" "$repo/templates/codex/config.toml"
-  git -C "$repo" add -- templates/codex/config.toml
-  git -C "$repo" -c user.name=fixture -c user.email=fixture@example.com -c commit.gpgsign=false commit -q -m 'old template'
-  python3 - "$current" "$appended" <<'PY'
-import sys
-text = open(sys.argv[1], encoding="utf-8").read()
-root, rest = text.split("\n[", 1)
-open(sys.argv[2], "w", encoding="utf-8").write(root.rstrip("\n") + '\nservice_tier = "fast"\n\n[' + rest)
-PY
-  cp -- "$appended" "$repo/templates/codex/config.toml"
-  git -C "$repo" add -- templates/codex/config.toml
-  git -C "$repo" -c user.name=fixture -c user.email=fixture@example.com -c commit.gpgsign=false commit -q -m 'appended tier'
-  # A version with CRLF line endings, as a checkout on another platform might
-  # commit it: the comparison applies one newline policy to both sides.
-  local crlf="$TMP/migrate/crlf-template.toml"
-  sed 's/$/\r/' "$old" >"$crlf"
-  cp -- "$crlf" "$repo/templates/codex/config.toml"
-  git -C "$repo" add -- templates/codex/config.toml
-  git -C "$repo" -c user.name=fixture -c user.email=fixture@example.com -c commit.gpgsign=false commit -q -m 'crlf template'
-  cp -- "$current" "$repo/templates/codex/config.toml"
-
-  migrate "$home" "$repo"
-  [[ -f $config && ! -L $config && $(stat -c '%a' -- "$config") == 600 ]] || fail "seeded config is not an owner-only regular file"
-  cmp -s -- "$config" "$repo/templates/codex/config.toml" || fail "seeded config differs from the template"
-  local inode; inode=$(stat -c '%i' -- "$config")
-  migrate "$home" "$repo"
-  [[ $(stat -c '%i' -- "$config") == "$inode" ]] || fail "repeat migration rewrote a matching config"
-  chmod 640 "$config"
-  migrate "$home" "$repo"
-  [[ $(stat -c '%a' -- "$config") == 600 ]] || fail "migration did not restore owner-only mode"
-
-  # App-written host tables survive; template-owned values are restored.
-  {
-    sed 's/^model_reasoning_effort = .*/model_reasoning_effort = "low"/' "$repo/templates/codex/config.toml"
-    printf '\n[projects."/srv/example"]\ntrust_level = "trusted"\n\n[plugins."sites@openai-bundled"]\nenabled = true\n\n[hooks.state]\n\n[hooks.state."/srv/example/config.toml:pre_tool_use:0:0"]\ntrusted_hash = "sha256:fixture"\n\n[desktop]\nfollowUpQueueMode = "queue"\n'
-  } >"$config"
-  chmod 600 "$config"
-  migrate "$home" "$repo"
-  [[ $(toml_value "$config" model_reasoning_effort) == xhigh ]] || fail "template-owned value was not restored"
-  # Codex records each hook's trusted hash under hooks.state; the record survives
-  # under the template's hooks table and does not count as drift.
-  [[ $(python3 -c 'import sys, tomllib
-data = tomllib.load(open(sys.argv[1], "rb"))
-print(data["hooks"]["state"]["/srv/example/config.toml:pre_tool_use:0:0"]["trusted_hash"])' "$config") == sha256:fixture ]] ||
-    fail "hook trust state was lost"
-  [[ $(python3 -c 'import sys, tomllib
-print(len(tomllib.load(open(sys.argv[1], "rb"))["hooks"]["PreToolUse"]))' "$config") == 1 ]] || fail "template hooks were not restored beside the trust state"
-  [[ $(toml_value "$config" 'projects./srv/example.trust_level') == trusted ]] || fail "host project table was lost"
-  [[ $(toml_value "$config" 'plugins.sites@openai-bundled.enabled') == True ]] || fail "host plugin table was lost"
-  [[ $(toml_value "$config" desktop.followUpQueueMode) == queue ]] || fail "host desktop table was lost"
-  [[ $(stat -c '%a' -- "$config") == 600 ]] || fail "reconciled config is not owner-only"
-  python3 "$repo/scripts/reconcile-codex-config.py" check "$repo/templates/codex/config.toml" "$config" ||
-    fail "reconciled config does not pass the drift check"
-  inode=$(stat -c '%i' -- "$config")
-  migrate "$home" "$repo"
-  [[ $(stat -c '%i' -- "$config") == "$inode" ]] || fail "repeat reconciliation rewrote a matching config"
-  # A root key the template retired, such as an old model pin, is drift on its
-  # own, and the merge drops it while the host tables and the host-owned root
-  # key Codex writes for the /fast choice survive.
-  {
-    printf 'model = "gpt-5.6-sol"\nservice_tier = "fast"\n'
-    cat "$repo/templates/codex/config.toml"
-    printf '\n[projects."/srv/example"]\ntrust_level = "trusted"\n\n[[host_array]]\nname = "fixture"\n'
-  } >"$config"
-  chmod 600 "$config"
-  ! python3 "$repo/scripts/reconcile-codex-config.py" check "$repo/templates/codex/config.toml" "$config" 2>/dev/null ||
-    fail "drift check accepted a root key the template retired"
-  migrate "$home" "$repo"
-  [[ -z $(python3 -c 'import sys, tomllib
-print(tomllib.load(open(sys.argv[1], "rb")).get("model", ""))' "$config") ]] ||
-    fail "retired root model pin survived reconciliation"
-  [[ $(toml_value "$config" 'projects./srv/example.trust_level') == trusted ]] || fail "host project table was lost beside the retired key"
-  [[ $(toml_value "$config" host_array) == *fixture* ]] || fail "host array of tables was lost beside the retired key"
-  [[ $(toml_value "$config" service_tier) == fast ]] || fail "host-owned service tier choice was lost"
-  python3 "$repo/scripts/reconcile-codex-config.py" check "$repo/templates/codex/config.toml" "$config" ||
-    fail "drift check flags a host array of tables as a retired root key"
-  # The host-owned key is read as TOML, not as text: a tier line inside a
-  # multi-line string is not a setting, a quoted key is, and an inline table at
-  # the root is drift, since the merge keeps only header sections.
-  {
-    printf '"service_tier" = "fast"\nretired_note = """\nDo not use:\nservice_tier = "flex"\n"""\n'
-    cat "$repo/templates/codex/config.toml"
-  } >"$config"
-  chmod 600 "$config"
-  ! python3 "$repo/scripts/reconcile-codex-config.py" check "$repo/templates/codex/config.toml" "$config" 2>/dev/null ||
-    fail "drift check accepted a retired root string"
-  migrate "$home" "$repo"
-  [[ $(toml_value "$config" service_tier) == fast ]] || fail "quoted host-owned key was lost"
-  [[ $(/usr/bin/grep -c '^service_tier' "$config") == 1 && -z $(python3 -c 'import sys, tomllib
-print(tomllib.load(open(sys.argv[1], "rb")).get("retired_note", ""))' "$config") ]] ||
-    fail "a tier line inside a retired string became a setting"
-  { printf 'inline_state = { mode = "queue" }\n'; cat "$repo/templates/codex/config.toml"; } >"$config"
-  chmod 600 "$config"
-  ! python3 "$repo/scripts/reconcile-codex-config.py" check "$repo/templates/codex/config.toml" "$config" 2>/dev/null ||
-    fail "drift check accepted a root inline table the merge would drop"
-  # A host root still exactly the root of a template this repository once
-  # carried was written by the harness: the retired tier in it is residue and
-  # goes on its own, the host tables stay, and the result passes the drift
-  # check and survives a repeat unchanged.
-  { cat "$old"; printf '\n[projects."/srv/example"]\ntrust_level = "trusted"\n'; } >"$config"
-  chmod 600 "$config"
-  ! python3 "$repo/scripts/reconcile-codex-config.py" check "$repo/templates/codex/config.toml" "$config" 2>/dev/null ||
-    fail "drift check accepted a root the harness wrote with a retired tier"
-  migrate "$home" "$repo"
-  [[ -z $(python3 -c 'import sys, tomllib
-print(tomllib.load(open(sys.argv[1], "rb")).get("service_tier", ""))' "$config") ]] ||
-    fail "template residue survived: a retired tier the old template wrote was kept as a host choice"
-  [[ $(toml_value "$config" 'projects./srv/example.trust_level') == trusted ]] || fail "host project table was lost beside the residue"
-  python3 "$repo/scripts/reconcile-codex-config.py" check "$repo/templates/codex/config.toml" "$config" ||
-    fail "reconciled residue does not pass the drift check"
-  inode=$(stat -c '%i' -- "$config")
-  migrate "$home" "$repo"
-  [[ $(stat -c '%i' -- "$config") == "$inode" ]] || fail "repeat reconciliation rewrote the reconciled residue"
-  # A root Codex rewrote, here a tier set back to default, is no template's:
-  # the choice stays and nothing is rewritten.
-  sed 's/^service_tier = "fast"$/service_tier = "default"/' "$old" >"$config"
-  chmod 600 "$config"
-  migrate "$home" "$repo"
-  [[ $(toml_value "$config" service_tier) == default ]] || fail "a tier Codex rewrote was dropped as residue"
-  # A merge that keeps a host choice writes it with the marker, so the result
-  # never matches the appended-tier template in history: the next check passes
-  # and a repeat leaves it alone, which is what keeps a choice from vanishing on
-  # the second reconciliation.
-  sed 's/^model_reasoning_effort = "xhigh"$/model_reasoning_effort = "low"/' "$old" >"$config"
-  chmod 600 "$config"
-  migrate "$home" "$repo"
-  [[ $(toml_value "$config" service_tier) == fast && $(toml_value "$config" model_reasoning_effort) == xhigh ]] ||
-    fail "a host choice beside a drifted template value was lost"
-  [[ $(/usr/bin/grep -c 'kept by the reconcile' "$config") == 1 ]] || fail "the kept host line carries no marker"
-  python3 "$repo/scripts/reconcile-codex-config.py" check "$repo/templates/codex/config.toml" "$config" ||
-    fail "a merge that kept a host choice produced a root the drift check rejects"
-  inode=$(stat -c '%i' -- "$config")
-  migrate "$home" "$repo"
-  [[ $(stat -c '%i' -- "$config") == "$inode" && $(toml_value "$config" service_tier) == fast ]] ||
-    fail "a repeat reconciliation rewrote or dropped a kept host choice"
-  # The appended-tier template itself, installed verbatim, is residue too, and
-  # so is the CRLF version, whichever newline policy the host file carries.
-  for verbatim in "$appended" "$crlf"; do
-    cp -- "$verbatim" "$config"
-    chmod 600 "$config"
-    migrate "$home" "$repo"
-    [[ -z $(python3 -c 'import sys, tomllib
-print(tomllib.load(open(sys.argv[1], "rb")).get("service_tier", ""))' "$config") ]] ||
-      fail "a tier a past template wrote survived as a host choice: ${verbatim##*/}"
-  done
-  rm -- "$config"
-
-  ln -s "$repo/codex/.codex/config.toml" "$config"
-  rm -- "$repo/codex/.codex/config.toml"
-  migrate "$home" "$repo"
-  [[ -f $config && ! -L $config ]] || fail "dangling managed link was not replaced by a regular file"
-  cmp -s -- "$config" "$repo/templates/codex/config.toml" || fail "dangling managed link was not seeded from the template"
-  rm -- "$config"
-
-  ln -s "$TMP/migrate/elsewhere/config.toml" "$config"
-  if migrate "$home" "$repo" >/dev/null 2>&1; then fail "migration replaced an unmanaged dangling link"; fi
-  [[ -L $config ]] || fail "failed migration changed an unmanaged link"
-  rm -- "$config"
-
-  printf 'not = [valid\n' >"$config"
-  if migrate "$home" "$repo" >/dev/null 2>&1; then fail "migration accepted an unparseable host config"; fi
-  [[ $(<"$config") == 'not = [valid' ]] || fail "failed migration changed an unparseable host config"
-  rm -- "$config"
-
-  rm -rf -- "$home/.codex"
-  if migrate "$home" "$repo" >/dev/null 2>&1; then fail "migration accepted a missing Codex root"; fi
-  [[ ! -e $home/.codex ]] || fail "failed migration created the Codex root"
-}
-
 case_clean_links
 case_no_folding
 case_skill_links
 case_skill_preflight
 case_make_guards
 case_install_gate
-case_migration
-printf 'ok: prepare-stow removes only dangling managed links, links skill directories, and migrates Codex config safely\n'
+printf 'ok: prepare-stow removes only dangling managed links, links skill directories, and guards the installed gate\n'

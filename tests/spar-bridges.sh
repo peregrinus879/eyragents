@@ -17,7 +17,6 @@ esac
 # (including its synthetic commit). All scanner and fake-client checks still run.
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 CLAUDE_BRIDGE="$ROOT/agents/.agents/skills/spar/scripts/spar-claude"
-CODEX_BRIDGE="$ROOT/agents/.agents/skills/spar/scripts/spar-codex"
 SCANNER="$ROOT/agents/.agents/skills/spar/scripts/spar-payload-scan"
 WORK=$(mktemp -d)
 TMP="$WORK/session"
@@ -50,26 +49,26 @@ expect_child_stopped() {
 
 # Dependency injection lives only in these disposable copies, never in a
 # production environment flag or a writable runtime exemption.
-python3 - "$CLAUDE_BRIDGE" "$CODEX_BRIDGE" "$WORK/bridges" "$SHIMS" "$HOMEBOX" <<'PY'
+python3 - "$WORK/bridges" "$SHIMS" "$HOMEBOX" "$CLAUDE_BRIDGE" <<'PY'
 import pathlib, shlex, sys
-for source in sys.argv[1:3]:
+for source in sys.argv[4:]:
     text = pathlib.Path(source).read_text()
     needle = '  local root\n'
     assert text.count(needle) == 1
-    shims = pathlib.Path(sys.argv[4])
-    text = text.replace(needle, needle + '  case $1 in ' + '|'.join(shlex.quote(str(shims / name)) for name in ('claude', 'codex', 'git')) + ') return 0 ;; esac\n')
+    shims = pathlib.Path(sys.argv[2])
+    text = text.replace(needle, needle + '  case $1 in ' + '|'.join(shlex.quote(str(shims / name)) for name in ('claude', 'git')) + ') return 0 ;; esac\n')
     needle = 'account_home=$(getent passwd "$(id -u)" | cut -d: -f6)'
     assert text.count(needle) == 1
-    text = text.replace(needle, 'account_home=' + shlex.quote(sys.argv[5]))
-    target = pathlib.Path(sys.argv[3]) / pathlib.Path(source).name
+    text = text.replace(needle, 'account_home=' + shlex.quote(sys.argv[3]))
+    target = pathlib.Path(sys.argv[1]) / pathlib.Path(source).name
     target.write_text(text)
     target.chmod(0o755)
 PY
 cp -- "$SCANNER" "$WORK/bridges/spar-payload-scan"
 PRODUCTION_CLAUDE=$CLAUDE_BRIDGE
-PRODUCTION_CODEX=$CODEX_BRIDGE
 CLAUDE_BRIDGE="$WORK/bridges/spar-claude"
-CODEX_BRIDGE="$WORK/bridges/spar-codex"
+PRODUCTION_BRIDGES=("$PRODUCTION_CLAUDE")
+BRIDGES=("$CLAUDE_BRIDGE")
 
 cat >"$SHIMS/git" <<'SHIM'
 #!/usr/bin/env bash
@@ -114,51 +113,7 @@ case ${SPAR_TEST_MODE:-ok} in
 esac
 SHIM
 
-cat >"$SHIMS/codex" <<'SHIM'
-#!/usr/bin/env bash
-source "$(dirname -- "$0")/shim.env"
-if [[ ${1:-} == --version ]]; then
-  if [[ $SPAR_TEST_MODE == bad-version ]]; then printf '%s\n' "$SPAR_TEST_REPLY"; else printf 'codex-cli 0.153.4\n'; fi
-  exit
-fi
-if [[ ${1:-} == login && ${2:-} == status ]]; then
-  printf 'Logged in using ChatGPT (fixture workspace)\n'
-  exit
-fi
-[[ ${1:-} == exec ]] || exit 90
-printf '%s\n' "$*" >>"$SPAR_TEST_CALLS"
-printf '%s\0' "$@" >"$SPAR_TEST_CALLS.argv"
-printf '%s\n' "$PWD" >>"$SPAR_TEST_CALLS.pwd"
-env >"$SPAR_TEST_CALLS.env"
-cat >"$SPAR_TEST_CALLS.stdin"
-thread="11111111-1111-4111-8111-111111111111"
-case ${SPAR_TEST_MODE:-ok} in
-  ok|bad-version)
-    jq -cn --arg t "$thread" '{type:"thread.started",thread_id:$t}'
-    jq -cn '{type:"item.completed",item:{type:"agent_message",text:"review ok"}}'
-    jq -cn '{type:"turn.completed"}' ;;
-  reply)
-    jq -cn --arg t "$thread" '{type:"thread.started",thread_id:$t}'
-    jq -cn --arg t "$SPAR_TEST_REPLY" '{type:"item.completed",item:{type:"agent_message",text:$t}}'
-    jq -cn '{type:"turn.completed"}' ;;
-  multi)
-    jq -cn --arg t "$thread" '{type:"thread.started",thread_id:$t}'
-    jq -cn '{type:"item.completed",item:{type:"agent_message",text:"part one"}}'
-    jq -cn '{type:"item.completed",item:{type:"agent_message",text:"part two"}}'
-    jq -cn '{type:"turn.completed"}' ;;
-  failure) printf 'reviewer failed while reading .env policy\n' >&2; exit 1 ;;
-  error-result)
-    jq -cn --arg t "$thread" '{type:"thread.started",thread_id:$t}'
-    jq -cn '{type:"turn.failed",error:"review failed"}' ;;
-  limit) printf 'rate limit reached; resets later\n' >&2; exit 1 ;;
-  hang)
-    trap '' TERM
-    (trap '' TERM; while :; do sleep 1; done) &
-    printf '%s\n' "$!" >"$SPAR_TEST_CHILD_PID"
-    while :; do sleep 1; done ;;
-esac
-SHIM
-chmod 755 "$SHIMS/claude" "$SHIMS/codex"
+chmod 755 "$SHIMS/claude"
 
 configure_shims() { # mode calls-file [reply-text] [child-pid-file]
   printf 'SPAR_TEST_MODE=%q\nSPAR_TEST_CALLS=%q\nSPAR_TEST_REPLY=%q\nSPAR_TEST_CHILD_PID=%q\n' \
@@ -1090,8 +1045,7 @@ system_files += [f"etc/ssh/ssh_host_{kind}_key" for kind in ("rsa", "dsa", "ecds
 system_trees = corpus["system_trees"] + corpus["raw_trees"]
 home_files = [
     ".claude/.credentials.json", ".claude/history.jsonl", ".codex/auth.json", ".codex/config.toml",
-    ".codex/history.jsonl", ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml",
-    ".hermes/auth.json", ".hermes/.env", ".hermes/state.db", ".hermes/state.db-wal", ".hermes/state.db-shm",
+    ".codex/history.jsonl", ".config/gh/hosts.yml", ".docker/config.json",
     ".local/share/opencode/auth.json", ".local/share/opencode/opencode.db",
     ".local/share/opencode/opencode.db-wal", ".local/share/opencode/opencode.db-shm",
     ".env", ".envrc", ".netrc", ".npmrc", ".pypirc", ".bash_history", ".zsh_history",
@@ -1101,7 +1055,7 @@ home_trees = [
     ".config/BraveSoftware", ".config/chromium", ".config/google-chrome", ".config/1Password",
     ".config/Bitwarden", ".local/share/keyrings", ".claude/projects", ".claude/sessions",
     ".claude/session-env", ".claude/tasks", ".claude/debug", ".codex/sessions", ".codex/archived_sessions",
-    ".hermes/sessions", ".hermes/logs", ".local/share/opencode/storage", ".local/share/opencode/log",
+    ".local/share/opencode/storage", ".local/share/opencode/log",
 ]
 shapes = ["service.keytab", "ssh_host_future_algorithm_key", "server.key", "server.pem", "client.p12",
           "client.pfx", "credentials", "credentials.json", "auth.json", ".credentials.json",
@@ -1113,15 +1067,14 @@ positive = corpus["positive_files"] + [
     "etc/ssh/ssh_host_future_algorithm_key.pub", "src/auth.py", "docs/keytab-policy.md",
     "etc/shadow-policy.md", "sys/kernel/debug-notes.md", "etc/credstore-notes.md",
     ".codex/config.toml.example", ".codex/sessions-policy.md", ".claude/settings.json",
-    ".hermes/memories/notes.md", ".hermes/skills/example/SKILL.md", ".config/opencode/opencode.json",
+    ".config/opencode/opencode.json",
 ]
 cases = {"system_files": system_files, "system_trees": system_trees, "home_files": home_files,
          "home_trees": home_trees, "additional_shapes": corpus["additional_shapes"], "denied": [], "positive": []}
 count = 0
 for path in system_files + home_files + trees:
     assert policy["sensitive_path"]("/" + path), path
-for path in (".config/gh/hosts.yml/nested/opaque.txt", ".docker/config.json/nested/opaque.txt",
-             ".hermes/config.yaml/nested/opaque.txt"):
+for path in (".config/gh/hosts.yml/nested/opaque.txt", ".docker/config.json/nested/opaque.txt"):
     assert policy["sensitive_path"]("legacy-provider-copy/" + path), path
 for prefix in ("", "copied layout/"):
     for accepted, paths in ((False, denied), (True, positive)):
@@ -1173,7 +1126,7 @@ fi
 # --- Bridges ---
 repo="$TMP/repo"
 git init -q "$repo"
-for bridge in "$PRODUCTION_CLAUDE" "$PRODUCTION_CODEX"; do
+for bridge in "${PRODUCTION_BRIDGES[@]}"; do
   rc=0
   PATH="$SHIMS:$PATH" /usr/bin/env -C "$repo" "$bridge" review 'Refuse planted runtime.' >"$TMP/out" 2>"$TMP/err" || rc=$?
   [[ $rc == 2 && $(<"$TMP/err") == *'resolves under a temp root'* ]] || fail "production bridge admitted a temp runtime"
@@ -1182,7 +1135,7 @@ printf 'harmless\n' >"$repo/README.md"
 printf 'in-repo artifact\n' >"$repo/notes.md"
 printf '/.eyr-plans/\n' >"$repo/.gitignore"
 # Generator semantics live in review-brief.sh. Exercise the generated artifact's
-# handoff to both mocked reviewers in the ordinary review below, without gates.
+# handoff to the mocked reviewer in the ordinary review below, without gates.
 local_brief="$repo/.eyr-plans/bridge-fixture/spar/repo-brief.md"
 (umask 077; mkdir -p "${local_brief%/*}")
 if $FIXTURES_ONLY; then
@@ -1208,7 +1161,7 @@ run_bridge() { # bridge mode calls-file [bridge args...]
   PATH="$SHIMS:$PATH" /usr/bin/env -C "$repo" "$bridge" review "$@" >"$calls.out" 2>"$calls.err" || BRIDGE_RC=$?
 }
 
-for bridge in "$CLAUDE_BRIDGE" "$CODEX_BRIDGE"; do
+for bridge in "${BRIDGES[@]}"; do
   name=${bridge##*/}
   calls="$TMP/calls-$name"
 
@@ -1267,28 +1220,6 @@ for bridge in "$CLAUDE_BRIDGE" "$CODEX_BRIDGE"; do
           fail "$name settings do not clear exactly the fable override" ;;
       esac
     done
-  else
-    for flag in 'default_permissions="spar-reviewer"' 'approval_policy="never"' 'features.plugins=false' \
-      'features.multi_agent=false' 'web_search="disabled"' 'network={enabled=false}' '":root"="deny"' 'service_tier="default"' \
-      "\"$repo\"=\"read\"" "\"$repo/.git\"=\"deny\"" '"**/.env"="deny"' '"**/*.pem"="deny"' \
-      "trust_level=\"untrusted\"" 'project_doc_max_bytes=0' '--ignore-user-config' '--ignore-rules'; do
-      [[ $args == *"$flag"* ]] || fail "$name isolation missing: $flag"
-    done
-    # No token selects a model, in any flag or configuration-override form:
-    # the catalog default is the reviewer.
-    for ((i = 0; i < ${#argv[@]}; i++)); do
-      override=""
-      case ${argv[i]} in
-        --model|--model=*|-m|-m?*|--profile|--profile=*|-p|-p?*) fail "$name pins a reviewer model instead of the catalog default: ${argv[i]}" ;;
-        -c|--config) override=${argv[i + 1]:-} ;;
-        -c?*) override=${argv[i]#-c} ;;
-        --config=*) override=${argv[i]#--config=} ;;
-      esac
-      key=${override%%=*}
-      key=${key//[[:space:]]/}
-      [[ -z $override || ( $key != model && $key != *.model ) ]] ||
-        fail "$name pins a reviewer model through a configuration override: ${argv[i]} $override"
-    done
   fi
   [[ $args != *'/var/tmp/spar-'* ]] || fail "$name still references a handoff directory"
 
@@ -1337,10 +1268,7 @@ for bridge in "$CLAUDE_BRIDGE" "$CODEX_BRIDGE"; do
   SPAR_TEST_REPLY="$token" run_bridge "$bridge" bad-version "$calls" "Review unsafe version metadata."
   [[ $BRIDGE_RC == 0 && $(<"$calls.err") != *"$token"* && $(<"$calls.err") == *'"clientversion":"unknown"'* ]] ||
     fail "$name leaked or inferred malformed version metadata"
-  if [[ $name == spar-codex ]]; then
-    run_bridge "$bridge" multi "$calls" "Review in parts."
-    [[ $BRIDGE_RC == 0 && $(<"$calls.out") == *'part one'*'part two'* ]] || fail "$name dropped an earlier reviewer message"
-  else
+  if [[ $name == spar-claude ]]; then
     SPAR_TEST_REPLY=claude-observed-fixture run_bridge "$bridge" metadata "$calls" "Review metadata."
     [[ $BRIDGE_RC == 0 && $(<"$calls.err") == *'"model":"claude-observed-fixture","effort":"unknown","tier":"standard","clientversion":"2.1.261"'* ]] ||
       fail "$name lost observed safe provenance"
@@ -1394,7 +1322,6 @@ import json
 from pathlib import Path
 import subprocess
 import sys
-import tomllib
 
 scratch, repo, home, shims = sys.argv[1:]
 cases = json.loads(Path(scratch, "path-cases.json").read_text())
@@ -1421,30 +1348,8 @@ for prefix in ("./", "./**/"):
     for path in cases["system_trees"] + cases["home_trees"] + [".git", "secrets"]:
         assert {f"Read({prefix}{path})", f"Read({prefix}{path}/**)"} <= denies, path
 
-codex_args = argv("spar-codex")
-profile = next(arg for arg in codex_args if arg.startswith("permissions.spar-reviewer="))
-profile = tomllib.loads(profile)["permissions"]["spar-reviewer"]
-fs = profile["filesystem"]
-workspace = fs[":workspace_roots"]
-assert profile["network"] == {"enabled": False}
-assert {key: value for key, value in fs.items() if value == "read"} == {
-    ":minimal": "read", str(Path(shims, "codex")): "read", repo: "read",
-}, "Codex reviewer read scope changed"
-assert fs[":root"] == fs[":tmpdir"] == fs[":slash_tmp"] == fs[repo + "/.git"] == "deny"
-assert {key: value for key, value in workspace.items() if value != "deny"} == {".": "read"}
-assert all(not any(char in key for char in "*?[") for key in fs), "root-table glob scan added"
-for path in cases["system_files"] + cases["system_trees"]:
-    assert fs["/" + path] == "deny", path
-    assert path not in workspace and "/" + path not in workspace, "system literal in workspace table"
-for path in cases["home_files"] + cases["home_trees"]:
-    assert fs["~/" + path] == "deny", path
-for path in cases["system_files"] + cases["system_trees"] + cases["home_files"] + cases["home_trees"] + cases["additional_shapes"]:
-    assert workspace["**/" + path] == "deny", path
-for path in cases["system_trees"] + cases["home_trees"] + [".git", "secrets"]:
-    assert workspace["**/" + path + "/**"] == "deny", "missing file-expansion descendant mask: " + path
-
 # Exercise real rg --files selection of synthetic paths only. This catches the
-# bare-directory-glob bug without invoking Codex or claiming sandbox dispatch.
+# bare-directory-glob bug without claiming reviewer dispatch.
 def selected(patterns):
     command = ["rg", "--files", "--hidden", "--no-ignore", "--null"]
     for pattern in sorted(patterns):
@@ -1455,15 +1360,14 @@ def selected(patterns):
 
 for name, patterns in (
     ("Claude repository rules", [rule[len("Read(./"):-1] for rule in denies if rule.startswith("Read(./")]),
-    ("Codex workspace masks", [pattern for pattern, mode in workspace.items() if mode == "deny"]),
 ):
     matches = selected(patterns)
     assert set(cases["denied"]) <= matches, (name, "unselected payloads", set(cases["denied"]) - matches)
     assert not set(cases["positive"]) & matches, (name, "positive source excluded", set(cases["positive"]) & matches)
-print(f"ok: both reviewer profiles retain scope and mask {len(set(cases['denied']))} synthetic payload paths; {len(cases['positive'])} positives usable")
+print(f"ok: the reviewer profile retains scope and mask {len(set(cases['denied']))} synthetic payload paths; {len(cases['positive'])} positives usable")
 PY
 
 if ! $FIXTURES_ONLY; then
-  SPAR_BRIDGE_FIXTURES="$TMP" env -u HOST_CODEX_CONFIG -u CONFIG_CONTRACT_ROOT python3 -B "$ROOT/tests/config-contracts.py"
+  SPAR_BRIDGE_FIXTURES="$TMP" env -u CONFIG_CONTRACT_ROOT python3 -B "$ROOT/tests/config-contracts.py"
 fi
 printf 'ok: spar bridges relay scanned one-pass reviews from a scrubbed environment and honor opt-out\n'

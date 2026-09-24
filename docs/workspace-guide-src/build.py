@@ -36,7 +36,7 @@ def load_reference():
     data['title'] = 'EyrAgents Workspace Guide'
     data['reviewed'] = f'host reference {data["reviewed"]}; AI reference {clients["reviewed"]}'
     data['scope'] = ('One offline development-workspace reference: hdw, Herdr, Claude Code, '
-                     'Codex, OpenCode, Hermes Agent, Neovim, shell and both host profiles. '
+                     'OpenCode, Neovim, shell and both host profiles. '
                      'Each source retains its own evidence baseline; installed help and '
                      'configuration determine actual behavior.')
     return data
@@ -75,8 +75,8 @@ def validate(data):
             if url.scheme != 'https' or not url.netloc:
                 raise ValueError(f'invalid source URL: {source["url"]}')
     recipes = data['recipes']
-    if [recipe['selector'] for recipe in recipes] != ['cc', 'cx', 'oc', 'ha']:
-        raise ValueError('launcher must cover all four hdw selectors')
+    if [recipe['selector'] for recipe in recipes] != ['cc', 'oc']:
+        raise ValueError('launcher must cover both hdw selectors')
     for recipe in recipes:
         if recipe['command'] != 'hdw ' + recipe['selector'] or recipe['resume'] != recipe['command'] + ' -c':
             raise ValueError(f'invalid launcher recipe: {recipe["selector"]}')

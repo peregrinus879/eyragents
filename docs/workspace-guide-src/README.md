@@ -2,7 +2,7 @@
 
 Open [`../workspace-guide.html`](../workspace-guide.html) in a modern browser and select **Omarchy** or **Arch WSL**. On GitHub, download the raw HTML first. The single file works offline, including search, host/layer/task filters, saved keys, launcher recipes, theme and printing. Source links use the network only when selected.
 
-The guide covers `hdw <cc|cx|oc|ha> [-c]`, Herdr, Claude Code, Codex, OpenCode, Hermes Agent, shared agent workflows, Neovim/LazyVim, Neo-tree, Git review, vault notes, Bash tools, Yazi and both outer terminals. Each application's help owns its full evolving catalog.
+The guide covers `hdw <cc|oc> [-c]`, Herdr, Claude Code, OpenCode, shared agent workflows, Neovim/LazyVim, Neo-tree, Git review, vault notes, Bash tools, Yazi and both outer terminals. Each application's help owns its full evolving catalog.
 
 ## Use
 
@@ -49,11 +49,11 @@ The author changing a control or adopting an update owns its guide reconciliatio
 
 `/omasync` owns host/default and `hdw` review; `/eyrsync` owns AI-client controls and workflows. A change to `hdw` arguments or continuation must reconcile the host recipes with client behavior. Each workflow updates this single guide within its authorized scope.
 
-Generation validates file consistency. It does not monitor upstream releases, parse running keymaps, or prove live key delivery. Interface changes should exercise both hosts, search and filters, disclosures, saved-key import/export, all eight launcher combinations, quoted directory input, clipboard fallback, theme, print, narrow/wide layouts and unavailable browser storage in an isolated profile.
+Generation validates file consistency. It does not monitor upstream releases, parse running keymaps, or prove live key delivery. Interface changes should exercise both hosts, search and filters, disclosures, saved-key import/export, all four launcher combinations, quoted directory input, clipboard fallback, theme, print, narrow/wide layouts and unavailable browser storage in an isolated profile.
 
 ## Saved keys
 
-Action IDs and the `eyragents-guide-v1` browser-storage namespace are stable compatibility identifiers. Favorites include recognized IDs from both hosts and all clients; switching host filters their display without discarding them. Export/import transfers favorites explicitly between files or machines.
+Action IDs and the `eyragents-guide-v1` browser-storage namespace are stable compatibility identifiers. Favorites include recognized IDs from both hosts and both clients; switching host filters their display without discarding them. Export/import transfers favorites explicitly between files or machines.
 
 The guide accepts both `hdw-guide-saved-v1` and `eyragents-guide-saved-v1` exports and exports the latter. Before discarding an old local guide copy, export its saved keys, then import that file here. File-URL storage can differ after a move or rename; existing browser profiles are never inspected or migrated automatically. With storage restricted, the interface and in-tab favorites still work.
 

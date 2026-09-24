@@ -51,7 +51,7 @@ function historyOrStore(path) {
     /\.(?:key|pem|p12|pfx)$/i.test(path) ||
     /\/(?:\.config\/(?:BraveSoftware|chromium|gh)|\.local\/share\/keyrings|\.docker)(?:\/|$)/i.test(path) ||
     /\/(?:shadow|gshadow|master\.passwd|\.claude\.json)$/i.test(path) ||
-    /\/(?:\.claude\/(?:projects|sessions|session-env|tasks|debug|history\.jsonl)|\.codex\/(?:config\.toml|sessions|archived_sessions|history\.jsonl)|\.hermes\/(?:config\.yaml|sessions|logs|state\.db|memories)|\.local\/share\/opencode)(?:\/|$)/i.test(path) ||
+    /\/(?:\.claude\/(?:projects|sessions|session-env|tasks|debug|history\.jsonl)|\.codex\/(?:config\.toml|sessions|archived_sessions|history\.jsonl)|\.local\/share\/opencode)(?:\/|$)/i.test(path) ||
     /^\/(?:var\/)?tmp\/(?:claude-[^/]+|codex[^/]*)(?:\/|$)/.test(path)
 }
 

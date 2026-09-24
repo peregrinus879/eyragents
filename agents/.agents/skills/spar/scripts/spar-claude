@@ -132,8 +132,7 @@ settings=$(jq -cn --arg repo "$repo" --arg home "$account_home" '
   ];
   def home_files: [
     ".claude/.credentials.json", ".claude/history.jsonl", ".codex/auth.json", ".codex/config.toml",
-    ".codex/history.jsonl", ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml",
-    ".hermes/auth.json", ".hermes/.env", ".hermes/state.db", ".hermes/state.db-wal", ".hermes/state.db-shm",
+    ".codex/history.jsonl", ".config/gh/hosts.yml", ".docker/config.json",
     ".local/share/opencode/auth.json", ".local/share/opencode/opencode.db",
     ".local/share/opencode/opencode.db-wal", ".local/share/opencode/opencode.db-shm",
     ".env", ".envrc", ".netrc", ".npmrc", ".pypirc", ".bash_history", ".zsh_history"
@@ -143,7 +142,7 @@ settings=$(jq -cn --arg repo "$repo" --arg home "$account_home" '
     ".config/BraveSoftware", ".config/chromium", ".config/google-chrome", ".config/1Password",
     ".config/Bitwarden", ".local/share/keyrings", ".claude/projects", ".claude/sessions",
     ".claude/session-env", ".claude/tasks", ".claude/debug", ".codex/sessions", ".codex/archived_sessions",
-    ".hermes/sessions", ".hermes/logs", ".local/share/opencode/storage", ".local/share/opencode/log"
+    ".local/share/opencode/storage", ".local/share/opencode/log"
   ];
   def file_shapes: [
     ".env", ".env.*", ".envrc", "*.key", "*.pem", "*.p12", "*.pfx", "*.keytab", "ssh_host_*_key",

@@ -1,5 +1,5 @@
 // commit-gate plugin: run the installed copy of the same commit-gate hook
-// Claude Code and Codex run before every bash tool call, so no tool creates a
+// Claude Code runs before every bash tool call, so no tool creates a
 // commit except through commit-apply. There is no prefilter: the gate alone
 // decides what counts, so quoting tricks on the word git cannot skip it. A
 // denial throws, which OpenCode reports and does not execute; a missing gate

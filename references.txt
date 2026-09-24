@@ -5,6 +5,4 @@
 # .agents/skills/eyrsync/SKILL.md. scripts/update-references.sh reads only this
 # manifest and refreshes existing clones. Bootstrap requires explicit approval.
 claude-code https://github.com/anthropics/claude-code.git github:R_kgDON91aYw
-codex https://github.com/openai/codex.git github:R_kgDOOYsS4Q
 opencode https://github.com/anomalyco/opencode.git github:R_kgDOOiiGLw
-hermes-agent https://github.com/NousResearch/hermes-agent.git github:R_kgDOPRF1Gw

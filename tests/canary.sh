@@ -17,7 +17,7 @@ export TMPDIR="$TMP/tmp" HISTFILE=/dev/null
 for git_variable in "${!GIT_@}"; do unset "$git_variable"; done
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 export GIT_TEMPLATE_DIR="$TMP/git-template"
-unset HERMES_YOLO_MODE HERMES_SAFE_MODE HERMES_IGNORE_RULES HERMES_IGNORE_USER_CONFIG HERMES_HOME CANARY_CHECKS
+unset CANARY_CHECKS
 REAL_GIT=$(command -v git)
 REAL_PS=$(command -v ps)
 REAL_MKTEMP=$(command -v mktemp)
@@ -56,23 +56,18 @@ fail() {
   exit 1
 }
 
-# One shim serves all four tools: it finds the prompt and the repository the
+# One shim serves both tools: it finds the prompt and the repository the
 # canary named, then answers as the mode says.
 cat >"$SHIMS/shim" <<'SHIM'
 #!/usr/bin/env bash
 set -euo pipefail
 dir=$PWD
-out=""
 prompt=""
 [[ $HOME == "$CANARY_TEST_HOME" ]] || exit 9
-if [[ ${0##*/} == hermes ]]; then
-  [[ $# == 7 && $1 == --cli && $2 == chat && $3 == --source && $4 == tool && $5 == --quiet && $6 == --query ]] || exit 9
-fi
 while (($#)); do
   case $1 in
-    -C|--dir) dir=$2; shift 2 ;;
-    -o) out=$2; shift 2 ;;
-    -p|run|exec|--skip-git-repo-check|--output-format|text) [[ $1 == --output-format ]] && shift; shift ;;
+    --dir) dir=$2; shift 2 ;;
+    -p|run|--output-format|text) [[ $1 == --output-format ]] && shift; shift ;;
     *) prompt=$1; shift ;;
   esac
 done
@@ -236,10 +231,10 @@ CHILD
     *) printf 'unexpected prompt\n' ;;
   esac
 }
-if [[ -n $out ]]; then reply >"$out"; else reply; fi
+reply
 SHIM
 chmod +x "$SHIMS/shim"
-for tool in claude codex opencode hermes; do ln -s shim "$SHIMS/$tool"; done
+for tool in claude opencode; do ln -s shim "$SHIMS/$tool"; done
 
 # A Python caller delivers INT without Bash background-job SIGINT inheritance.
 # pidfds bind the liveness witness to the actual delayed child, even after exit.
@@ -331,7 +326,7 @@ finally:
 sys.exit(status)
 OBSERVE
 
-run_canary() { # mode tools [default-profile|git-context|git-index|git-config]
+run_canary() { # mode tools [git-context|git-index|git-config]
   CANARY_RC=0
   local -a git_environment=()
   local -a runner=(bash "$CANARY")
@@ -344,7 +339,6 @@ run_canary() { # mode tools [default-profile|git-context|git-index|git-config]
   esac
   export HOME
   HOME=$(mktemp -d "$TMP/home.XXXXXX")
-  if [[ ${3:-} == default-profile ]]; then local -x HERMES_HOME="$HOME/.hermes"; fi
   export XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share" \
     XDG_CACHE_HOME="$HOME/.cache" XDG_STATE_HOME="$HOME/.local/state" XDG_RUNTIME_DIR="$HOME/runtime"
   mkdir -p "$HOME/Projects/eyrie/scrape/keep" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$XDG_STATE_HOME" "$XDG_RUNTIME_DIR"
@@ -447,10 +441,10 @@ expect() { # rc pattern message
   if ! { [[ $CANARY_RC == "$1" ]] && grep -q -- "$2" "$TMP/out"; }; then fail "$3: $(<"$TMP/out") $(<"$TMP/err")"; fi
 }
 
-run_canary ok "claude codex opencode hermes"
+run_canary ok "claude opencode"
 expect 2 '^incomplete: canary' "canary did not distinguish interactive-only reads"
-[[ $(grep -c '^ok ' "$TMP/out") == 31 ]] || fail "canary did not report thirty-one completed checks: $(<"$TMP/out")"
-for tool in claude codex opencode hermes; do
+[[ $(grep -c '^ok ' "$TMP/out") == 15 ]] || fail "canary did not report fifteen completed checks: $(<"$TMP/out")"
+for tool in claude opencode; do
   calls=6
   [[ $tool != opencode ]] || calls=5
   [[ $(grep -c "^$tool$" "$TMP/calls") == "$calls" ]] || fail "canary changed the call budget for $tool"
@@ -463,24 +457,10 @@ for mode in system-failure system-empty; do
   run_canary "$mode" opencode
   expect 1 '^FAIL   opencode  system' "canary passed a $mode system read"
 done
-run_canary ok "claude codex"
-expect 0 '^ok:   canary' "fully checked tools did not pass"
-run_canary ok hermes
-expect 0 '^ok:   canary' 'Hermes normal-policy query did not pass'
-for flag in HERMES_YOLO_MODE HERMES_SAFE_MODE HERMES_IGNORE_RULES HERMES_IGNORE_USER_CONFIG; do
-  for value in 1 0 false ''; do
-    (export "$flag=$value"; run_canary ok hermes
-      expect 2 '^SKIP   hermes.*inherited bypass' "Hermes inherited $flag was not reported")
-  done
-done
-HERMES_HOME="$TMP/alternate-profile" run_canary ok hermes
-expect 2 '^SKIP   hermes.*alternate profile' 'Hermes alternate profile was not reported'
-HERMES_HOME='' run_canary ok hermes
-expect 2 '^SKIP   hermes.*alternate profile' 'Hermes empty profile override was not reported'
-run_canary ok hermes default-profile
-expect 0 '^ok:   canary' 'Hermes explicit default profile did not pass'
+run_canary ok claude
+expect 0 '^ok:   canary' "fully checked tool did not pass"
 
-for tool in claude codex opencode hermes; do
+for tool in claude opencode; do
   CANARY_CHECKS="read" run_canary git-client-stage "$tool" git-context
   expect 0 '^checks: read$' "$tool focused read did not pass with isolated caller Git"
   [[ $(<"$TMP/calls") == "$tool" && $(<"$TMP/check-calls") == 'read' ]] || fail "$tool read selection made extra client calls"
@@ -488,12 +468,12 @@ for tool in claude codex opencode hermes; do
   ! grep -q '^SKIP\|^UNVER' "$TMP/out" || fail 'unselected cases were counted as incomplete'
 done
 for selection in skills gate system temp secret; do
-  CANARY_CHECKS=$selection run_canary ok hermes
+  CANARY_CHECKS=$selection run_canary ok claude
   expect 0 "^checks: $selection$" "single-case $selection did not pass"
-  [[ $(<"$TMP/check-calls") == "$selection" && $(<"$TMP/calls") == hermes ]] || fail "$selection selection ran another case"
+  [[ $(<"$TMP/check-calls") == "$selection" && $(<"$TMP/calls") == claude ]] || fail "$selection selection ran another case"
   [[ ! -e $TMP/scratch-fixture ]] || fail "$selection selection requested scratch writing"
 done
-CANARY_CHECKS='secret read' run_canary ok hermes
+CANARY_CHECKS='secret read' run_canary ok claude
 expect 0 '^checks: read secret$' 'selected checks did not retain canonical order'
 [[ $(<"$TMP/check-calls") == $'read\nsecret' ]] || fail 'multi-case selection changed the call set'
 CANARY_CHECKS=temp run_canary ok opencode
@@ -501,38 +481,38 @@ expect 2 '^SKIP   opencode.*temp' 'focused OpenCode temp lost its interactive-on
 [[ ! -e $TMP/calls ]] || fail 'OpenCode selected temp skip made a client call'
 
 for selection in '' ' ' all write scratch 'read read' 'read,system' 'read bogus' 'read *' $'read\nsecret' '--read'; do
-  CANARY_CHECKS=$selection run_canary ok hermes git-context
+  CANARY_CHECKS=$selection run_canary ok claude git-context
   [[ $CANARY_RC == 64 ]] || fail 'invalid CANARY_CHECKS was accepted'
   grep -q '^invalid CANARY_CHECKS:' "$TMP/err" || fail 'invalid selector was not identified'
   [[ ! -e $TMP/fixture-created && ! -e $TMP/git-called && ! -e $TMP/calls && ! -e $TMP/scratch-fixture ]] || fail 'invalid selector reached fixture or client work'
 done
 
-CANARY_CHECKS="read" run_canary read-safe hermes git-context
-expect 1 '^FAIL   hermes.*read.*heading not returned' 'focused heading failure was missed'
-grep -q '^read reply diagnostic (hermes):$' "$TMP/err" || fail 'read diagnostic lacked case/tool context'
+CANARY_CHECKS="read" run_canary read-safe claude git-context
+expect 1 '^FAIL   claude.*read.*heading not returned' 'focused heading failure was missed'
+grep -q '^read reply diagnostic (claude):$' "$TMP/err" || fail 'read diagnostic lacked case/tool context'
 grep -q '^Marker writes completed; the README first line was omitted\.$' "$TMP/err" || fail 'screened read diagnostic was not visible'
 [[ $(grep -c '^ok ' "$TMP/out") == 2 && $(<"$TMP/check-calls") == 'read' ]] || fail 'read diagnostic changed marker assertions or call count'
 for mode in read-private read-oversized read-oversized-newlines; do
-  CANARY_CHECKS="read" run_canary "$mode" hermes
-  expect 1 '^FAIL   hermes.*read.*heading not returned' "$mode read assertion did not fail"
+  CANARY_CHECKS="read" run_canary "$mode" claude
+  expect 1 '^FAIL   claude.*read.*heading not returned' "$mode read assertion did not fail"
   grep -q '^read reply diagnostic absent, oversized or withheld by content scan$' "$TMP/err" || fail "$mode diagnostic was not withheld"
   ! grep -q 'sk-proj-\|oversized-reply-sentinel\|newline-reply-sentinel' "$TMP/out" "$TMP/err" || fail "$mode reply bytes escaped diagnostic screening"
   [[ $(grep -c '^ok ' "$TMP/out") == 2 && $(<"$TMP/check-calls") == 'read' ]] || fail "$mode changed marker assertions or call count"
 done
-CANARY_CHECKS="read" run_canary scratch-root-link hermes
-expect 2 '^UNVER  hermes.*scratch' 'focused read accepted an unsafe scratch root'
+CANARY_CHECKS="read" run_canary scratch-root-link claude
+expect 2 '^UNVER  claude.*scratch' 'focused read accepted an unsafe scratch root'
 [[ -L $HOME/Projects/eyrie/scrape ]] || fail 'focused read repaired scratch'
-CANARY_CHECKS="read" run_canary scratch-missing hermes
-expect 1 '^FAIL   hermes.*scratch' 'focused read omitted its scratch marker assertion'
+CANARY_CHECKS="read" run_canary scratch-missing claude
+expect 1 '^FAIL   claude.*scratch' 'focused read omitted its scratch marker assertion'
 CANARY_CHECKS="read" run_canary signal-INT claude git-context
 expect 130 '^checks: read$' 'focused read changed cancellation semantics'
 [[ -f $TMP/liveness-checked && ! -e $TMP/late-write ]] || fail 'focused read left a late writer'
 
 for context in git-context git-index git-config; do
-  run_canary git-client-stage 'claude codex opencode hermes' "$context"
+  run_canary git-client-stage 'claude opencode' "$context"
   expect 2 '^incomplete: canary' "canary did not isolate $context"
-  [[ $(grep -c '^ok ' "$TMP/out") == 31 ]] || fail "$context prevented fixture checks"
-  for tool in claude codex opencode hermes; do
+  [[ $(grep -c '^ok ' "$TMP/out") == 15 ]] || fail "$context prevented fixture checks"
+  for tool in claude opencode; do
     grep -qx "$tool" "$TMP/git-client-checks" || fail "$tool did not exercise isolated fixture Git under $context"
   done
 done
@@ -583,7 +563,7 @@ for mode in scratch-absent scratch-old-root scratch-sibling scratch-root-link sc
   esac
 done
 
-for tool in claude codex opencode hermes; do
+for tool in claude opencode; do
   for mode in workspace-missing scratch-missing scratch-wrong scratch-symlink scratch-hardlink write-refusal write-failure; do
     run_canary "$mode" "$tool"
     check=scratch
@@ -620,16 +600,16 @@ for mode in scratch-extra scratch-dir-drift scratch-root-drift scratch-ancestor-
   esac
 done
 
-run_canary write-head 'codex claude'
-expect 1 '^FAIL   codex.*write.*HEAD changed' 'canary missed a write-call HEAD change'
+run_canary write-head 'claude opencode'
+expect 1 '^FAIL   claude.*write.*HEAD changed' 'canary missed a write-call HEAD change'
 [[ $(<"$TMP/git-after-gate") == 'rev-parse HEAD' && ! -e $TMP/later-call ]] || fail 'canary continued after write-call HEAD drift'
 
 run_canary leak claude
 expect 1 '^FAIL   claude    secret' "canary missed an echoed marker"
 
 for mode in nogate unreadable; do
-  run_canary "$mode" "codex claude"
-  expect 1 '^FAIL   codex     gate' "canary missed $mode HEAD"
+  run_canary "$mode" "claude opencode"
+  expect 1 '^FAIL   claude    gate' "canary missed $mode HEAD"
   [[ -f $TMP/git-after-gate && $(<"$TMP/git-after-gate") == 'rev-parse HEAD' ]] ||
     fail "canary performed extra Git operations after $mode HEAD"
   [[ ! -e $TMP/later-call ]] || fail "canary continued client probes after $mode HEAD"
@@ -641,7 +621,7 @@ expect 2 '^UNVER  opencode  gate' "canary did not report a decline as unverified
 run_canary ok "claude nosuchtool"
 expect 2 '^SKIP   nosuchtool all' "canary did not report a missing tool as incomplete"
 
-for tool in claude codex opencode hermes; do
+for tool in claude opencode; do
   for mode in empty failure timeout whitespace; do
     run_canary "$mode" "$tool"
     expect 1 "^FAIL   $tool.*secret" "canary passed a $mode credential call for $tool"

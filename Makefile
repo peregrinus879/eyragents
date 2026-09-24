@@ -4,11 +4,11 @@
 # a real directory and only leaf files are links.
 
 SHELL := /bin/bash
-PACKAGES := agents claude-code codex opencode hermes
+PACKAGES := agents claude-code opencode
 STOW := stow --no-folding --ignore='__pycache__' -t ~
-TOOL_PACKAGES := claude-code codex opencode hermes
-# Each skill under ~/.agents/skills deploys as one directory link, which Codex's
-# loader follows where it skips file links; Stow leaves that directory to
+TOOL_PACKAGES := claude-code opencode
+# Each skill under ~/.agents/skills deploys as one directory link, so files
+# added to a skill need no restow; Stow leaves that directory to
 # scripts/prepare-stow.sh --link-skills.
 AGENTS_STOW := $(STOW) --ignore='\.agents/skills'
 SHELLCHECK_FILES := claude-code/.claude/statusline.sh \
@@ -16,24 +16,22 @@ SHELLCHECK_FILES := claude-code/.claude/statusline.sh \
   $(filter-out %/spar-payload-scan %.py,$(wildcard agents/.agents/skills/*/scripts/*)) \
   $(wildcard scripts/*.sh tests/*.sh)
 
-.PHONY: help stow unstow dry-run restow require-clone check-skills install-gate migrate-codex-config migrate-hermes-config lint test check verify-deploy verify canary canary-develop clean refs workspace-guide
+.PHONY: help stow unstow dry-run restow require-clone check-skills install-gate lint test check verify-deploy verify canary canary-develop clean refs workspace-guide
 
 # Deployment goals and their guards must never race, including `make -j clean restow`.
 .NOTPARALLEL:
 
 help:
 	@echo "Targets:"
-	@echo "  stow           Clean dangling links, stow packages, link skills, install the gate, reconcile Codex and Hermes configs"
+	@echo "  stow           Clean dangling links, stow packages, link skills, install the gate"
 	@echo "  unstow         Remove all package links and the skill directory links"
 	@echo "  dry-run        Preview Stow actions"
-	@echo "  restow         Guard, preflight skills, clean, refresh links, install the gate, reconcile Codex and Hermes configs"
+	@echo "  restow         Guard, preflight skills, clean, refresh links, install the gate"
 	@echo "  check-skills   Read-only preflight of every managed skill directory"
 	@echo "  install-gate   Install templates/hooks/commit-gate as a real file under ~/.agents/hooks"
-	@echo "  migrate-codex-config  Reconcile ~/.codex/config.toml with the template, keeping host tables"
-	@echo "  migrate-hermes-config Reconcile private ~/.hermes/config.yaml and compose shared guidance"
 	@echo "  lint           ShellCheck, Python, and plugin syntax checks over managed scripts"
 	@echo "  test           Fast tests: configuration boundaries, bridges, statusline, preparation, commit gate"
-	@echo "  check          Repository checks: links, JSON/TOML, Hermes YAML/policy and fixture tests (runs in CI)"
+	@echo "  check          Repository checks: links, JSON/TOML and fixture tests (runs in CI)"
 	@echo "  verify-deploy  Check every package file resolves to its deployed target"
 	@echo "  verify         lint, check, and verify-deploy"
 	@echo "  canary         Up to six live calls per tool; interactive-only OpenCode checks reported separately (not a gate)"
@@ -47,8 +45,6 @@ stow: clean
 	$(AGENTS_STOW) -v agents
 	bash scripts/prepare-stow.sh --link-skills
 	$(MAKE) --no-print-directory install-gate
-	bash scripts/prepare-stow.sh --migrate-codex-config
-	bash scripts/prepare-stow.sh --migrate-hermes-config
 
 unstow: require-clone check-skills
 	$(STOW) -D -v $(TOOL_PACKAGES)
@@ -64,11 +60,9 @@ restow: clean
 	$(AGENTS_STOW) -R -v agents
 	bash scripts/prepare-stow.sh --link-skills
 	$(MAKE) --no-print-directory install-gate
-	bash scripts/prepare-stow.sh --migrate-codex-config
-	bash scripts/prepare-stow.sh --migrate-hermes-config
 
-# The hook runs outside the Codex sandbox, so its executable lives outside
-# every workspace as a real file the sandboxed agent cannot write.
+# The hook's executable lives outside every workspace as a real file, so an
+# agent's workspace edits cannot change it.
 GATE := $(HOME)/.agents/hooks/commit-gate
 # Preserve an override as data, never recursively expand Make expressions.
 override export GATE := $(value GATE)
@@ -83,17 +77,10 @@ require-clone:
 check-skills: require-clone
 	@bash scripts/prepare-stow.sh --check-skills
 
-migrate-codex-config: require-clone
-	bash scripts/prepare-stow.sh --migrate-codex-config
-
-migrate-hermes-config: require-clone
-	bash scripts/prepare-stow.sh --migrate-hermes-config
-
 lint:
 	shellcheck -s bash $(SHELLCHECK_FILES)
 	python3 -I -c 'import sys; [compile(open(p, "rb").read(), p, "exec") for p in sys.argv[1:]]' \
-	  agents/.agents/skills/spar/scripts/spar-payload-scan scripts/reconcile-codex-config.py scripts/reconcile-hermes-config.py scripts/update-references.py tests/reference-migration.py \
-	  hermes/.hermes/plugins/eyragents/__init__.py tests/hermes.py tests/hermes-runtime.py tests/hermes-live.py tests/hermes-live-fixtures.py tests/config-contracts.py \
+	  agents/.agents/skills/spar/scripts/spar-payload-scan scripts/update-references.py tests/reference-migration.py tests/config-contracts.py \
 	  agents/.agents/skills/commit/scripts/governance.py tests/commit-governance.py tests/develop-live.py tests/develop-live-fixtures.py docs/workspace-guide-src/build.py
 	@set -e; for plugin in opencode/.config/opencode/plugins/*.js opencode/.config/opencode/lib/*.mjs; do node --check "$$plugin"; done
 	@echo "ok:   lint"
@@ -104,11 +91,8 @@ test:
 	bash tests/mise-env.sh
 	bash tests/update-references.sh
 	python3 tests/reference-migration.py
-	python3 tests/hermes.py
-	python3 tests/hermes-live-fixtures.py
 	bash tests/statusline.sh
 	bash tests/prepare-stow.sh
-	bash tests/reconcile-codex.sh
 	bash tests/review-brief.sh
 	bash tests/spar-bridges.sh
 	bash tests/commit-gate.sh
@@ -146,7 +130,6 @@ check:
 # files, so they are skipped.
 verify-deploy:
 	@bash scripts/prepare-stow.sh --check-gate
-	@python3 scripts/reconcile-hermes-config.py check "$(CURDIR)"
 	@fail=0; \
 	while IFS= read -r -d '' src; do \
 	  [[ "$$src" == */.gitignore ]] && continue; \
@@ -189,16 +172,10 @@ verify-deploy:
 	  if [[ ! -e $$target && ! -L $$target ]]; then :; \
 	  else echo "FAIL: generated OpenCode state reached the package source: $$target"; fail=1; fi; \
 	done; \
-	for b in review-brief spar-claude spar-codex spar-payload-scan commit-candidate commit-apply publish-bind publish-apply publish-verify publish-clip; do \
+	for b in review-brief spar-claude spar-payload-scan commit-candidate commit-apply publish-bind publish-apply publish-verify publish-clip; do \
 	  skill=spar; [[ $$b == commit-* ]] && skill=commit; [[ $$b == publish-* ]] && skill=publish; \
 	  if [[ -x "$$HOME/.agents/skills/$$skill/scripts/$$b" ]]; then echo "ok:   $$b executable"; else echo "FAIL: $$b missing or not executable"; fail=1; fi; \
 	done; \
-	config="$$HOME/.codex/config.toml"; \
-	if [[ -f $$config && ! -L $$config && -O $$config && $$(stat -c '%a' -- "$$config") =~ ^[46]00$$ ]] && \
-	  python3 scripts/reconcile-codex-config.py check templates/codex/config.toml "$$config" && \
-	  HOST_CODEX_CONFIG="$$config" python3 tests/config-contracts.py >/dev/null; then \
-	  echo "ok:   host Codex config carries the template boundaries"; \
-	else echo "FAIL: host Codex config is missing, exposed, or drifted from the template (run make restow)"; fail=1; fi; \
 	if [[ -e "$$HOME/.config/opencode/opencode.jsonc" ]]; then \
 	  echo "FAIL: stray ~/.config/opencode/opencode.jsonc shadows the stowed config"; fail=1; \
 	else echo "ok:   no stray opencode.jsonc"; fi; \

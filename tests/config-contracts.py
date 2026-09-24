@@ -16,10 +16,8 @@ import posixpath
 import re
 import runpy
 import subprocess
-import tomllib
 from functools import lru_cache
 from pathlib import Path
-from unittest.mock import patch
 
 ROOT = Path(os.environ.get("CONFIG_CONTRACT_ROOT", Path(__file__).resolve().parent.parent))
 
@@ -40,7 +38,6 @@ CREDENTIAL_FILES = (
     "~/.codex/auth.json",
     "~/.config/gh/hosts.yml",
     "~/.docker/config.json",
-    "~/.hermes/config.yaml",
     "~/.local/share/opencode/auth.json",
     "~/.netrc",
     "~/.npmrc",
@@ -49,7 +46,7 @@ CREDENTIAL_FILES = (
 )
 # Credential stores that may be copied into a repository; every copy stays unreadable.
 PROJECT_STORE_DIRECTORIES = (".aws", ".gnupg", ".kube", ".ssh", ".config/BraveSoftware", ".config/chromium", ".local/share/keyrings", ".mozilla")
-PROJECT_STORE_FILES = (".claude/.credentials.json", ".codex/auth.json", ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml", ".local/share/opencode/auth.json", ".bash_history", ".zsh_history")
+PROJECT_STORE_FILES = (".claude/.credentials.json", ".codex/auth.json", ".config/gh/hosts.yml", ".docker/config.json", ".local/share/opencode/auth.json", ".bash_history", ".zsh_history")
 PROJECT_STORES = (*PROJECT_STORE_DIRECTORIES, *PROJECT_STORE_FILES)
 # Standing read authorization is separate from OpenCode's external location asks.
 SYSTEM_READ_TREES = ("/bin", "/boot", "/efi", "/etc", "/lib", "/lib64", "/opt",
@@ -113,16 +110,6 @@ REPOSITORY_HOST_EXTENDED = (
 def load_json(path: str):
     with (ROOT / path).open(encoding="utf-8") as handle:
         return json.load(handle)
-
-
-def load_toml(path: str):
-    with (ROOT / path).open("rb") as handle:
-        return tomllib.load(handle)
-
-
-def load_toml_file(path: str):
-    with open(path, "rb") as handle:
-        return tomllib.load(handle)
 
 
 def require(condition: bool, message: str) -> None:
@@ -231,31 +218,6 @@ def claude_file_action(config: dict, tool: str, target: str) -> str | None:
     return None
 
 
-def codex_entries(filesystem: dict, roots: list[str]):
-    """Materialize configured POSIX paths only, without filesystem/host reads."""
-    special = {":root": "/", ":slash_tmp": "/tmp", ":tmpdir": "/fixture-tmp"}
-    for key, value in filesystem.items():
-        if key in ("glob_scan_max_depth", ":minimal"):
-            continue  # Runtime platform roots are not invented by this model.
-        bases = roots if key == ":workspace_roots" else [special.get(key, key.replace("~/", FIXTURE_HOME + "/", 1))]
-        for base in bases:
-            for subpath, access in (value.items() if isinstance(value, dict) else [(".", value)]):
-                path = base if subpath == "." else base.rstrip("/") + "/" + subpath
-                if access in ("read", "write"):
-                    path = path.removesuffix("/**")
-                yield path, access
-
-
-def codex_file_action(entries: list[tuple[str, str]], target: str) -> str:
-    # Glob masks must match the file itself. Matching only a directory ancestor
-    # would hide a missing /** rule: Linux's rg --files does not emit directories.
-    if any(access == "deny" and path_glob(target, path) for path, access in entries if "*" in path or "?" in path):
-        return "deny"
-    literals = [(path, access) for path, access in entries if not any(c in path for c in "*?[]") and below_path(target, path)]
-    return max(literals, key=lambda item: (len(Path(item[0]).parts), {"read": 0, "write": 1, "deny": 2}[item[1]]),
-               default=("/", "deny"))[1]
-
-
 SAFETY = load_json("tests/safety-paths.json")
 SYSTEM_FILES = (*SAFETY["system_files"], *SAFETY["raw_files"])
 SYSTEM_TREES = (*SAFETY["system_trees"], *SAFETY["raw_trees"])
@@ -316,105 +278,13 @@ require("implicit" in hard_denies and "normal OS interfaces" in hard_denies, "Cl
 require("specific credential file" not in soft_denies, "Claude credentials remain a waivable soft rule")
 require("reviewed repository ID" in soft_denies and "explicit push URLs" in soft_denies, "Claude lost the pinned-reference classifier exception")
 
-# Codex
-codex_template = load_toml("templates/codex/config.toml")
-
-
-def check_codex(config: dict, label: str) -> None:
-    require(config["default_permissions"] == "trusted-workspace", f"{label} default profile drifted")
-    require(config["approvals_reviewer"] == "auto_review", f"{label} approval review drifted")
-    require(config["approval_policy"] == "on-request" and config["web_search"] == "live", f"{label} approval/network surfaces drifted")
-    require("sandbox_mode" not in config, f"{label} mixes legacy sandbox with permission profile")
-    profile = config["permissions"]["trusted-workspace"]
-    require(profile.get("extends") == ":workspace", f"{label} lost inherited workspace metadata protections")
-    require(profile.get("workspace_roots") == {"~/Projects/eyrie/scrape": True}, f"{label} persistent scratch is not the sole profile-defined workspace root")
-    filesystem = profile["filesystem"]
-    require(filesystem[":root"] == "deny", f"{label} filesystem root is not denied")
-    require(filesystem.get(":minimal") == "read", f"{label} lacks normal runtime reads")
-    require(profile["network"]["enabled"] is False, f"{label} command network is enabled")
-    require(filesystem.get("~/.local/share/mise") == "read", f"{label} cannot execute mise-managed runtimes")
-    for path in (*CREDENTIAL_DIRECTORIES, *CREDENTIAL_FILES):
-        require(filesystem.get(path) == "deny", f"{label} credential store reachable: {path}")
-    require(filesystem.get("~/Projects") == "read", f"{label} cannot read H's repositories under ~/Projects")
-    for tree in SYSTEM_READ_TREES:
-        require(filesystem.get(tree) == "read", f"{label} cannot read the system tree {tree}")
-    require(filesystem.get("/var/tmp") == "read" and filesystem.get(":slash_tmp") in ("read", "write"), f"{label} cannot read the temp roots")
-    for other in ("/tmp/opencode", "/tmp/claude-1000"):
-        require(filesystem.get(other) == "deny", f"{label} reads another tool's session root: {other}")
-    for key in filesystem:
-        require(not (key.startswith(("/tmp/", "/var/tmp/")) and any(c in key for c in "*?")), f"{label} carries a glob under a temp root, which stalls the sandbox: {key}")
-        require(not (key.startswith("/") and any(c in key for c in "*?[]")), f"{label} adds a system-root glob scan: {key}")
-        if filesystem[key] in ("read", "write"):
-            require(not any(c in key.removesuffix("/**") for c in "*?[]"), f"{label} uses an unsupported read/write glob: {key}")
-    for key in ("/home", "~", "/proc", "/dev", "/run"):
-        require(key not in filesystem, f"{label} blanket region rule loses read descendants or runtime interfaces: {key}")
-    for shape in CREDENTIAL_SHAPES:
-        require(shape == ".npmrc" or filesystem.get(f"~/**/{shape}") == "deny" or filesystem.get(f"~/Projects/**/{shape}") == "deny", f"{label} credential shape reachable under ~/Projects: {shape}")
-    for store in PROJECT_STORES:
-        require(filesystem.get(f"~/Projects/**/{store}") == "deny", f"{label} credential store copy reachable under ~/Projects: {store}")
-    # OpenSSH keys live under ~/.ssh and the rc files are denied as literal
-    # home paths; home-wide globs for them match files inside already denied
-    # or runtime trees and break or slow sandbox startup.
-    for shape in CREDENTIAL_SHAPES:
-        name = shape.removesuffix("/**")
-        if name.startswith("id_") or name in (".netrc", ".npmrc", ".pypirc"):
-            require(f"~/**/{name}" not in filesystem, f"{label} home-wide glob breaks sandbox startup: {name}")
-            continue
-        require(filesystem.get(f"~/**/{name}") == "deny", f"{label} home deny missing: {shape}")
-    workspace = filesystem[":workspace_roots"]
-    require(workspace["."] == "write", f"{label} workspace is not writable")
-    require(workspace.get(".git/config") == "read" and workspace.get(".git/hooks") == "read",
-            f"{label} Git configuration or hooks are writable in the workspace")
-    for shape in CREDENTIAL_SHAPES:
-        name = shape.removesuffix("/**")
-        require(workspace.get(f"**/{name}") == "deny", f"{label} workspace deny missing: {shape}")
-        require(name not in workspace, f"{label} literal workspace entry creates placeholder files: {name}")
-    for path in (*SYSTEM_FILES, *SYSTEM_TREES, *(f"etc/ssh/ssh_host_{kind}_key" for kind in ("rsa", "dsa", "ecdsa", "ed25519"))):
-        require(filesystem.get("/" + path) == "deny", f"{label} missing literal system/raw exclusion: {path}")
-    # This models configured masks only. Missing literals outside writable roots
-    # are skipped by 0.154 bwrap; virtual /proc is mounted again after masks.
-    entries = list(codex_entries(filesystem, [FIXTURE_CWD, FIXTURE_HOME + "/Projects/eyrie/scrape"]))
-    for scope in (FIXTURE_CWD, FIXTURE_HOME + "/Projects/eyrie/scrape", FIXTURE_HOME + "/Projects/sibling"):
-        for store in (*PROJECT_STORE_DIRECTORIES, "secrets", *SYSTEM_TREES):
-            for suffix in ("/ordinary.txt", "/nested/ordinary.txt"):
-                target = scope + "/copy/" + store + suffix
-                require(codex_file_action(entries, target) == "deny", f"{label} copied-directory mask cannot select contents: {target}")
-        for shape in SAFETY["additional_shapes"]:
-            target = scope + "/copy/" + shape.replace("*", "fixture")
-            require(codex_file_action(entries, target) == "deny", f"{label} private-key shape mask missing: {target}")
-    for path in HOME_READ_PATHS:
-        require(codex_file_action(entries, FIXTURE_HOME + "/" + path) == "read", f"{label} scoped home read is shadowed: {path}")
-    for target in (FIXTURE_CWD + "/ordinary.md", FIXTURE_HOME + "/Projects/eyrie/scrape/ordinary.md"):
-        require(codex_file_action(entries, target) == "write", f"{label} writable root lost: {target}")
-    for scope in (FIXTURE_CWD, FIXTURE_HOME + "/Projects/eyrie/scrape"):
-        for subpath in (".git/config", ".git/hooks/pre-commit"):
-            require(codex_file_action(entries, scope + "/" + subpath) == "read", f"{label} writable Git configuration/hooks: {scope}/{subpath}")
-    for target in (FIXTURE_HOME + "/Projects/quarry/ordinary.md", FIXTURE_HOME + "/Projects/scratch/ordinary.md",
-                   FIXTURE_HOME + "/Projects/eyrie/scrape-other/ordinary.md", FIXTURE_HOME + "/Projects/eyrie/ordinary.md",
-                   FIXTURE_HOME + "/Projects/eyrie/sibling/ordinary.md", FIXTURE_HOME + "/Projects/eyrie-other/scrape/ordinary.md"):
-        require(codex_file_action(entries, target) == "read", f"{label} scratch write leaked to a sibling: {target}")
-    for target in (FIXTURE_HOME + "/Documents/ordinary.md", "/home/other/.config/ordinary.md", "/unlisted-system/ordinary.md"):
-        require(codex_file_action(entries, target) == "deny", f"{label} unlisted region received a read grant: {target}")
-    policy = config["auto_review"]["policy"]
-    require("explicitly approves the exact candidate" in policy, f"{label} auto review no longer gates commits")
-    # No template carries the marker the reconcile puts on a kept host line, so a
-    # root the merge wrote with a host choice never reads as a template root.
-    require("kept by the reconcile" not in (ROOT / "templates/codex/config.toml").read_text(encoding="utf-8"), "Codex template carries the reconcile's kept marker")
-    # No model pin: the catalog default is the moving target (AGENTS.md, Tool Configuration).
-    require("model" not in config and "default_subagent_model" not in config.get("agents", {}), f"{label} pins a model instead of the catalog default")
-
-
-check_codex(codex_template, "Codex portable template")
-if os.environ.get("HOST_CODEX_CONFIG"):
-    check_codex(load_toml_file(os.environ["HOST_CODEX_CONFIG"]), "host Codex config")
-
 # OpenCode
 opencode = load_json("opencode/.config/opencode/opencode.json")
 require(opencode["share"] == "disabled", "OpenCode sharing is enabled")
 require(opencode["autoupdate"] is False, "OpenCode autoupdate competes with the wrapper")
 bash = opencode["permission"]["bash"]
 require(next(iter(bash.items())) == ("*", "allow"), "OpenCode Bash autonomy catch-all is not first")
-for command in (*HARD_DENIED_GIT, *PRIVILEGE, *REPOSITORY_HOST, *REPOSITORY_HOST_EXTENDED, "claude *", "codex *", "opencode *"):
+for command in (*HARD_DENIED_GIT, *PRIVILEGE, *REPOSITORY_HOST, *REPOSITORY_HOST_EXTENDED, "claude *", "opencode *"):
     require(bash.get(command) == "deny", f"OpenCode Bash deny missing: {command}")
 for command in (*APPROVAL_GIT, "git remote set-url *", "git config core.hooksPath*", "git config credential*"):
     require(bash.get(command) == "ask", f"OpenCode Bash approval missing: {command}")
@@ -597,7 +467,6 @@ for name, agent in opencode_agents.items():
         require(evaluate("external_directory", subject, opencode["permission"], permissions) == expected, f"OpenCode agent changes inherited external action: {name}: {subject}")
     require("tools" not in agent, f"OpenCode agent uses the deprecated tools field: {name}")
 require(not (ROOT / "opencode/.config/opencode/agents").exists(), "OpenCode markdown agents exist beside the config agents")
-require(not (ROOT / "codex/.codex/agents").exists(), "a Codex agent role exists without a verified read-only authority profile")
 require(claude.get("attribution", {}).get("sessionUrl") is False, "Claude Code would add a session URL trailer to commits")
 require("classifyAllShell" not in claude.get("autoMode", {}), "Claude Code re-classifies its allow-listed commands for no gain")
 for store in PROJECT_STORES:
@@ -614,7 +483,6 @@ for store in PROJECT_STORES:
 require("Read(~/Projects/**)" in claude["permissions"]["allow"], "Claude Code lacks the standing read allow under ~/Projects")
 for tree in SYSTEM_READ_TREES:
     require(f"Read(//{tree.lstrip('/')}/**)" in claude["permissions"]["allow"], f"Claude Code lacks the standing read allow on {tree}")
-require(codex_template.get("personality") == "none", "Codex personality filler is not disabled")
 require(re.fullmatch(r"openai/[a-z0-9][a-z0-9.-]*", opencode.get("small_model", "")), "OpenCode small_model is not a concrete OpenAI model id")
 require(opencode.get("skills", {}).get("paths") == ["~/.agents/skills"], "OpenCode skill paths are not exactly the neutral source")
 guidance = ROOT / "opencode/.config/opencode/AGENTS.md"
@@ -630,11 +498,6 @@ require(claude.get("env", {}).get("CLAUDE_CODE_EFFORT_LEVEL") == "xhigh", "Claud
 spar_claude = (ROOT / "agents/.agents/skills/spar/scripts/spar-claude").read_text(encoding="utf-8")
 require('MODEL="fable"' in spar_claude and re.search(r'^\s*--model "\$MODEL"\s*$', spar_claude, re.M), "spar-claude does not review with the fable alias")
 require(re.search(r'ANTHROPIC_DEFAULT_FABLE_MODEL:\s*""', spar_claude) and spar_claude.count("ANTHROPIC_DEFAULT_") == 1, "spar-claude does not clear exactly the fable override")
-require("service_tier" not in codex_template and codex_template["features"].get("fast_mode") is True, "Codex template sets a service tier by default or drops the /fast toggle")
-require(codex_template.get("model_reasoning_effort") == "xhigh" and codex_template.get("agents", {}).get("default_subagent_reasoning_effort") == "xhigh", "Codex template effort is not xhigh")
-spar_codex = (ROOT / "agents/.agents/skills/spar/scripts/spar-codex").read_text(encoding="utf-8")
-require(not re.search(r"^\s*(-m\S*|--model\S*|-p\S*|--profile\S*)(\s|$)", spar_codex, re.M) and not re.search(r"""(^|\s)(-c|--config)(=|\s+)?["']?\s*(profiles\.[^=\s]+\.)?model\s*=""", spar_codex, re.M), "spar-codex pins a reviewer model instead of the catalog default")
-require('service_tier="default"' in spar_codex and 'service_tier="fast"' not in spar_codex and 'model_reasoning_effort="xhigh"' in spar_codex, "spar-codex does not review on the standard tier at xhigh")
 require(re.fullmatch(r"openai/gpt-[0-9][a-z0-9.-]*", opencode["model"]) and not opencode["model"].endswith("-fast"), "OpenCode model is not a concrete GPT id on the standard tier")
 require(not opencode["small_model"].endswith("-fast"), "OpenCode small model is on the Fast tier")
 
@@ -651,14 +514,6 @@ gate_hooks = [
 require(any(command.endswith(".agents/hooks/commit-gate") for command in gate_hooks), "Claude Code does not run the installed commit-gate before Bash")
 require(not any("\"if\"" in json.dumps(entry) for entry in claude.get("hooks", {}).get("PreToolUse", [])), "Claude Code narrows the gate hook with an if filter")
 require("Edit(~/.agents/hooks/**)" in claude["permissions"]["deny"], "Claude Code file tools may edit the installed commit gate")
-require(codex_template["features"].get("hooks") is True, "Codex hooks are not enabled, so commit-gate cannot run")
-codex_gate = [
-    hook["command"]
-    for entry in codex_template.get("hooks", {}).get("PreToolUse", [])
-    for hook in entry.get("hooks", [])
-    if hook.get("type") == "command"
-]
-require(any(command.endswith(".agents/hooks/commit-gate") for command in codex_gate), "Codex does not run the installed commit-gate before a tool call")
 require(edit_rules.get("**/.agents/hooks/**") == "deny", "OpenCode file tools may edit the installed commit gate")
 require(external_rules.get("~/.agents/hooks/**") == "deny", "OpenCode may reach the installed commit gate")
 require((ROOT / "opencode/.config/opencode/plugins/commit-gate.js").is_file(), "OpenCode commit-gate plugin is missing")
@@ -682,10 +537,8 @@ for line in (ROOT / "references.txt").read_text(encoding="utf-8").splitlines():
     references[fields[0]] = fields[2]
 require(references == {
     "claude-code": "github:R_kgDON91aYw",
-    "codex": "github:R_kgDOOYsS4Q",
     "opencode": "github:R_kgDOOiiGLw",
-    "hermes-agent": "github:R_kgDOPRF1Gw",
-}, "harness reference identities differ from the reviewed four-tool set")
+}, "harness reference identities differ from the reviewed tool set")
 
 # Skills stay portable: the name matches the directory and only standard frontmatter fields appear.
 develop_root = ROOT / "agents/.agents/skills/develop"
@@ -716,8 +569,7 @@ history_paths = (".codex/config.toml", ".codex/history.jsonl", ".claude/history.
                  ".claude/projects/fixture/session.jsonl", ".claude/projects/fixture/subagents/session.jsonl",
                  ".claude/sessions/ordinary.txt", ".claude/session-env/ordinary.txt", ".claude/debug/ordinary.txt",
                  ".codex/sessions/ordinary.txt", ".codex/archived_sessions/ordinary.txt",
-                 ".hermes/sessions/ordinary.txt", ".hermes/logs/ordinary.txt", ".hermes/state.db",
-                 ".hermes/state.db-wal", ".hermes/state.db-shm", ".local/share/opencode/storage/ordinary.txt",
+                 ".local/share/opencode/storage/ordinary.txt",
                  ".local/share/opencode/log/ordinary.txt", ".local/share/opencode/opencode.db",
                  ".local/share/opencode/opencode.db-wal", ".local/share/opencode/opencode.db-shm")
 corpus = list(dict.fromkeys([
@@ -735,8 +587,6 @@ safe_paths = tuple(dict.fromkeys([
     *(tree + "-public/ordinary.txt" for tree in SYSTEM_TREES),
     *(f"etc/ssh/ssh_host_{kind}_key.pub" for kind in ("rsa", "dsa", "ecdsa", "ed25519")),
 ]))
-codex_primary = list(codex_entries(codex_template["permissions"]["trusted-workspace"]["filesystem"],
-                                 [FIXTURE_CWD, FIXTURE_HOME + "/Projects/eyrie/scrape"]))
 bridge_fixtures = os.environ.get("SPAR_BRIDGE_FIXTURES")
 if bridge_fixtures:
     argv = (Path(bridge_fixtures) / "spar-claude.argv").read_bytes().decode().rstrip("\0").split("\0")
@@ -747,17 +597,6 @@ if bridge_fixtures:
     require({"Write", "Edit", "NotebookEdit", "Bash", "WebFetch", "WebSearch", "Task"} <= set(bridge_claude),
             "Claude reviewer lost explicit capability denies")
     require(all(rule.startswith("Read(") for rule in bridge_claude_permissions["allow"]), "Claude reviewer added a non-read allowance")
-    argv = (Path(bridge_fixtures) / "spar-codex.argv").read_bytes().decode().rstrip("\0").split("\0")
-    profile = next(arg for arg in argv if arg.startswith("permissions.spar-reviewer="))
-    bridge_profile = tomllib.loads(profile)["permissions"]["spar-reviewer"]
-    bridge_filesystem = bridge_profile["filesystem"]
-    bridge_codex = bridge_filesystem[":workspace_roots"]
-    require(bridge_profile["network"]["enabled"] is False and not bridge_profile.get("workspace_roots"), "Codex reviewer network/root scope widened")
-    require(all(bridge_filesystem[key] == "deny" for key in (":root", ":tmpdir", ":slash_tmp")), "Codex reviewer root/temp boundary widened")
-    require(bridge_codex["."] == "read" and bridge_codex[".git"] == "deny", "Codex reviewer repository boundary drifted")
-    require(not any(access == "write" for _, access in codex_entries(bridge_filesystem, [FIXTURE_CWD])), "Codex reviewer acquired writes")
-    for setting in ('approval_policy="never"', 'web_search="disabled"', 'agents.enabled=false', 'features.request_permissions_tool=false'):
-        require(setting in argv, f"Codex reviewer lost its fixed restriction: {setting}")
 
 for prefix in ("", "copy/deep/"):
     for name, denied in [(name, True) for name in corpus] + [(name, False) for name in safe_paths]:
@@ -767,8 +606,6 @@ for prefix in ("", "copy/deep/"):
         for tool in ("Read", "Edit"):
             require((claude_file_action(claude["permissions"], tool, absolute_target) == "deny") == denied,
                     f"Claude primary {tool} path corpus mismatch: {subject}")
-        require(codex_file_action(codex_primary, absolute_target) == ("deny" if denied else "write"),
-                f"Codex configured workspace mask mismatch: {subject}")
         for permissions in (opencode["permission"], derived_agents["auditor"]["permission"]):
             require((evaluate("read", subject, permissions) == "deny") == denied, f"OpenCode path corpus mismatch: {subject}")
         require(evaluate("edit", subject, opencode["permission"]) == ("deny" if denied else "allow"),
@@ -776,9 +613,7 @@ for prefix in ("", "copy/deep/"):
         require(evaluate("edit", subject, derived_agents["auditor"]["permission"]) == "deny", f"OpenCode auditor can edit corpus path: {subject}")
         if bridge_fixtures:
             claude_denied = any(rule.startswith("Read(./") and path_glob(subject, rule[7:-1]) for rule in bridge_claude)
-            codex_denied = any(action == "deny" and path_glob(subject, pattern) for pattern, action in bridge_codex.items())
             require(claude_denied == denied, f"Claude bridge path corpus mismatch: {subject}")
-            require(codex_denied == denied, f"Codex bridge path corpus mismatch: {subject}")
             fixture = Path(bridge_fixtures) / "corpus" / subject
             fixture.parent.mkdir(parents=True, exist_ok=True)
             fixture.write_text("ordinary synthetic fixture\n")
@@ -805,11 +640,6 @@ for tree, location in (("scratch", "eyrie/scrape"), ("quarry", "quarry")):
                 if not denied:
                     require(action == "allow" if tool == "Read" or tree == "scratch" else action != "allow",
                             f"Claude {tree} {tool} allowance mismatch: {subject}")
-            # .npmrc outside a workspace is an existing Codex scan limitation,
-            # not a demand that every temp/system/home shape be OS-masked.
-            if tree == "scratch" or name != ".npmrc":
-                require(codex_file_action(codex_primary, target) == ("deny" if denied else "write" if tree == "scratch" else "read"),
-                        f"Codex configured {tree} boundary mismatch: {subject}")
             if name in (store + "/ordinary.txt" for store in PROJECT_STORE_DIRECTORIES) or name == "secrets/ordinary.txt":
                 for permissions in (opencode["permission"], derived_agents["auditor"]["permission"]):
                     require(evaluate("external_directory", external, permissions) == "deny", f"OpenCode {tree} copied directory store reopened: {external}")
@@ -833,34 +663,12 @@ require(len(guard_results) == len(guard_cases), "OpenCode pure Safety predicate 
 for (path, denied), result in zip(guard_cases, guard_results):
     require(result == denied, f"OpenCode pure Safety predicate disagrees with shared corpus: {path}")
 
-# Run Hermes's real path decision with identity resolution and absent fixture
-# files. These are lexical-policy checks, not host metadata or native dispatch.
-hermes = runpy.run_path(str(ROOT / "hermes/.hermes/plugins/eyragents/__init__.py"))
-hermes_globals = hermes["path_denial"].__globals__
-with patch.dict(os.environ, {"HOME": FIXTURE_HOME}, clear=True), \
-     patch.dict(hermes_globals, {"resolve_target": lambda path: path}), \
-     patch.object(Path, "exists", return_value=False):
-    for prefix in ("", "copy/deep/"):
-        for name, denied in [(name, True) for name in corpus] + [(name, False) for name in safe_paths]:
-            # The common history cases are foreign for the other clients.
-            # Do not force Hermes to admit copies or deny its own runtime store.
-            if name.startswith((".hermes/sessions/", ".hermes/logs/", ".hermes/state.db")):
-                continue
-            target = Path(FIXTURE_CWD) / prefix / name
-            for write in (False, True):
-                require(bool(hermes["path_denial"](target, write, Path(FIXTURE_HOME))) == denied,
-                        f"Hermes lexical {'write' if write else 'read'} protection mismatch: {prefix + name}")
-    for suffix in ("memories/MEMORY.md", "skills/local/SKILL.md", "curator/ordinary.json"):
-        require(hermes["path_denial"](Path(FIXTURE_HOME) / ".hermes" / suffix, True, Path(FIXTURE_HOME)) is None,
-                f"Hermes own learning acquired a foreign-store deny: {suffix}")
-
 # Positive read scopes are checked after system masks so a broad denial cannot
 # make an inventory-only test pass while hiding useful configuration/metadata.
 for name in SAFETY["positive_files"]:
     if not name.startswith(("etc/", "usr/", "sys/", "var/")):
         continue
     require(claude_file_action(claude["permissions"], "Read", "/" + name) == "allow", f"Claude useful system read lost: {name}")
-    require(codex_file_action(codex_primary, "/" + name) == "read", f"Codex useful configured system read lost: {name}")
 for name in SYSTEM_FILES:
     require(scan["sensitive_path"]("/" + name), f"scanner absolute protected-file mismatch: {name}")
     for tool in ("Read", "Edit"):

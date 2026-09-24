@@ -21,14 +21,13 @@ const trees = [
 const homeTrees = [
   ".ssh", ".aws", ".gnupg", ".kube", ".mozilla", ".password-store",
   ".claude/projects", ".claude/sessions", ".claude/session-env", ".claude/tasks", ".claude/debug",
-  ".codex/sessions", ".codex/archived_sessions", ".hermes/sessions", ".hermes/logs",
+  ".codex/sessions", ".codex/archived_sessions",
   ".local/share/opencode/storage", ".local/share/opencode/log",
 ]
 const homeFiles = [
   ".aws/credentials", ".aws/config", ".kube/config", ".ssh/id_rsa", ".ssh/id_dsa", ".ssh/id_ecdsa", ".ssh/id_ed25519",
   ".claude/.credentials.json", ".claude/history.jsonl", ".codex/config.toml", ".codex/auth.json",
-  ".codex/history.jsonl", ".hermes/config.yaml", ".hermes/auth.json", ".hermes/.env", ".hermes/state.db",
-  ".hermes/state.db-wal", ".hermes/state.db-shm", ".docker/config.json",
+  ".codex/history.jsonl", ".docker/config.json",
   ".env", ".envrc", ".netrc", ".npmrc", ".pypirc", ".bash_history", ".zsh_history",
 ]
 const configStores = ["BraveSoftware", "chromium", "google-chrome", "1Password", "Bitwarden"]
@@ -120,7 +119,7 @@ export async function protectedLayout(home) {
   const noAdapt = [...hardFiles, ...hardTrees, state, canonical[3],
     ...xdg.filter((_, index) => discovered[index].incomplete),
     ...canonical.filter((_, index) => discovered[index].incomplete),
-    ...homes.flatMap((root) => [".local/state", ".docker", ".claude.json", ".hermes/memories"].map((name) => join(root, name))),
+    ...homes.flatMap((root) => [".local/state", ".docker", ".claude.json"].map((name) => join(root, name))),
     ...configs.flatMap((root) => ["gh", "git"].map((name) => join(root, name))),
     ...datas.map((root) => join(root, "opencode")),
   ]

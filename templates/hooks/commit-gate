@@ -21,13 +21,13 @@
 # false positive costs one rewritten command, or writing prose that mentions
 # such a command with the file tools instead of a shell heredoc; a miss would
 # cost the gate. The hook reads the JSON the tool sends on stdin (Claude Code
-# and Codex send the same shape; the OpenCode plugin mirrors it), prints the
+# sends it; the OpenCode plugin mirrors the shape), prints the
 # hookSpecificOutput JSON on stdout, the reason on stderr, and exits 2 to
 # deny.
 #
 # `make stow` installs this file as a real copy under ~/.agents/hooks,
-# outside every workspace, and the hooks name that copy: a hook runs outside
-# the Codex sandbox, so its executable must not be writable from inside it.
+# outside every workspace, and the hooks name that copy, so an agent's
+# workspace edits cannot change the gate.
 set -euo pipefail
 
 deny() {

@@ -110,8 +110,7 @@ PROTECTED_FILES = (
     "etc/ipsec.secrets", "var/lib/NetworkManager/secret_key", "var/lib/systemd/credential.secret",
     "proc/kcore", "proc/vmcore", "dev/mem", "dev/port",
     ".claude/.credentials.json", ".claude/history.jsonl", ".codex/config.toml", ".codex/auth.json",
-    ".codex/history.jsonl", ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml",
-    ".hermes/state.db", ".hermes/state.db-wal", ".hermes/state.db-shm",
+    ".codex/history.jsonl", ".config/gh/hosts.yml", ".docker/config.json",
     ".local/share/opencode/auth.json", ".local/share/opencode/opencode.db",
     ".local/share/opencode/opencode.db-wal", ".local/share/opencode/opencode.db-shm",
 )
@@ -124,10 +123,10 @@ PROTECTED_TREES = (
     ".config/BraveSoftware", ".config/chromium", ".config/google-chrome", ".config/1Password",
     ".config/Bitwarden", ".local/share/keyrings", ".claude/projects", ".claude/sessions",
     ".claude/session-env", ".claude/tasks", ".claude/debug", ".codex/sessions", ".codex/archived_sessions",
-    ".hermes/sessions", ".hermes/logs", ".local/share/opencode/storage", ".local/share/opencode/log",
+    ".local/share/opencode/storage", ".local/share/opencode/log",
     # Retain the earlier refusal of these provider paths even if copied as
     # directories rather than ordinary files. New system file names stay exact.
-    ".config/gh/hosts.yml", ".docker/config.json", ".hermes/config.yaml",
+    ".config/gh/hosts.yml", ".docker/config.json",
 )
 
 

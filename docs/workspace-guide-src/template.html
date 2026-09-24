@@ -144,7 +144,7 @@
     #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 30px); padding: 12px 18px; border: 1px solid var(--green); background: var(--surface); border-radius: 8px; z-index: 100; }
     [data-app="herdr"], [data-app="yazi"] { --app: var(--green); }
     [data-app="lazyvim"] { --app: var(--violet); }
-    [data-app="ai"], [data-app="claude"], [data-app="codex"], [data-app="opencode"], [data-app="hermes"] { --app: var(--blue); }
+    [data-app="ai"], [data-app="claude"], [data-app="opencode"] { --app: var(--blue); }
     [data-app="shell"], [data-app="terminal"] { --app: var(--amber); }
     @media (max-width: 1250px) {
       main { padding: 24px; }
@@ -217,7 +217,7 @@
           <div class="map-bar"><span data-terminal>Outer terminal</span><span>OUTER TERMINAL</span></div>
           <div class="map-bar"><strong>herdr</strong><span>session › workspace › tab</span></div>
           <div class="panes">
-            <button class="pane pane-ai" data-app="ai" data-view="launch"><div class="eyebrow">01 / AI TOOL · 50%</div><strong>Think. Build. Review.</strong><p>Full-height space for the active agent.</p><div class="agent-labels">CLAUDE · CODEX<br>OPENCODE · HERMES</div></button>
+            <button class="pane pane-ai" data-app="ai" data-view="launch"><div class="eyebrow">01 / AI TOOL · 50%</div><strong>Think. Build. Review.</strong><p>Full-height space for the active agent.</p><div class="agent-labels">CLAUDE · OPENCODE</div></button>
             <button class="pane" data-app="lazyvim" data-filter="lazyvim"><div class="eyebrow">02 / EDITOR · 25%</div><strong>Neovim + Neo-tree</strong><p>Code · Git review · vault</p></button>
             <button class="pane" data-app="shell" data-filter="shell"><div class="eyebrow">03 / SHELL · 25%</div><strong><code>~/project ❯</code></strong><p>Bash · Yazi · your tools</p></button>
           </div>
@@ -226,7 +226,7 @@
       </div>
       <div class="legend"><span><strong>Prefix</strong> = <kbd class="prefix">Ctrl+Space</kbd>, release, then next key</span><span><strong>Neovim leader</strong> = <kbd>Space</kbd> in Normal mode</span><span><strong>+</strong> hold together · <strong>→</strong> press next · <strong>/</strong> alternatives</span><span>A keybinding is one shortcut; a keymap is the collection.</span></div>
       <div class="section-heading"><h2 id="guide-title">Your daily keys &amp; commands</h2><div class="scopes" aria-label="Reference scope"><button data-scope="daily" aria-pressed="true">Daily</button><button data-scope="all" aria-pressed="false">All</button><button data-scope="saved" aria-pressed="false">★ Saved <span id="saved-count">0</span></button></div></div>
-      <div class="searchbar"><div class="search-wrap"><label class="field" for="search">Search actions, keys, commands or context · / to focus</label><input id="search" type="search" placeholder="Try: new workspace, copy path, vault, Hermes…" autocomplete="off" spellcheck="false"></div><div class="category-wrap"><label class="field" for="category">Task / application</label><select id="category"><option value="all">Every task</option></select></div></div>
+      <div class="searchbar"><div class="search-wrap"><label class="field" for="search">Search actions, keys, commands or context · / to focus</label><input id="search" type="search" placeholder="Try: new workspace, copy path, vault, OpenCode…" autocomplete="off" spellcheck="false"></div><div class="category-wrap"><label class="field" for="category">Task / application</label><select id="category"><option value="all">Every task</option></select></div></div>
       <div class="filters" id="filters" aria-label="Filter by layer"></div>
       <div class="result-line"><span id="results" role="status" aria-live="polite"></span><button id="reset">Reset filters</button></div>
       <div id="bindings"></div>
@@ -241,7 +241,7 @@
           <div class="command-box"><div class="eyebrow">Run inside Herdr</div><pre id="launch-command" tabindex="0"></pre><button class="button" id="copy-launch">Copy command</button></div>
           <p class="recipe-note" id="recipe-note"></p>
         </div></div>
-        <div class="panel"><h2>The working loop</h2><ol><li>Open <code>herdr</code> from your normal terminal.</li><li>Navigate inside Herdr, then run <code>hdw cc</code>, <code>hdw cx</code>, <code>hdw oc</code>, or <code>hdw ha</code>.</li><li>Use <kbd>Prefix</kbd> → <kbd>Tab</kbd> to cycle AI, editor and shell panes. <kbd>Prefix</kbd> → <kbd>z</kbd> zooms the focused pane.</li><li>Review changes in Neovim with <kbd>Space</kbd> → <kbd>g</kbd> → <kbd>d</kbd>.</li><li>Return to an existing workspace with <kbd>Prefix</kbd> → <kbd>w</kbd>; detach with <kbd>Prefix</kbd> → <kbd>d</kbd>.</li></ol><p style="margin-top:18px">Every <code>hdw</code> call creates another workspace, including <code>-c</code>. The original caller remains. Bare <code>hdw</code> shows usage; outside-Herdr calls refuse.</p><p>If setup fails, read the reported original/new context. The new workspace/root is retained for inspection; preserve uncertain state.</p></div>
+        <div class="panel"><h2>The working loop</h2><ol><li>Open <code>herdr</code> from your normal terminal.</li><li>Navigate inside Herdr, then run <code>hdw cc</code> or <code>hdw oc</code>.</li><li>Use <kbd>Prefix</kbd> → <kbd>Tab</kbd> to cycle AI, editor and shell panes. <kbd>Prefix</kbd> → <kbd>z</kbd> zooms the focused pane.</li><li>Review changes in Neovim with <kbd>Space</kbd> → <kbd>g</kbd> → <kbd>d</kbd>.</li><li>Return to an existing workspace with <kbd>Prefix</kbd> → <kbd>w</kbd>; detach with <kbd>Prefix</kbd> → <kbd>d</kbd>.</li></ol><p style="margin-top:18px">Every <code>hdw</code> call creates another workspace, including <code>-c</code>. The original caller remains. Bare <code>hdw</code> shows usage; outside-Herdr calls refuse.</p><p>If setup fails, read the reported original/new context. The new workspace/root is retained for inspection; preserve uncertain state.</p></div>
       </div>
     </section>
     <section id="view-workflow" hidden>
@@ -413,8 +413,7 @@
     function renderRecipe() {
       const recipe = D.recipes.find(recipe => recipe.selector === $('#agent').value);
       $('#launch-command').textContent = launchCommand();
-      $('#recipe-note').textContent = 'New Herdr workspace; AI command: ' + ($('#resume').checked ? recipe.resumes : recipe.launch) + '. Editor: ${EDITOR:-nvim} .; shell below it.'
-        + (recipe.selector === 'ha' && $('#resume').checked ? ' Hermes may restore the recorded conversation directory; confirm the working directory before editing.' : '');
+      $('#recipe-note').textContent = 'New Herdr workspace; AI command: ' + ($('#resume').checked ? recipe.resumes : recipe.launch) + '. Editor: ${EDITOR:-nvim} .; shell below it.';
     }
     async function copyLaunch() {
       const text = launchCommand();

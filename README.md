@@ -1,6 +1,6 @@
 # EyrAgents
 
-Shared guidance, skills, and reviewed Git workflows for **Claude Code, Codex, OpenCode, and Hermes Agent** on Omarchy and Arch WSL. [GNU Stow](https://www.gnu.org/software/stow/) deploys the tool adapters; private host configuration is reconciled from templates.
+Shared guidance, skills, and reviewed Git workflows for **Claude Code and OpenCode** on Omarchy and Arch WSL. [GNU Stow](https://www.gnu.org/software/stow/) deploys the tool adapters.
 
 This is a standalone personal harness. It owns AI-client configuration, startup defaults and shared workflows, and uses ordinary installed tools without depending on a host-dotfiles repository.
 
@@ -10,7 +10,7 @@ This is a standalone personal harness. It owns AI-client configuration, startup 
 - Tool-specific access controls, with their differences documented in the [access policy](docs/access.md).
 - Exact-candidate commit approval, exact-approved agent publication, and optional read-only review.
 - Repeatable deployment checks and opt-in live smoke tests.
-- One offline development-workspace guide covering the host environment and all four AI clients.
+- One offline development-workspace guide covering the host environment and both AI clients.
 
 ## Tools And Layout
 
@@ -18,12 +18,10 @@ This is a standalone personal harness. It owns AI-client configuration, startup 
 | --- | --- |
 | `agents/.agents/` | Shared guidance, skills, reviewer bridges, and auditor charter. |
 | `claude-code/.claude/` | Claude Code instructions, settings, skill links, auditor, and status line. |
-| `codex/.codex/` + `templates/codex/` | Codex instructions and the template for its private host-local configuration. |
 | `opencode/.config/opencode/` | OpenCode instructions, models, permissions, TUI, commands, and plugins. |
-| `hermes/.hermes/` + `templates/hermes/` | Hermes plugin and the template for its private host-local configuration. |
 | `scripts/`, `tests/`, `docs/` | Deployment helpers, verification, and documentation. |
 
-The [architecture guide](docs/design.md#configuration-ownership) explains linked packages, whole skill-directory links, copied hooks, and reconciled files. The [Makefile](Makefile) owns deployment targets and the package list.
+The [architecture guide](docs/design.md#configuration-ownership) explains linked packages, whole skill-directory links, and the copied hook. The [Makefile](Makefile) owns deployment targets and the package list.
 
 ## Independence
 
@@ -37,7 +35,7 @@ Start with the [setup guide](docs/setup.md): prerequisites, client installation 
 
 ## Usage
 
-Start an installed client in the project you want to work on. The [operations guide](docs/operations.md) covers continuation, model effort, native learning, and verification. The [offline workspace guide](docs/workspace-guide.html) combines `hdw`, Herdr, editor/shell controls and AI-client workflows, with an Omarchy/Arch WSL selector and saved favorites. Open it locally in a browser; on GitHub, download the raw HTML first. [Guide maintenance](docs/workspace-guide-src/README.md) explains ownership and rebuilding.
+Start an installed client in the project you want to work on. The [operations guide](docs/operations.md) covers continuation, model effort, shared workflows, and verification. The [offline workspace guide](docs/workspace-guide.html) combines `hdw`, Herdr, editor/shell controls and AI-client workflows, with an Omarchy/Arch WSL selector and saved favorites. Open it locally in a browser; on GitHub, download the raw HTML first. [Guide maintenance](docs/workspace-guide-src/README.md) explains ownership and rebuilding.
 
 | Workflow | Canonical procedure |
 | --- | --- |

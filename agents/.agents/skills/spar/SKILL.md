@@ -5,7 +5,7 @@ description: Value-based cross-model review of a plan, diff, or decision through
 
 # Spar
 
-The session's model is the implementer; a different vendor's model is a read-only reviewer launched by a bridge. Claude Code reviews with `spar-codex`; OpenCode reviews with `spar-claude`; a Codex session cannot launch `spar-claude` inside its profile, so it prepares the request and artifact and asks H to run the bridge. Convergence is evidence-based, and H arbitrates anything left open.
+The session's model is the implementer; a different vendor's model is a read-only reviewer launched by a bridge. OpenCode reviews with `spar-claude`; Claude Code uses the in-tool `auditor` until its OpenCode bridge exists. Convergence is evidence-based, and H arbitrates anything left open.
 
 ## When
 
