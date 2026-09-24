@@ -34,6 +34,4 @@ Bridges run the other client under H's normal settings, which load project confi
 
 ## Findings
 
-Verify each finding's ground. Fix confirmed issues, rebut disputed ones with evidence, and ask for the ground when one is missing. Relay objections in substance; never soften or drop them. Record each finding in the workstream register with its disposition: implemented, declined with the rationale shown to H, or open for H's ruling. For each open item, present the decision, both positions with evidence, and your recommendation labeled as judgment. A review authorizes nothing by itself.
-
-Keep requests and replies that later steps need under `.eyr-plans/<workstream>/spar/` (cross-vendor) or `audit/` (in-tool), following the [workstream contract](../develop/references/workstream.md), and remove them once no step needs them.
+Verify each finding's ground. Fix confirmed issues, rebut disputed ones with evidence, and ask for the ground when one is missing. Relay objections in substance; never soften or drop them. Record each finding with its disposition in the plan file: implemented, declined with the rationale shown to H, or open for H's ruling. For each open item, present the decision, both positions with evidence, and your recommendation labeled as judgment. A review authorizes nothing by itself.

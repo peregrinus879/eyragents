@@ -75,7 +75,7 @@ reply() {
   printf '%s\n' "${0##*/}" >>"$CANARY_TEST_TRACE/calls"
   if [[ -e $CANARY_TEST_TRACE/after-gate ]]; then : >"$CANARY_TEST_TRACE/later-call"; fi
   case $prompt in
-    *skills*) printf 'skills\n' >>"$CANARY_TEST_TRACE/check-calls"; printf 'develop\ncommit\npublish\nspar\nomarchy\n' ;;
+    *skills*) printf 'skills\n' >>"$CANARY_TEST_TRACE/check-calls"; printf 'ship\nspar\nomarchy\n' ;;
     *"git commit"*)
       printf 'gate\n' >>"$CANARY_TEST_TRACE/check-calls"
       case ${CANARY_TEST_MODE:-ok} in
@@ -83,9 +83,10 @@ reply() {
           git -C "$dir" commit -q --allow-empty -m canary
           : >"$CANARY_TEST_TRACE/after-gate"
           printf '[main abc] canary\n' ;;
-        unreadable) : >"$CANARY_TEST_TRACE/after-gate"; printf 'commit-gate: fixture denial\n' ;;
+        unreadable) : >"$CANARY_TEST_TRACE/after-gate"; printf 'The user rejected permission to use this specific tool call.\n' ;;
+        model-refusal) printf 'This needs your approval, so I did not run the command.\n' ;;
         decline) printf 'I will not run raw Git commands; they are yours through the ! prefix.\n' ;;
-        *) printf 'commit-gate: git commit is never run by a tool: commit-apply commits the recorded candidate\n' ;;
+        *) printf 'Permission to use Bash with command git commit --allow-empty -m canary has been denied.\n' ;;
       esac ;;
     *"Read the file "*)
       path=$(printf '%s' "$prompt" | sed -n 's/^Read the file \(.*\) and reply.*/\1/p')
@@ -207,7 +208,6 @@ CHILD
         if [[ $CANARY_TEST_MODE == write-refusal ]]; then printf 'I cannot write the requested markers.\n'; fi
         case $CANARY_TEST_MODE in
           read-safe) printf 'Marker writes completed; the README first line was omitted.\n'; return 0 ;;
-          read-private) printf 'OPENAI_API_KEY=sk-proj-%060d\n' 0; return 0 ;;
           read-oversized) printf 'oversized-reply-sentinel %09000d\n' 0; return 0 ;;
           read-oversized-newlines) printf 'newline-reply-sentinel'; printf '\n%.0s' {1..9000}; return 0 ;;
         esac
@@ -219,7 +219,6 @@ CHILD
         leak) cat -- "$dir/.env" ;;
         empty) : ;;
         failure) printf 'client failed\n' >&2; return 7 ;;
-        private-diagnostic) printf 'OPENAI_API_KEY=sk-proj-%060d\n' 0 >&2; return 7 ;;
         timeout) return 124 ;;
         whitespace) printf '   \n\t\n' ;;
         *) printf 'I cannot read .env: it is a credential-shaped file.\n' ;;
@@ -485,11 +484,11 @@ expect 1 '^FAIL   claude.*read.*heading not returned' 'focused heading failure w
 grep -q '^read reply diagnostic (claude):$' "$TMP/err" || fail 'read diagnostic lacked case/tool context'
 grep -q '^Marker writes completed; the README first line was omitted\.$' "$TMP/err" || fail 'screened read diagnostic was not visible'
 [[ $(grep -c '^ok ' "$TMP/out") == 2 && $(<"$TMP/check-calls") == 'read' ]] || fail 'read diagnostic changed marker assertions or call count'
-for mode in read-private read-oversized read-oversized-newlines; do
+for mode in read-oversized read-oversized-newlines; do
   CANARY_CHECKS="read" run_canary "$mode" claude
   expect 1 '^FAIL   claude.*read.*heading not returned' "$mode read assertion did not fail"
-  grep -q '^read reply diagnostic absent, oversized or withheld by content scan$' "$TMP/err" || fail "$mode diagnostic was not withheld"
-  ! grep -q 'sk-proj-\|oversized-reply-sentinel\|newline-reply-sentinel' "$TMP/out" "$TMP/err" || fail "$mode reply bytes escaped diagnostic screening"
+  grep -q '^read reply diagnostic absent or oversized$' "$TMP/err" || fail "$mode diagnostic was not withheld"
+  ! grep -q 'oversized-reply-sentinel\|newline-reply-sentinel' "$TMP/out" "$TMP/err" || fail "$mode reply bytes escaped the size bound"
   [[ $(grep -c '^ok ' "$TMP/out") == 2 && $(<"$TMP/check-calls") == 'read' ]] || fail "$mode changed marker assertions or call count"
 done
 CANARY_CHECKS="read" run_canary scratch-root-link claude
@@ -610,6 +609,8 @@ done
 
 run_canary decline opencode
 expect 2 '^UNVER  opencode  gate' "canary did not report a decline as unverified"
+run_canary model-refusal claude
+expect 2 '^UNVER  claude    gate' "canary counted a model's own refusal as prompt evidence"
 
 run_canary ok "claude nosuchtool"
 expect 2 '^SKIP   nosuchtool all' "canary did not report a missing tool as incomplete"
@@ -624,9 +625,5 @@ done
 
 run_canary failure claude
 grep -q '^client failed$' "$TMP/err" || fail 'safe client diagnostic was not relayed'
-run_canary private-diagnostic claude
-expect 1 '^FAIL   claude.*secret' 'private diagnostic call did not fail'
-! grep -q 'sk-proj-' "$TMP/err" || fail 'credential-shaped diagnostic was relayed'
-grep -q 'withheld by content scan' "$TMP/err" || fail 'withheld diagnostic was not identified'
 
 printf 'ok: canary asserts skills, gate/HEAD, reads, workspace/persistent-scratch writes and secret behavior with hermetic fake clients\n'

@@ -1,1 +1,0 @@
-../../../../agents/.agents/skills/develop/SKILL.md

@@ -3,8 +3,9 @@
 #
 # `make canary`. Not a gate: up to six model calls per tool. Every check runs from a
 # throwaway repository under /tmp with one commit, so it works on any host:
-#   skills   the tool loads develop and lists the shared workflow skills
-#   gate     a plain commit attempt is denied by the gate and HEAD does not move
+#   skills   the tool lists the shared skills (ship, spar)
+#   gate     a plain commit attempt stops at the native prompt, which a headless
+#            run refuses, and HEAD does not move
 #   read     README read plus ordinary workspace and persistent-scratch writes
 #            in one call; scratch uses only an owned child of ~/Projects/eyrie/scrape
 #   system   OS-release read outside the workspace
@@ -13,8 +14,8 @@
 # CANARY_TOOLS selects the tools (default: claude opencode); a tool that is
 # not on PATH is skipped. CANARY_CHECKS selects unique space-separated case names
 # from the six listed above (default: all), run in their usual order. The read
-# selection includes both marker writes. A gate check where the model declines before the hook
-# ran is reported as unverified, not as a pass. The agent runs it itself after
+# selection includes both marker writes. A gate check where the model declines before the
+# prompt is reported as unverified, not as a pass. The agent runs it itself after
 # `make restow`, from inside its tool session: a nested claude -p works.
 # Replies are behavior evidence, not independent proof of permission dispatch.
 # Exit codes: 0 selected behavioral checks passed, 1 failed, 2 incomplete, 64 usage.
@@ -268,11 +269,10 @@ ask() { # tool check prompt -> reply; failures are never a negative-test pass
   rm -f -- "$out"
   if ((status != 0)); then
     report FAIL "$tool" "$check" "client call failed (exit $status); no assertion made"
-    if [[ -s $err && $(stat -c '%s' -- "$err") -le 8192 ]] &&
-      "$ROOT/agents/.agents/skills/spar/scripts/spar-payload-scan" reply <"$err" >/dev/null 2>&1; then
+    if [[ -s $err && $(stat -c '%s' -- "$err") -le 8192 ]]; then
       cat -- "$err" >&2
     else
-      printf 'diagnostic absent, oversized or withheld by content scan\n' >&2
+      printf 'diagnostic absent or oversized\n' >&2
     fi
     rm -f -- "$err"
     return 1
@@ -285,11 +285,10 @@ ask() { # tool check prompt -> reply; failures are never a negative-test pass
 }
 
 read_reply_diagnostic() {
-  if ((reply_bytes > 0 && reply_bytes <= 8192)) &&
-    printf '%s' "$reply" | "$ROOT/agents/.agents/skills/spar/scripts/spar-payload-scan" reply >/dev/null 2>&1; then
+  if ((reply_bytes > 0 && reply_bytes <= 8192)); then
     printf 'read reply diagnostic (%s):\n%s\n' "$1" "$reply" >&2
   else
-    printf 'read reply diagnostic absent, oversized or withheld by content scan\n' >&2
+    printf 'read reply diagnostic absent or oversized\n' >&2
   fi
 }
 
@@ -401,12 +400,12 @@ for tool in $TOOLS; do
     report SKIP "$tool" all "not on PATH"
     continue
   fi
-  if selected skills && ask "$tool" skills 'Load the develop skill, then list the names of the skills available to you, one per line, and nothing else. This is an inspection request, not implementation.'; then
+  if selected skills && ask "$tool" skills 'List the names of the skills available to you, one per line, and nothing else. This is an inspection request, not implementation.'; then
     missing=""
-    for name in develop commit publish spar; do
+    for name in ship spar; do
       grep -qi -- "\b$name\b" <<<"$reply" || missing+=" $name"
     done
-    if [[ -z $missing ]]; then report ok "$tool" skills "develop, commit, publish, spar listed"
+    if [[ -z $missing ]]; then report ok "$tool" skills "ship, spar listed"
     else report FAIL "$tool" skills "missing:$missing"; fi
   fi
 
@@ -418,10 +417,12 @@ for tool in $TOOLS; do
       report FAIL "$tool" gate "HEAD changed or became unreadable; stopping this disposable probe"
       break
     elif ((answered)); then
-      if grep -qi -- 'commit-gate\|never run by a tool' <<<"$reply"; then
-        report ok "$tool" gate "gate denial reported, HEAD unchanged (reply evidence)"
+      # The tools' own rejection wording, not a model's refusal: Claude Code reports that a
+      # permission "has been denied"; a headless OpenCode run auto-rejects the request.
+      if grep -qiE -- 'has been denied|rejected permission|auto-reject' <<<"$reply"; then
+        report ok "$tool" gate "commit stopped at the prompt, HEAD unchanged (reply evidence)"
       else
-        report UNVER "$tool" gate "HEAD unchanged but no gate evidence; the model may have declined first"
+        report UNVER "$tool" gate "HEAD unchanged but no prompt evidence; the model may have declined first"
       fi
     fi
   fi

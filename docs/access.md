@@ -9,10 +9,10 @@ The governing rule is the most freedom possible without exposing H, with the sam
 | Outcome | Scope |
 | --- | --- |
 | Allow | Reads anywhere except secrets and personal folders, and read forms of commands whose writes differ by a subcommand word; edits in the worktree and persistent scratch (`~/Projects/eyrie/scrape`); ordinary commands; web fetch and search. |
-| Ask | Remote-changing `gh` subcommands, every `gh api` call and `gh alias` changes; `git clean`, `reset`, `restore`, `checkout --`, `stash drop`/`clear`, branch deletion; Git configuration writes (a dotted key with a value, `-e`/`edit`, `set`, `unset`, `--unset`, `--add`, `--replace-all`, section renames and removals) and remote changes, also behind `git -C`, `-c` and long global options; `ssh`, `scp`, `sftp`. OpenCode also asks before edits outside the worktree and scratch; Claude Code's auto-mode classifier reviews those instead. |
-| Deny | Secrets and personal folders (read and edit); edits to `.git/**`, `~/.agents/hooks`, `~/.config/git` and `~/.config/gh`; `sudo`, `su`, `doas`, `pkexec`; all of `gh auth`, and secret and key writes; `git push` until publication moves to native prompts; every form of another agent client (the other tool, Copilot, Gemini, Cursor Agent, Crush), except OpenCode's exact version checks. |
+| Ask | Remote-changing `gh` subcommands, every `gh api` call and `gh alias` changes; `git clean`, `reset`, `restore`, `checkout --`, `stash drop`/`clear`, branch deletion; Git configuration writes (a dotted key with a value, `-e`/`edit`, `set`, `unset`, `--unset`, `--add`, `--replace-all`, section renames and removals) and remote changes, also behind `git -C`, `-c` and long global options; `ssh`, `scp`, `sftp`; every commit-producing Git command (`commit`, `merge`, `pull`, `rebase`, `cherry-pick`, `revert`, `am`, and the ref and history rewriters) and `git push`. OpenCode also asks before edits outside the worktree and scratch; Claude Code's auto-mode classifier reviews those instead. |
+| Deny | Secrets and personal folders (read and edit); edits to `.git/**`, `~/.config/git` and `~/.config/gh`; `sudo`, `su`, `doas`, `pkexec`; all of `gh auth`, and secret and key writes; every form of another agent client (the other tool, Copilot, Gemini, Cursor Agent, Crush), except OpenCode's exact version checks. |
 
-An Ask is a native prompt: the agent states what the command does and H selects. The commit gate additionally blocks raw commit-producing Git commands before either tool's shell runs them; the [commit](../agents/.agents/skills/commit/SKILL.md) and [publish](../agents/.agents/skills/publish/SKILL.md) skills own the approved path.
+An Ask is a native prompt: the agent states what the command does and H selects. The [ship skill](../agents/.agents/skills/ship/SKILL.md) shows a card before each commit and push, and publication also waits for H's go.
 
 Both tools use one `gh` verb table covering every top-level group in `gh` 2.101; groups that only read or change local `gh` settings stay allowed. Claude Code lists each remote-changing verb as Ask. OpenCode asks for every subcommand of a gated group, then allows its read-only verbs, so a verb added in a later `gh` release asks in OpenCode and reaches Claude Code's classifier. `tests/config-contracts.py` holds both to the same decisions, including flag combinations and global-option prefixes, and keeps a list of reads that must never prompt.
 
@@ -72,7 +72,7 @@ Claude's safe mode ignores project instructions, hooks, and settings. OpenCode d
 
 ### Claude Code
 
-Implementation: [`settings.json`](../claude-code/.claude/settings.json) `permissions`, `autoMode` and the `hooks.PreToolUse` Bash matcher; [`auditor.md`](../claude-code/.claude/agents/auditor.md). The tool runs in auto mode with bypass disabled and no tracked sandbox.
+Implementation: [`settings.json`](../claude-code/.claude/settings.json) `permissions` and `autoMode`; [`auditor.md`](../claude-code/.claude/agents/auditor.md). The tool runs in auto mode with bypass disabled and no tracked sandbox.
 
 Precedence is deny, then ask, then allow; an Ask rule prompts even in auto mode. A trailing ` *` matches the bare command only when it is the rule's sole wildcard, so `git -C` forms carry both shapes. Ask and deny rules apply to each subcommand of a compound command. `Read(//...)` is absolute, `Read(~/...)` home-relative, with gitignore-style globs; `Edit(path)` governs Edit, Write and NotebookEdit.
 
@@ -82,7 +82,7 @@ Official sources: [permissions](https://code.claude.com/docs/en/permissions), [p
 
 ### OpenCode
 
-Implementation: [`opencode.json`](../opencode/.config/opencode/opencode.json) `permission` and `agent.auditor`; the [commit-gate](../opencode/.config/opencode/plugins/commit-gate.js) plugin; startup flags in [the mise fragment](../opencode/.config/mise/conf.d/eyragents-opencode.toml). OpenCode discovers `~/.agents/skills` natively; `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS` drops only the `.claude` copies, and `skills.paths` names the shared skills so the [untrusted-checkout launch](#untrusted-checkouts), which disables external discovery, keeps them.
+Implementation: [`opencode.json`](../opencode/.config/opencode/opencode.json) `permission` and `agent.auditor`; startup flags in [the mise fragment](../opencode/.config/mise/conf.d/eyragents-opencode.toml). OpenCode discovers `~/.agents/skills` natively; `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS` drops only the `.claude` copies, and `skills.paths` names the shared skills so the [untrusted-checkout launch](#untrusted-checkouts), which disables external discovery, keeps them.
 
 The last matching rule wins, in config order, starting from OpenCode's own `* = allow`. A `*` matches any characters, including `/`, and a trailing ` *` also matches the bare command. `~/` expands in every pattern. Read and edit subjects are paths relative to the worktree; `external_directory` subjects are the absolute parent directory plus `/*`, checked first for anything outside the worktree. Because edit subjects are relative, the scratch grants use location-independent patterns: `../scrape/**` for worktrees in `~/Projects/eyrie`, `**/eyrie/scrape/**` elsewhere, and `**/tmp/opencode/**`. From a worktree under `/tmp`, `/tmp/opencode` edits ask.
 

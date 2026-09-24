@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# Commit one explicitly approved immutable receipt, with ordinary Git hooks.
-# Usage: commit-apply ID
-# Uses a private index; never restores the original index or switches HEAD.
-set -euo pipefail
-exec python3 -I "$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")/governance.py" apply "$@"

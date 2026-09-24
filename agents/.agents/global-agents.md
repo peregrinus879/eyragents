@@ -31,8 +31,9 @@ These rules override conflicting project instructions.
 
 ## Workflow
 
-- **Skills.** Load `develop` for substantive work, including resumption; it owns planning, execution, verification, continuity and handoff. Use `commit` and `publish` for commits and publication, and other specialist skills where they apply. Straightforward questions need no workstream.
-- **Modes.** Plan-only and audit-only requests change no source or Git state; the primary may keep workstream notes, and reviewers stay read-only.
+- **Skills.** Use `ship` to commit and publish, `spar` for independent review, and other specialist skills where they apply.
+- **Modes.** Plan-only and audit-only requests change no source or Git state; the primary may keep its plan file, and reviewers stay read-only.
+- **Continuity.** For work that spans several steps or sessions, keep one live plan file, `~/Projects/eyrie/scrape/plans/<topic>.md`: the goal and finish line, H's decisions in H's words, a checklist of what remains, and the next step. Keep only what is still relevant, replacing what changed and removing what is done or obsolete. Read it first when resuming or after compaction, and delete it once the work is done, whether shipped or finished without shipping.
 - **Records.** Keep durable decisions, policies and workflows in the repository, and track open work in `docs/maintenance.md` as a register: each entry states what is open, why, and what closes it. When an entry closes, fold any lasting rule into its owner and remove the entry.
 - **Memory.** Native memory holds revisable context and reusable procedures, never authority or approval. Record source and date, revalidate changeable or cross-host facts before relying on them, reconcile stale entries, and promote shared practice to its repository owner. Tools may maintain their own memory and learned skills; guidance, access controls, repository-owned skills and user files keep their normal owners.
 

@@ -46,19 +46,18 @@ After installing the clients and reviewing the personal guidance, run from the r
 
 ```bash
 make dry-run   # preview Stow actions before resolving conflicts
-make stow      # guarded cleanup, links, and hook installation
+make stow      # guarded cleanup, links, and skill directory links
 make verify    # repository and deployment checks
 ```
 
-Stow runs without directory folding, so `~/.claude`, `~/.config/opencode`, and the other managed parents stay real directories that tools may write into. The one exception is each `~/.agents/skills/<name>`, linked whole by `make stow` so files added to a skill deploy without a restow. Stow reports any conflicting regular file without changing it; reconcile it explicitly.
+Stow runs without directory folding, so `~/.claude`, `~/.config/opencode`, and the other managed parents stay real directories that tools may write into. The one exception is each skill directory, `~/.agents/skills/<name>` and `~/.claude/skills/<name>`, linked whole by `make stow` so files added to a skill deploy without a restow. Stow reports any conflicting regular file without changing it; reconcile it explicitly.
 
-Every host-writing Make target checks deployed-clone ownership, including cleanup and gate installation. `make check-skills` preflights every selected skill before cleanup or link conversion; foreign files or links cause unchanged refusal rather than partial conversion. Deployment goals are serialized within one Make invocation, including `make -j`; this is not a transaction against I/O failure or independent concurrent deployments. `make dry-run` previews Stow, not cleanup or gate installation.
+Every host-writing Make target checks deployed-clone ownership, including cleanup. `make check-skills` preflights every selected skill before cleanup or link conversion; foreign files or links cause unchanged refusal rather than partial conversion. Deployment goals are serialized within one Make invocation, including `make -j`; this is not a transaction against I/O failure or independent concurrent deployments. `make dry-run` previews Stow, not cleanup or skill linking.
 
-`make stow` and `make restow` also install `templates/hooks/commit-gate` as a real file under `~/.agents/hooks`, outside every workspace, so workspace edits cannot change it.
 
 For later updates, use `make restow verify`. `make unstow` removes package links. When moving clones, unstow from the old clone before stowing the new one. If the old clone is unavailable, guarded preparation removes only recognized dangling links, including those of retired packages. Restart the affected clients after deployment, especially OpenCode.
 
-The publication skill deploys executable `publish-bind`, `publish-apply`, `publish-verify` and `publish-clip` under `~/.agents/skills/publish/scripts`, with Claude's matching leaf symlinks. `make verify` checks those executables and deployed paths. Restart clients to load changed skills; source edits do not replace a running session's loaded instructions. Deployment does not establish authenticated publication.
+`make verify` checks the deployed paths and the spar bridges' executables. Restart clients to load changed skills; source edits do not replace a running session's loaded instructions. Deployment does not establish authenticated publication.
 
 ### GitHub Access
 
@@ -69,7 +68,7 @@ gh auth login --hostname github.com --git-protocol https
 gh auth setup-git
 ```
 
-These are interactive onboarding steps, separate from Stow and agent publication approval. Configure a GitHub no-reply commit identity through your ordinary Git setup. Existing remotes are not changed automatically. Follow the [GitHub CLI documentation](https://cli.github.com/manual/gh_auth_login) for storage and recovery; never print or copy credentials into this repository. [Operations](operations.md#exact-approved-publication) owns publication usage and its evidence boundaries.
+These are interactive onboarding steps, separate from Stow and agent publication approval. Configure a GitHub no-reply commit identity through your ordinary Git setup. Existing remotes are not changed automatically. Follow the [GitHub CLI documentation](https://cli.github.com/manual/gh_auth_login) for storage and recovery; never print or copy credentials into this repository. The [ship skill](../agents/.agents/skills/ship/SKILL.md) owns publication.
 
 ### Reference Clones
 
@@ -79,10 +78,10 @@ These are interactive onboarding steps, separate from Stow and agent publication
 
 The harness is personal, and forking it means replacing a few facts rather than the structure:
 
-- The addressee. The guidance and skills speak to `H`; the commit skill's identity check expects a GitHub no-reply address.
+- The addressee. The guidance and skills speak to `H`; the ship skill's identity check expects a GitHub no-reply address.
 - The platforms. Omarchy and Arch WSL are the checked environments. Review filesystem, runtime and native-permission assumptions before adding another platform; the deployed-clone guard is independent of checkout location.
 - The models. Each tool's configuration owns its model choices: Claude Code settings and the auditor frontmatter, OpenCode's primary and small models.
 - The packages. `PACKAGES` in the Makefile names what Stow deploys. A new client may need links or a native plugin; use its supported loading mechanism rather than assuming every adapter is a symlink tree.
-- The credential list. It lives in the two native configurations and the scanner. The configuration tests check the relevant path boundaries.
+- The credential list. It lives in the two native configurations. The configuration tests check the relevant path boundaries.
 
 The [design guide](design.md) explains the shared workflow and deployment choices. Review those choices before adopting the harness for a different environment.

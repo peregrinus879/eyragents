@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# Observe the bound push destination with ls-remote, not a tracking-ref guess.
-# Usage: publish-verify ID
-# Optional repository verify-published targets remain separate from CI status.
-set -euo pipefail
-exec python3 -I "$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")/../../commit/scripts/governance.py" verify "$@"

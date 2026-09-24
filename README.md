@@ -1,6 +1,6 @@
 # EyrAgents
 
-Global guidance, skills, and reviewed Git workflows for **Claude Code and OpenCode** on Omarchy and Arch WSL. [GNU Stow](https://www.gnu.org/software/stow/) deploys the tool adapters.
+Global guidance, skills, and Git workflows for **Claude Code and OpenCode** on Omarchy and Arch WSL. [GNU Stow](https://www.gnu.org/software/stow/) deploys the tool adapters.
 
 This is a standalone personal harness. It owns AI-client configuration, startup defaults and shared workflows, and uses ordinary installed tools without depending on a host-dotfiles repository.
 
@@ -8,7 +8,7 @@ This is a standalone personal harness. It owns AI-client configuration, startup 
 
 - One source for global guidance and reusable [Agent Skills](https://agentskills.io).
 - Tool-specific access controls, with their differences documented in the [access policy](docs/access.md).
-- Exact-candidate commit approval, exact-approved agent publication, and optional read-only review.
+- Commits and pushes approved by H at each tool's native prompt, and optional independent review.
 - Repeatable deployment checks and opt-in live smoke tests.
 - One offline development-workspace guide covering the host environment and both AI clients.
 
@@ -17,11 +17,11 @@ This is a standalone personal harness. It owns AI-client configuration, startup 
 | Source | Deployed role |
 | --- | --- |
 | `agents/.agents/` | Global guidance, skills, reviewer bridges, and auditor charter. |
-| `claude-code/.claude/` | Claude Code instructions, settings, skill links, auditor, and status line. |
-| `opencode/.config/opencode/` | OpenCode instructions, models, permissions, TUI, commands, and the commit-gate plugin. |
+| `claude-code/.claude/` | Claude Code instructions link, settings, auditor, and status line. |
+| `opencode/.config/opencode/` | OpenCode instructions link, models, permissions, auditor, and TUI settings. |
 | `scripts/`, `tests/`, `docs/` | Deployment helpers, verification, and documentation. |
 
-The [architecture guide](docs/design.md#configuration-ownership) explains linked packages, whole skill-directory links, and the copied hook. The [Makefile](Makefile) owns deployment targets and the package list.
+The [architecture guide](docs/design.md#configuration-ownership) explains linked packages and whole skill-directory links. The [Makefile](Makefile) owns deployment targets and the package list.
 
 ## Independence
 
@@ -39,13 +39,11 @@ Start an installed client in the project you want to work on. The [operations gu
 
 | Workflow | Canonical procedure |
 | --- | --- |
-| Develop a goal into a verified result | [develop](agents/.agents/skills/develop/SKILL.md) |
-| Commit an atomic change | [commit](agents/.agents/skills/commit/SKILL.md) |
-| Review and publish commits | [publish](agents/.agents/skills/publish/SKILL.md) |
+| Commit and publish verified work | [ship](agents/.agents/skills/ship/SKILL.md) |
 | Obtain a second opinion | [spar](agents/.agents/skills/spar/SKILL.md) |
 | Reconcile the harness with upstream tools | [eyrsync](.agents/skills/eyrsync/SKILL.md) |
 
-The primary uses `develop` for substantive work from intake or resumption through verified delivery and lightweight continuity. It hands repository changes to `commit` when preparation is directed; H approves each exact candidate, then the reviewed publication set through `publish`. Research and plan-only work can finish without Git. Full technical records are available on request. Host-local authentication supplies capability, not approval; [setup](docs/setup.md#github-access) owns standalone onboarding.
+Long work keeps a live plan file, as global guidance's Continuity rule describes. `ship` shows a card before each commit, and H approves the `git commit` at the native prompt; publication waits for H's go, then each `git push` prompts too. Host-local authentication supplies capability, not approval; [setup](docs/setup.md#github-access) owns standalone onboarding.
 
 ## Verify
 

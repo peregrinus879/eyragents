@@ -468,25 +468,13 @@
       "title": "EyrAgents operations",
       "label": "EyrAgents operations",
       "url": "https://github.com/peregrinus879/eyragents/blob/main/docs/operations.md",
-      "scope": "Managed workflows and command wrappers reviewed 2026-09-14. Native client controls retain their own evidence baselines; current session status wins over a resumed model preference."
+      "scope": "Managed workflows reviewed 2026-09-24. Native client controls retain their own evidence baselines; current session status wins over a resumed model preference."
     },
     "agents-access": {
       "title": "EyrAgents access policy",
       "label": "EyrAgents access policy",
       "url": "https://github.com/peregrinus879/eyragents/blob/main/docs/access.md",
       "scope": "Reconciled 2026-09-24 against Claude Code 2.1.281 documentation and OpenCode 1.18.32 source. Activation and live dispatch need separate evidence."
-    },
-    "agents-develop": {
-      "title": "Managed OpenCode develop wrapper",
-      "label": "EyrAgents develop wrapper",
-      "url": "https://github.com/peregrinus879/eyragents/blob/main/opencode/.config/opencode/commands/develop.md",
-      "scope": "Managed definition reviewed 2026-09-15: no agent override, so the current agent is inherited. Pair with the versioned OpenCode command contract; this is not live Plan/Build or slash-command acceptance."
-    },
-    "opencode-commands": {
-      "title": "OpenCode 1.18.31 command execution",
-      "label": "OpenCode command source",
-      "url": "https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/src/session/prompt.ts#L1356-L1473",
-      "scope": "Selected version-matched source rechecked 2026-09-15: cmd.agent ?? input.agent, with the current agent supplied by the same-version TUI prompt dispatcher. This qualifies managed wrapper mode selection only; other controls retain their own older baselines."
     },
     "claude": {
       "title": "Claude Code controls",
@@ -5810,7 +5798,7 @@
         "/skills"
       ],
       "source": "claude",
-      "detail": "List native and installed workflows. Shared EyrAgents skills include /develop, /commit, /publish and /spar.",
+      "detail": "List native and installed workflows. Shared EyrAgents skills include /ship and /spar.",
       "mode": "Claude Code prompt",
       "essential": false,
       "warning": "",
@@ -5981,41 +5969,16 @@
       "title": "Select a workflow",
       "keys": [
         "/skills",
-        "/commit",
-        "/publish",
+        "/ship",
         "/spar"
       ],
       "source": "opencode-tui",
-      "detail": "Select a skill, or use the commit, publish and spar wrappers in Build. Commit and publication retain their separate approval boundaries.",
+      "detail": "Select a skill; OpenCode offers each skill as a slash command. Commits and pushes stop at the native permission prompt.",
       "mode": "OpenCode prompt",
       "essential": false,
       "warning": "",
       "tags": "",
       "extra": [
-        "agents"
-      ],
-      "hosts": [
-        "eyrarchy",
-        "eyrwsl"
-      ],
-      "kind": "command"
-    },
-    {
-      "id": "ai-opencode-develop",
-      "app": "opencode",
-      "category": "OpenCode",
-      "title": "Develop in the current agent mode",
-      "keys": [
-        "/develop"
-      ],
-      "source": "agents-develop",
-      "detail": "The managed wrapper inherits the current agent under the checked 1.18.31 command contract. A plan-only prompt tests instruction adherence; native Plan/Build slash-command acceptance remains separate.",
-      "mode": "OpenCode prompt",
-      "essential": false,
-      "warning": "",
-      "tags": "",
-      "extra": [
-        "opencode-commands",
         "agents"
       ],
       "hosts": [
@@ -6260,7 +6223,7 @@
     },
     {
       "title": "Shared workflows",
-      "text": "Develop carries substantive work from its goal to a verified result with lightweight continuity. It offers Prepare commit reviews or Pause here when Git preparation has not already been directed. Commit and publish retain their separate exact approvals and reuse the same workstream. Use the installed skill picker or name the relevant skill; procedures live in the skills, not this guide.",
+      "text": "Ship commits and publishes: a card before each commit, H's approval at the native prompt, and publication only after H's go. Spar gives independent review, and long work keeps a live plan file. Use the installed skill picker or name the relevant skill; procedures live in the skills, not this guide.",
       "sources": [
         "agents"
       ]

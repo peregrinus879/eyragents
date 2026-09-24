@@ -7,44 +7,40 @@ SHELL := /bin/bash
 PACKAGES := agents claude-code opencode
 STOW := stow --no-folding --ignore='__pycache__' -t ~
 TOOL_PACKAGES := claude-code opencode
-# Each skill under ~/.agents/skills deploys as one directory link, so files
-# added to a skill need no restow; Stow leaves that directory to
-# scripts/prepare-stow.sh --link-skills.
+# Each skill deploys as one directory link under ~/.agents/skills and
+# ~/.claude/skills, so files added to a skill need no restow; Stow leaves those
+# directories to scripts/prepare-stow.sh --link-skills.
 AGENTS_STOW := $(STOW) --ignore='\.agents/skills'
 SHELLCHECK_FILES := claude-code/.claude/statusline.sh \
-  templates/hooks/commit-gate \
-  $(filter-out %/spar-payload-scan %.py,$(wildcard agents/.agents/skills/*/scripts/*)) \
+  $(filter-out %.py,$(wildcard agents/.agents/skills/*/scripts/*)) \
   $(wildcard scripts/*.sh tests/*.sh)
 
-.PHONY: help stow unstow dry-run restow require-clone check-skills install-gate lint test check verify-deploy verify canary canary-develop clean refs workspace-guide
+.PHONY: help stow unstow dry-run restow require-clone check-skills lint test check verify-deploy verify canary clean refs workspace-guide
 
 # Deployment goals and their guards must never race, including `make -j clean restow`.
 .NOTPARALLEL:
 
 help:
 	@echo "Targets:"
-	@echo "  stow           Clean dangling links, stow packages, link skills, install the gate"
+	@echo "  stow           Clean dangling links, stow packages, link skill directories"
 	@echo "  unstow         Remove all package links and the skill directory links"
 	@echo "  dry-run        Preview Stow actions"
-	@echo "  restow         Guard, preflight skills, clean, refresh links, install the gate"
+	@echo "  restow         Guard, preflight skills, clean, refresh links"
 	@echo "  check-skills   Read-only preflight of every managed skill directory"
-	@echo "  install-gate   Install templates/hooks/commit-gate as a real file under ~/.agents/hooks"
-	@echo "  lint           ShellCheck, Python, and plugin syntax checks over managed scripts"
-	@echo "  test           Fast tests: configuration boundaries, bridges, statusline, preparation, commit gate"
+	@echo "  lint           ShellCheck and Python syntax checks over managed scripts"
+	@echo "  test           Fast tests: configuration boundaries, bridges, statusline, preparation, canary fixtures"
 	@echo "  check          Repository checks: links, JSON/TOML and fixture tests (runs in CI)"
 	@echo "  verify-deploy  Check every package file resolves to its deployed target"
 	@echo "  verify         lint, check, and verify-deploy"
 	@echo "  canary         Up to six live calls per tool; behavioral smoke (not a gate)"
 	@echo "  refs           Refresh existing clones declared by this repository (preview with scripts/update-references.sh --dry-run)"
 	@echo "  workspace-guide Rebuild the full offline workspace and AI-client guide for both hosts"
-	@echo "  canary-develop Four opt-in OpenCode workflow cases in disposable repositories"
 	@echo "  clean          Remove dangling links that point into this repository's packages"
 
 stow: clean
 	$(STOW) -v $(TOOL_PACKAGES)
 	$(AGENTS_STOW) -v agents
 	bash scripts/prepare-stow.sh --link-skills
-	$(MAKE) --no-print-directory install-gate
 
 unstow: require-clone check-skills
 	$(STOW) -D -v $(TOOL_PACKAGES)
@@ -59,15 +55,6 @@ restow: clean
 	$(STOW) -R -v $(TOOL_PACKAGES)
 	$(AGENTS_STOW) -R -v agents
 	bash scripts/prepare-stow.sh --link-skills
-	$(MAKE) --no-print-directory install-gate
-
-# The hook's executable lives outside every workspace as a real file, so an
-# agent's workspace edits cannot change it.
-GATE := $(HOME)/.agents/hooks/commit-gate
-# Preserve an override as data, never recursively expand Make expressions.
-override export GATE := $(value GATE)
-install-gate: require-clone
-	@bash scripts/prepare-stow.sh --install-gate
 
 # A managed endpoint that is a link must resolve into this clone; a reference
 # clone of the same repository must never redeploy the packages from itself.
@@ -80,24 +67,18 @@ check-skills: require-clone
 lint:
 	shellcheck -s bash $(SHELLCHECK_FILES)
 	python3 -I -c 'import sys; [compile(open(p, "rb").read(), p, "exec") for p in sys.argv[1:]]' \
-	  agents/.agents/skills/spar/scripts/spar-payload-scan scripts/update-references.py tests/reference-migration.py tests/config-contracts.py \
-	  agents/.agents/skills/commit/scripts/governance.py tests/commit-governance.py tests/develop-live.py tests/develop-live-fixtures.py docs/workspace-guide-src/build.py
-	@set -e; for plugin in opencode/.config/opencode/plugins/*.js; do node --check "$$plugin"; done
+	  scripts/update-references.py tests/reference-migration.py tests/config-contracts.py docs/workspace-guide-src/build.py
 	@echo "ok:   lint"
 
 test:
 	python3 tests/config-contracts.py
-	python3 tests/develop-live-fixtures.py
 	bash tests/mise-env.sh
 	bash tests/update-references.sh
 	python3 tests/reference-migration.py
 	bash tests/statusline.sh
 	bash tests/prepare-stow.sh
-	bash tests/payload-scan.sh
 	bash tests/spar-bridges.sh
-	bash tests/commit-gate.sh
 	bash tests/canary.sh
-	bash tests/publish-clip.sh
 	@echo "ok:   test"
 
 check:
@@ -126,7 +107,6 @@ check:
 # and a retired source must leave no link behind. GNU Stow ignores .gitignore
 # files, so they are skipped.
 verify-deploy:
-	@bash scripts/prepare-stow.sh --check-gate
 	@fail=0; \
 	while IFS= read -r -d '' src; do \
 	  [[ "$$src" == */.gitignore ]] && continue; \
@@ -156,8 +136,10 @@ verify-deploy:
 	  case $$dir in \
 	    agents/.agents/skills/*/*) continue ;; \
 	    agents/.agents/skills/*) \
-	      if [[ -L $$target && $$(readlink -f -- "$$target") == "$(CURDIR)/$$dir" ]]; then echo "ok:   skill directory link resolves into the repo: $$target"; \
-	      else echo "FAIL: skill directory is not one link into the repo (run make restow): $$target"; fail=1; fi ;; \
+	      for link in "$$target" "$$HOME/.claude/skills/$${dir##*/}"; do \
+	        if [[ -L $$link && $$(readlink -f -- "$$link") == "$(CURDIR)/$$dir" ]]; then echo "ok:   skill directory link resolves into the repo: $$link"; \
+	        else echo "FAIL: skill directory is not one link into the repo (run make restow): $$link"; fail=1; fi; \
+	      done ;; \
 	    *) if [[ -d $$target && ! -L $$target ]]; then :; \
 	       else echo "FAIL: managed directory is folded or missing: $$target"; fail=1; fi ;; \
 	  esac; \
@@ -169,9 +151,8 @@ verify-deploy:
 	  if [[ ! -e $$target && ! -L $$target ]]; then :; \
 	  else echo "FAIL: generated OpenCode state reached the package source: $$target"; fail=1; fi; \
 	done; \
-	for b in spar-claude spar-opencode spar-payload-scan commit-candidate commit-apply publish-bind publish-apply publish-verify publish-clip; do \
-	  skill=spar; [[ $$b == commit-* ]] && skill=commit; [[ $$b == publish-* ]] && skill=publish; \
-	  if [[ -x "$$HOME/.agents/skills/$$skill/scripts/$$b" ]]; then echo "ok:   $$b executable"; else echo "FAIL: $$b missing or not executable"; fail=1; fi; \
+	for b in spar-claude spar-opencode; do \
+	  if [[ -x "$$HOME/.agents/skills/spar/scripts/$$b" ]]; then echo "ok:   $$b executable"; else echo "FAIL: $$b missing or not executable"; fail=1; fi; \
 	done; \
 	if [[ -e "$$HOME/.config/opencode/opencode.jsonc" ]]; then \
 	  echo "FAIL: stray ~/.config/opencode/opencode.jsonc shadows the stowed config"; fail=1; \
@@ -191,9 +172,6 @@ refs:
 
 workspace-guide:
 	python3 docs/workspace-guide-src/build.py
-
-canary-develop:
-	python3 tests/develop-live.py --opencode "$$(mise which opencode)"
 
 clean: check-skills
 	bash scripts/prepare-stow.sh

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Prepare $HOME for `stow --no-folding`, link skill directories and manage the
-# installed commit gate.
+# Prepare $HOME for `stow --no-folding` and link skill directories.
 #
 # Without arguments: remove dangling symlinks under the managed target
 # directories whose link text names a path inside one of this repository's
@@ -14,19 +13,16 @@
 # and regular files are never touched; Stow itself reports any remaining
 # conflict without changing the filesystem.
 #
-# --link-skills: make each ~/.agents/skills/<name> one link to the skill's
-# directory in the agents package, so a file added to a skill deploys without
-# a restow. A directory left by an earlier deploy is
-# emptied of links into that skill's source (including recognized retired
-# package links) and removed. All selected skills are preflighted before any
-# mutation; foreign files and links, including dangling links, stop the script
-# unchanged. --check-skills runs that preflight without making changes.
-# --unlink-skills removes the links that resolve into this clone's package.
-# --require-clone checks all managed endpoints and parents without writing.
-# --install-gate installs only at the fixed host endpoint, with real parents
-# outside Git workspaces and no endpoint symlink/hardlink. GATE cannot relocate it.
-# --check-gate applies the same endpoint checks and verifies executable content,
-# without installing or creating directories.
+# --link-skills: make each ~/.agents/skills/<name> and ~/.claude/skills/<name>
+# one link to the skill's directory in the agents package, so a file added to a
+# skill deploys without a restow; Claude Code reads only ~/.claude/skills. A
+# directory left by an earlier deploy is emptied of links into that skill's
+# source (including recognized retired package links) and removed. All selected
+# skills are preflighted before any mutation; foreign files and links, including
+# dangling links, stop the script unchanged. --check-skills runs that preflight
+# without making changes. --unlink-skills removes the links that resolve into
+# this clone's package. --require-clone checks all managed endpoints and parents
+# without writing.
 set -euo pipefail
 
 abort() {
@@ -43,7 +39,12 @@ PACKAGES=(agents claude-code opencode)
 TARGET_ROOTS=("$HOME/.claude" "$HOME/.codex" "$HOME/.agents" "$HOME/.local/bin" "$HOME/.config/opencode" "$HOME/.config/mise/conf.d" "$HOME/.hermes/plugins")
 # Package entries that once existed, including retired packages: links into
 # them are still ours to clean.
-RETIRED_ENTRIES=(agents/.local codex/.agents codex/.codex hermes/.hermes claude-code/.claude/rules opencode/.config/opencode/skills)
+RETIRED_ENTRIES=(agents/.local codex/.agents codex/.codex hermes/.hermes claude-code/.claude/rules claude-code/.claude/skills
+  opencode/.config/opencode/skills opencode/.config/opencode/commands opencode/.config/opencode/plugins)
+# Skills that once shipped: the directories their Claude links leave behind are pruned when empty.
+RETIRED_SKILLS=(commit develop publish)
+SKILL_ROOTS=("$HOME/.agents/skills" "$HOME/.claude/skills")
+STRICT=0
 
 managed_link_text() { # link text
   local text=$1 package tail entry
@@ -65,8 +66,6 @@ require_clone() {
   mapfile -d '' -t sources < <(git -C "$repository_root" ls-files -z --cached --others --exclude-standard -- "${PACKAGES[@]}")
   scan=$!; wait "$scan" || abort 'cannot enumerate package files'
   ((${#sources[@]})) || abort 'no Git-visible package files found'
-  # The installed gate has no Stow source, but its parents are also writable.
-  sources+=(agents/.agents/hooks/commit-gate)
   for src in "${sources[@]}"; do
     path="$HOME/${src#*/}"
     while [[ $path != "$HOME" ]]; do
@@ -83,40 +82,6 @@ require_clone() {
   done
 }
 
-manage_gate() { # install|check
-  local gate=${GATE-"$HOME/.agents/hooks/commit-gate"} parent
-  [[ $gate == "$HOME/.agents/hooks/commit-gate" ]] || abort 'GATE must name the fixed canonical HOME/.agents/hooks/commit-gate endpoint'
-  [[ $gate != "$repository_root"/* ]] || abort 'the installed gate must remain outside the repository'
-  parent=${gate%/*}
-  while [[ -n $parent && $parent != / ]]; do
-    [[ ! -L $parent && ( ! -e $parent || -d $parent ) ]] || abort "gate parent must be a real directory, not a fold or file: $parent"
-    if [[ -f $parent/.git || -L $parent/.git || -e $parent/.git/HEAD ]]; then
-      abort "the installed gate must remain outside Git workspaces: $parent"
-    fi
-    parent=${parent%/*}
-  done
-  for parent in "$HOME/.agents" "$HOME/.agents/hooks"; do
-    [[ ! -e $parent || -O $parent ]] || abort "gate parent must be owned by you: $parent"
-  done
-  [[ ! -L $gate ]] || abort "gate endpoint must not be a symlink: $gate"
-  if [[ -e $gate ]]; then
-    [[ -f $gate && -O $gate && $(stat -c '%h' -- "$gate") == 1 ]] || abort 'gate endpoint must be an owner-controlled, single-link regular file'
-  fi
-  [[ $(realpath -m -- "$gate") == "$gate" ]] || abort 'gate endpoint must resolve to its canonical host path'
-  if [[ $1 == check ]]; then
-    if [[ ! -f $gate || ! -x $gate ]] || ! cmp -s "$repository_root/templates/hooks/commit-gate" "$gate"; then
-      abort 'installed commit gate is missing, not executable, unreadable, or drifted (run make restow)'
-    fi
-    printf 'ok:   installed commit gate matches templates/hooks/commit-gate\n'
-    return
-  fi
-  mkdir -p -- "$HOME/.agents/hooks"
-  [[ -d $HOME/.agents && ! -L $HOME/.agents && -d $HOME/.agents/hooks && ! -L $HOME/.agents/hooks &&
-    ! -L $gate && $(realpath -m -- "$gate") == "$gate" ]] || abort 'gate destination changed before installation'
-  install -T -m 755 -- "$repository_root/templates/hooks/commit-gate" "$gate"
-  printf 'ok:   commit gate installed at %s\n' "$gate"
-}
-
 clean_links() {
   local root path text dir
   [[ -n ${HOME:-} && $HOME != / ]] || abort 'HOME must name a non-root directory'
@@ -130,7 +95,12 @@ clean_links() {
     done < <(find "$root" -xtype l -print0 2>/dev/null)
   done
   # Managed directories the retired links leave behind, pruned only when empty, deepest first.
-  local -a retired=("$HOME"/.config/opencode/skills/*/ "$HOME/.config/opencode/skills" "$HOME/.config/opencode/lib" "$HOME/.claude/rules")
+  local -a retired=("$HOME"/.config/opencode/skills/*/ "$HOME/.config/opencode/skills" "$HOME/.config/opencode/lib"
+    "$HOME/.config/opencode/commands" "$HOME/.config/opencode/plugins" "$HOME/.claude/rules")
+  local skill
+  for skill in "${RETIRED_SKILLS[@]}"; do
+    retired+=("$HOME/.claude/skills/$skill/scripts" "$HOME/.claude/skills/$skill/references" "$HOME/.claude/skills/$skill")
+  done
   for dir in "${retired[@]}"; do
     dir=${dir%/}
     [[ -d $dir && ! -L $dir ]] || continue
@@ -148,81 +118,96 @@ package_skills() {
 }
 
 check_skills() {
-  local root="$HOME/.agents/skills" name source target entry resolved scan
+  local root name source target entry resolved scan
   local -a entries=()
   [[ -n ${HOME:-} && $HOME != / ]] || abort 'HOME must name a non-root directory'
-  [[ ! -L $HOME/.agents ]] || abort "the agents root must be a real directory, not a link: $HOME/.agents"
-  [[ ! -L $root ]] || abort "the skills root must be a real directory, not a link: $root"
-  [[ ! -e $root || -d $root ]] || abort "the skills root is not a directory: $root"
-  while IFS= read -r name; do
-    source="$repository_root/agents/.agents/skills/$name"
-    target="$root/$name"
-    if [[ -L $target ]]; then
-      resolved=$(realpath -m -- "$target") || abort "cannot resolve $target"
-      [[ $resolved == "$source" ]] && continue
-      if [[ ! -e $target && ( $resolved == */agents/.agents/skills/"$name" ||
-        $resolved == */codex/.agents/skills/"$name" ) ]]; then continue; fi
-      abort "refusing to repoint a foreign skill link: $target"
-    elif [[ -d $target ]]; then
-      mapfile -d '' -t entries < <(find "$target" -mindepth 1 -print0)
-      scan=$!; wait "$scan" || abort "cannot inspect the skill directory: $target"
-      for entry in "${entries[@]}"; do
-        if [[ -L $entry ]]; then
-          resolved=$(realpath -m -- "$entry") || abort "cannot resolve $entry"
-          [[ $resolved == "$source"/* ]] && continue
-          # Earlier deployments used codex/.agents; recognize only a dangling
-          # link naming this selected skill, not arbitrary missing targets.
-          if [[ ! -e $entry && ( $resolved == */codex/.agents/skills/"$name"/* ||
-            $resolved == */agents/.agents/skills/"$name"/* ) ]]; then continue; fi
-          abort "foreign link inside a managed skill directory: $entry"
-        elif [[ -d $entry ]]; then
-          continue
-        fi
-        abort "foreign entry inside a managed skill directory: $entry"
-      done
-    elif [[ -e $target ]]; then
-      abort "skill endpoint is neither a link nor a directory: $target"
+  for root in "${SKILL_ROOTS[@]}"; do
+    if [[ -L ${root%/skills} ]]; then
+      # Before Stow runs, a fold into this clone is left for Stow to replace; linking
+      # and unlinking need real parents, or they would write into the package source.
+      [[ $STRICT == 0 && $(realpath -m -- "${root%/skills}") == "$repository_root"/* ]] ||
+        abort "the skills parent must be a real directory, not a link: ${root%/skills}"
+      continue
     fi
-  done < <(package_skills)
+    [[ ! -L $root ]] || abort "the skills root must be a real directory, not a link: $root"
+    [[ ! -e $root || -d $root ]] || abort "the skills root is not a directory: $root"
+    while IFS= read -r name; do
+      source="$repository_root/agents/.agents/skills/$name"
+      target="$root/$name"
+      if [[ -L $target ]]; then
+        resolved=$(realpath -m -- "$target") || abort "cannot resolve $target"
+        [[ $resolved == "$source" ]] && continue
+        if [[ ! -e $target && ( $resolved == */agents/.agents/skills/"$name" ||
+          $resolved == */codex/.agents/skills/"$name" ) ]]; then continue; fi
+        abort "refusing to repoint a foreign skill link: $target"
+      elif [[ -d $target ]]; then
+        mapfile -d '' -t entries < <(find "$target" -mindepth 1 -print0)
+        scan=$!; wait "$scan" || abort "cannot inspect the skill directory: $target"
+        for entry in "${entries[@]}"; do
+          if [[ -L $entry ]]; then
+            resolved=$(realpath -m -- "$entry") || abort "cannot resolve $entry"
+            [[ $resolved == "$source"/* ]] && continue
+            # Earlier deployments linked each file, through codex/.agents or the
+            # retired claude-code/.claude/skills tree; recognize only a dangling
+            # link naming this selected skill, not arbitrary missing targets.
+            if [[ ! -e $entry && ( $resolved == */codex/.agents/skills/"$name"/* ||
+              $resolved == */agents/.agents/skills/"$name"/* ||
+              $resolved == */claude-code/.claude/skills/"$name"/* ) ]]; then continue; fi
+            abort "foreign link inside a managed skill directory: $entry"
+          elif [[ -d $entry ]]; then
+            continue
+          fi
+          abort "foreign entry inside a managed skill directory: $entry"
+        done
+      elif [[ -e $target ]]; then
+        abort "skill endpoint is neither a link nor a directory: $target"
+      fi
+    done < <(package_skills)
+  done
 }
 
 link_skills() {
-  local root="$HOME/.agents/skills" name source target text entry
+  local root name source target text entry
+  STRICT=1
   check_skills
-  mkdir -p -- "$root"
-  while IFS= read -r name; do
-    source="$repository_root/agents/.agents/skills/$name"
-    target="$root/$name"
-    if [[ -L $target ]]; then
-      [[ $(realpath -m -- "$target") == "$source" ]] && continue
-      rm -- "$target"
-    fi
-    text=$(realpath --relative-to="$root" -- "$source")
-    if [[ -d $target ]]; then
-      while IFS= read -r -d '' entry; do
-        rm -- "$entry"
-      done < <(find "$target" -type l -print0)
-      find "$target" -depth -type d -exec rmdir -- {} + || abort "cannot remove empty skill directories: $target"
-    fi
-    ln -s -- "$text" "$target"
-    printf 'linked skill directory: %s -> %s\n' "$target" "$text"
-  done < <(package_skills)
+  for root in "${SKILL_ROOTS[@]}"; do
+    mkdir -p -- "$root"
+    while IFS= read -r name; do
+      source="$repository_root/agents/.agents/skills/$name"
+      target="$root/$name"
+      if [[ -L $target ]]; then
+        [[ $(realpath -m -- "$target") == "$source" ]] && continue
+        rm -- "$target"
+      fi
+      text=$(realpath --relative-to="$root" -- "$source")
+      if [[ -d $target ]]; then
+        while IFS= read -r -d '' entry; do
+          rm -- "$entry"
+        done < <(find "$target" -type l -print0)
+        find "$target" -depth -type d -exec rmdir -- {} + || abort "cannot remove empty skill directories: $target"
+      fi
+      ln -s -- "$text" "$target"
+      printf 'linked skill directory: %s -> %s\n' "$target" "$text"
+    done < <(package_skills)
+  done
 }
 
 unlink_skills() {
-  local root="$HOME/.agents/skills" name target
-  while IFS= read -r name; do
-    target="$root/$name"
-    [[ -L $target ]] || continue
-    [[ $(realpath -m -- "$target") == "$repository_root/agents/.agents/skills/$name" ]] || continue
-    rm -- "$target"
-    printf 'removed skill directory link: %s\n' "$target"
-  done < <(package_skills)
+  local root name target
+  for root in "${SKILL_ROOTS[@]}"; do
+    while IFS= read -r name; do
+      target="$root/$name"
+      [[ -L $target ]] || continue
+      [[ $(realpath -m -- "$target") == "$repository_root/agents/.agents/skills/$name" ]] || continue
+      rm -- "$target"
+      printf 'removed skill directory link: %s\n' "$target"
+    done < <(package_skills)
+  done
 }
 
 [[ $# -le 1 ]] || abort "unsupported arguments: $*"
 case ${1:-} in
-  ''|--require-clone|--check-skills|--install-gate|--check-gate|--link-skills|--unlink-skills) ;;
+  ''|--require-clone|--check-skills|--link-skills|--unlink-skills) ;;
   *) abort "unsupported arguments: $*" ;;
 esac
 require_clone
@@ -230,13 +215,12 @@ case ${1:-} in
   '') check_skills; clean_links ;;
   --require-clone) ;;
   --check-skills) check_skills ;;
-  --install-gate) manage_gate install ;;
-  --check-gate) manage_gate check ;;
   --link-skills)
     [[ $# == 1 ]] || abort "unsupported arguments: $*"
     link_skills ;;
   --unlink-skills)
     [[ $# == 1 ]] || abort "unsupported arguments: $*"
+    STRICT=1
     check_skills
     unlink_skills ;;
   *) abort "unsupported arguments: $*" ;;

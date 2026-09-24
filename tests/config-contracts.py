@@ -166,9 +166,15 @@ COMMANDS = {
     "git -c core.pager=cat config --global user.name y": "ask",
     "git remote set-url origin u": "ask", "git -C /x remote add up u": "ask",
     "ssh host": "ask", "scp a host:b": "ask", "sudo pacman -Syu": "deny", "su": "deny", "pkexec true": "deny",
-    # Global options before the subcommand do not open a way around the push rule.
-    "git push": "deny", "git push origin main": "deny", "git -C /x push": "deny", "git -c push.default=current push": "deny",
-    "git --no-pager push origin main": "deny", "git --git-dir=/x/.git push": "deny",
+    # Commits and pushes ask: H approves each at the native prompt, also behind global options.
+    "git push": "ask", "git push origin main": "ask", "git -C /x push": "ask", "git -c push.default=current push": "ask",
+    "git --no-pager push origin main": "ask", "git --git-dir=/x/.git push": "ask",
+    "git commit -m x": "ask", "git commit": "ask", "git -C /x commit -F msg": "ask", "git -c core.hooksPath=/x commit -m x": "ask",
+    "git merge topic": "ask", "git pull": "ask", "git rebase main": "ask", "git cherry-pick abc": "ask", "git revert abc": "ask",
+    "git am patch.mbox": "ask", "git commit-tree abc -m x": "ask", "git update-ref refs/heads/x abc": "ask",
+    "git replace abc def": "ask", "git filter-branch --all": "ask", "git notes add -m x": "ask", "git fast-import": "ask",
+    "git -C/x commit -m x": "ask", "git -cuser.name=x commit -m x": "ask", "git -C/x push": "ask",
+    "git notes --ref=x add -m y": "ask", "git notes remove HEAD": "ask", "git notes prune": "ask",
     # Every form of another agent client is gated: launches, exports, auth, uninstall.
     "opencode": "deny", "opencode .": "deny", "opencode run x": "deny", "opencode serve": "deny",
     "opencode export ses_1": "deny", "opencode auth login": "deny", "opencode uninstall --force": "deny",
@@ -204,6 +210,9 @@ READS = [
     "gh label list", "gh release list", "claude --version",
     "git config --get my.flag-example", "gh issue -R o/r list", "gh pr --repo o/r view 1",
     "git branch --sort=-committerdate", "git checkout main", "git checkout -b feat", "git switch main",
+    "git notes show HEAD", "git notes list", "git notes", "git notes --ref=x show HEAD",
+    # Stash entries are local and recoverable, and never reach the reviewed history: not gated.
+    "git stash", "git stash push -m checkpoint", "git stash pop",
 ]
 COMMANDS.update({command: "allow" for command in READS})
 for group, verbs in GH_READ.items():
@@ -280,7 +289,7 @@ for worktree in (WORKTREE, HOME + "/Projects/quarry/opencode", HOME + "/Work/tri
             f"OpenCode cannot write its own temp root from {worktree}")
 for path in ("~/Projects/other/app.py", "~/.bashrc"):
     require(claude_decision("Edit", expand(path)) != "allow", f"Claude pre-approves an edit outside scope: {path}")
-for path in ("{w}/.git/config", "{w}/.git/hooks/pre-commit", "~/.agents/hooks/commit-gate", "~/.config/git/config"):
+for path in ("{w}/.git/config", "{w}/.git/hooks/pre-commit", "~/.config/git/config"):
     require(claude_decision("Edit", expand(path)) == "deny", f"Claude can edit {path}")
     require(oc_file("edit", expand(path)) == "deny", f"OpenCode can edit {path}")
 require(claude_decision("Read", "/tmp/opencode/s/x") == "deny", "Claude reads OpenCode's session root")
@@ -296,8 +305,7 @@ for section in ("allow", "soft_deny", "hard_deny"):
 require("personal folders" in " ".join(claude["autoMode"]["hard_deny"]), "Claude classifier lacks the personal-folder rule")
 require(claude.get("attribution", {}).get("sessionUrl") is False, "Claude would add a session URL to commits")
 require(claude.get("env", {}).get("CLAUDE_CODE_EFFORT_LEVEL") == "xhigh", "Claude Code effort is not xhigh")
-gate = [hook["command"] for entry in claude["hooks"]["PreToolUse"] if entry.get("matcher") == "Bash" for hook in entry["hooks"]]
-require(any(command.endswith(".agents/hooks/commit-gate") for command in gate), "Claude does not run the commit gate")
+require("hooks" not in claude, "Claude settings carry hooks; commits and pushes use native prompts")
 
 require(opencode["share"] == "disabled" and opencode["autoupdate"] is False, "OpenCode sharing or autoupdate drifted")
 primary = opencode["model"].split("/", 1)[1]
@@ -306,8 +314,8 @@ require(opencode["provider"]["openai"]["models"][primary]["options"]["reasoningE
 require(not opencode.get("instructions"), "OpenCode duplicates native guidance")
 # Native discovery finds ~/.agents/skills; the explicit path keeps them in the restricted untrusted-checkout launch.
 require(opencode.get("skills") == {"paths": ["~/.agents/skills"]}, "OpenCode shared skill path drifted")
-plugins = sorted(p.name for p in (ROOT / "opencode/.config/opencode/plugins").iterdir())
-require(plugins == ["commit-gate.js"], f"unexpected OpenCode plugins: {plugins}")
+require(not (ROOT / "opencode/.config/opencode/plugins").exists(), "OpenCode plugins are back; commits use native prompts")
+require(not (ROOT / "opencode/.config/opencode/commands").exists(), "OpenCode command wrappers are back; skills are native")
 
 # Auditors: the same charter in both tools; no edit tools, shell and web under the primary rules.
 charter = (ROOT / "agents/.agents/agents/auditor.md").read_text(encoding="utf-8")
@@ -326,7 +334,7 @@ for key in ("edit", "task"):
 for key in ("webfetch", "websearch"):
     require(oc_last(oc_rules(opencode["permission"], key, auditor), "*") == "allow", f"OpenCode auditor lacks {key}")
 require(oc_last(oc_rules(opencode["permission"], "bash", auditor), "git log -1") == "allow" and
-        oc_last(oc_rules(opencode["permission"], "bash", auditor), "git push") == "deny", "OpenCode auditor shell does not follow the primary rules")
+        oc_last(oc_rules(opencode["permission"], "bash", auditor), "git push") == "ask", "OpenCode auditor shell does not follow the primary rules")
 require(oc_file("read", expand("{w}/src/app.py"), auditor) == "allow", "OpenCode auditor cannot read the repository")
 require(oc_file("read", expand("~/.ssh/id_rsa"), auditor) == "deny", "OpenCode auditor reads secrets")
 
@@ -336,13 +344,14 @@ require(guidance.is_symlink() and guidance.resolve() == (ROOT / "agents/.agents/
         "OpenCode global guidance is not linked to global guidance")
 # Claude Code 2.1.277+ reads AGENTS.md natively; a project CLAUDE.md would take precedence over it.
 require(not (ROOT / "CLAUDE.md").exists(), "a project CLAUDE.md would stop Claude Code reading AGENTS.md")
-for skill, script in (("commit", "commit-candidate"), ("commit", "commit-apply"), ("publish", "publish-bind"),
-                      ("publish", "publish-apply"), ("publish", "publish-verify")):
-    source = ROOT / "agents/.agents/skills" / skill / "scripts" / script
-    link = ROOT / "claude-code/.claude/skills" / skill / "scripts" / script
-    require(os.access(source, os.X_OK), f"skill script missing or not executable: {skill}/{script}")
-    require(link.is_symlink() and link.resolve() == source.resolve(), f"Claude skill link missing or drifted: {script}")
-require(os.access(ROOT / "templates/hooks/commit-gate", os.X_OK), "templates/hooks/commit-gate is not executable")
+# Skills deploy as directory links made at stow time; no tracked per-file link tree.
+require(not (ROOT / "claude-code/.claude/skills").exists(), "a tracked Claude skill link tree is back")
+require(sorted(d.name for d in (ROOT / "agents/.agents/skills").iterdir()) == ["ship", "spar"], "shared skill set drifted")
+for script in ("spar-claude", "spar-opencode"):
+    require(os.access(ROOT / "agents/.agents/skills/spar/scripts" / script, os.X_OK), f"spar bridge not executable: {script}")
+eyrsync = ROOT / ".claude/skills/eyrsync"
+require(eyrsync.is_symlink() and eyrsync.resolve() == (ROOT / ".agents/skills/eyrsync").resolve(),
+        "project skill eyrsync is not one directory link into .agents/skills")
 for skill_dir in sorted([*(ROOT / "agents/.agents/skills").iterdir(), *(ROOT / ".agents/skills").iterdir()]):
     front = (skill_dir / "SKILL.md").read_text(encoding="utf-8").split("---\n", 2)[1]
     keys = {line.split(":", 1)[0] for line in front.splitlines() if ":" in line and not line.startswith(" ")}
