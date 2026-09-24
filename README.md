@@ -1,12 +1,12 @@
 # EyrAgents
 
-Shared guidance, skills, and reviewed Git workflows for **Claude Code and OpenCode** on Omarchy and Arch WSL. [GNU Stow](https://www.gnu.org/software/stow/) deploys the tool adapters.
+Global guidance, skills, and reviewed Git workflows for **Claude Code and OpenCode** on Omarchy and Arch WSL. [GNU Stow](https://www.gnu.org/software/stow/) deploys the tool adapters.
 
 This is a standalone personal harness. It owns AI-client configuration, startup defaults and shared workflows, and uses ordinary installed tools without depending on a host-dotfiles repository.
 
 ## What Is Included
 
-- One source for shared guidance and reusable [Agent Skills](https://agentskills.io).
+- One source for global guidance and reusable [Agent Skills](https://agentskills.io).
 - Tool-specific access controls, with their differences documented in the [access policy](docs/access.md).
 - Exact-candidate commit approval, exact-approved agent publication, and optional read-only review.
 - Repeatable deployment checks and opt-in live smoke tests.
@@ -16,7 +16,7 @@ This is a standalone personal harness. It owns AI-client configuration, startup 
 
 | Source | Deployed role |
 | --- | --- |
-| `agents/.agents/` | Shared guidance, skills, reviewer bridges, and auditor charter. |
+| `agents/.agents/` | Global guidance, skills, reviewer bridges, and auditor charter. |
 | `claude-code/.claude/` | Claude Code instructions, settings, skill links, auditor, and status line. |
 | `opencode/.config/opencode/` | OpenCode instructions, models, permissions, TUI, commands, and the commit-gate plugin. |
 | `scripts/`, `tests/`, `docs/` | Deployment helpers, verification, and documentation. |

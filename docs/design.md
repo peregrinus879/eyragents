@@ -4,7 +4,7 @@
 
 ## Intent-led collaboration
 
-H supplies direction, not an exhaustive specification. Shared guidance's [Approach](../agents/.agents/shared-guidance.md#approach) makes broader reasoning an explicit step before choosing a solution: frame the goal and surrounding system, check missing counterparts and assumptions, and consider alternatives and downstream effects. Interpolation fills reasonable gaps; extrapolation tests related cases. The first example or existing configuration is evidence, not the boundary of the problem. This applies across all work, not only access planning or source references.
+H supplies direction, not an exhaustive specification. Global guidance's [Approach](../agents/.agents/global-agents.md#approach) makes broader reasoning an explicit step before choosing a solution: frame the goal and surrounding system, check missing counterparts and assumptions, and consider alternatives and downstream effects. Interpolation fills reasonable gaps; extrapolation tests related cases. The first example or existing configuration is evidence, not the boundary of the problem. This applies across all work, not only access planning or source references.
 
 Broad reasoning does not authorize broad action. Surface useful omissions and material tradeoffs for H, while well-supported low-risk work proceeds within scope. Likewise, a command that relieves one symptom is not a durable fix when the workflow will require it repeatedly; explain that distinction and the underlying remedy. Keep the analysis proportionate rather than adding a mandatory essay or another approval ritual to trivial work.
 
@@ -34,19 +34,19 @@ The [access policy](access.md) makes that distinction inspectable across tools: 
 
 The tools enforce the same intent to different depths. Claude Code combines deterministic rules with an auto-mode classifier; OpenCode has only static rules, so it asks where Claude Code's classifier would review. Both allow what does not expose H and gate the rest: secrets and personal folders are denied, and remote, destructive or configuration-changing commands ask. Neither is shell containment. The [access policy](access.md) owns the rules and their limits.
 
-Reads are broad and secrets are denied by one finite inventory in both tools, so ordinary configuration, package metadata and diagnostics stay readable. A finite inventory cannot recognize a renamed secret; shared guidance still binds there.
+Reads are broad and secrets are denied by one finite inventory in both tools, so ordinary configuration, package metadata and diagnostics stay readable. A finite inventory cannot recognize a renamed secret; global guidance still binds there.
 
 Persistent scratch (`~/Projects/eyrie/scrape`) is writable in both tools; OpenCode also writes its session scratch under `/tmp/opencode`. Persistent work there is preserved project work, not disposable by location.
 
 ## Independent review
 
-A second opinion is worth most from a fresh context, and more from a different model family. Every reviewer, in-tool or cross-vendor, follows one [charter](../agents/.agents/agents/auditor.md): full context, a top-down review from goal and approach to presentation against shared guidance, and read-only conduct. Reviewers have read, search, shell and web tools without edit tools, under the primary's rules, so they verify claims instead of trusting a curated brief. The drafter states what it already did, and the reviewer spends its effort on what was not covered. The bridges run the other tool's client under H's normal settings with the same reviewer tools, Claude Code by tool list and OpenCode through its `auditor` agent, with a hard timeout; a reply without the charter's verdict line fails. Review is recommended where it earns its cost, never mandatory.
+A second opinion is worth most from a fresh context, and more from a different model family. Every reviewer, in-tool or cross-vendor, follows one [charter](../agents/.agents/agents/auditor.md): full context, a top-down review from goal and approach to presentation against global guidance, and read-only conduct. Reviewers have read, search, shell and web tools without edit tools, under the primary's rules, so they verify claims instead of trusting a curated brief. The drafter states what it already did, and the reviewer spends its effort on what was not covered. The bridges run the other tool's client under H's normal settings with the same reviewer tools, Claude Code by tool list and OpenCode through its `auditor` agent, with a hard timeout; a reply without the charter's verdict line fails. Review is recommended where it earns its cost, never mandatory.
 
 Retained requests and replies belong to a workstream's `spar/` (cross-vendor) or `audit/` (in-tool) directory; the primary writes them, never a reviewer.
 
 ## One neutral source
 
-Guidance and skills live once, under `~/.agents`, the home of the Agent Skills format. Both tools use native global-instruction symlinks to neutral `shared-guidance.md`: Claude Code's `CLAUDE.md` and OpenCode's `~/.config/opencode/AGENTS.md`. OpenCode does not append the same guidance through explicit `instructions`; native global discovery avoids duplicate loading without disabling project `CLAUDE.md` fallback. Claude's project import remains. Skill executables stay in each skill's standard `scripts/` directory; tool-specific discovery adapters do not transfer ownership out of EyrAgents.
+Guidance and skills live once, under `~/.agents`, the home of the Agent Skills format. Both tools use native global-instruction symlinks to neutral `global-agents.md`: Claude Code's `CLAUDE.md` and OpenCode's `~/.config/opencode/AGENTS.md`. OpenCode does not append the same guidance through explicit `instructions`, so it loads once. Both tools read a project's `AGENTS.md` natively, so repositories carry no `CLAUDE.md` import. The guidance file avoids the name `AGENTS.md` because both tools also auto-load `AGENTS.md` files from subdirectories they read. Skill executables stay in each skill's standard `scripts/` directory; tool-specific discovery adapters do not transfer ownership out of EyrAgents.
 
 ## Configuration Ownership
 
@@ -54,7 +54,7 @@ The package directories mirror deployed paths, but not every managed endpoint is
 
 | Component | Ownership and deployment |
 | --- | --- |
-| Shared guidance and skills | `agents/.agents/` is canonical. Each skill directory is linked whole, so new skill files deploy without a restow; each client uses its native adapter. |
+| Global guidance and skills | `agents/.agents/` is canonical. Each skill directory is linked whole, so new skill files deploy without a restow; each client uses its native adapter. |
 | Claude Code | `claude-code/.claude/` supplies linked instructions, settings, skills, auditor, and status line. |
 | OpenCode | `opencode/.config/opencode/` supplies linked instructions, configuration, commands and the commit-gate plugin; its mise fragment supplies startup defaults. |
 | Commit gate | `templates/hooks/commit-gate` is copied to a checked regular file at `~/.agents/hooks/commit-gate`, outside editable workspaces. |
@@ -98,4 +98,4 @@ Repo-local ignored state survives application restarts but not push/pull. A cond
 
 ## Effort and models
 
-Each tool's configuration and the reviewer scripts own model choices; the contracts check only the configured `xhigh` effort, and shared guidance carries no duplicate flag or override recipe. One owner per choice means a `/model` switch or catalog bump changes one file, not a test and three documents. The policy favors the most capable primary models, with small models for tool-managed lightweight tasks. Moving aliases or catalog defaults follow their provider's selection, whose strongest-model status needs revalidation; concrete IDs carry an update trigger in the ledger. Configured preferences and observed runtime provenance remain distinct.
+Each tool's configuration and the reviewer scripts own model choices; the contracts check only the configured `xhigh` effort, and global guidance carries no duplicate flag or override recipe. One owner per choice means a `/model` switch or catalog bump changes one file, not a test and three documents. The policy favors the most capable primary models, with small models for tool-managed lightweight tasks. Moving aliases or catalog defaults follow their provider's selection, whose strongest-model status needs revalidation; concrete IDs carry an update trigger in the ledger. Configured preferences and observed runtime provenance remain distinct.

@@ -1,20 +1,22 @@
 # Access Policy
 
-The comparison point for Claude Code and OpenCode: what each agent may do, how each tool enforces it, and where the tools differ. [Shared guidance](../agents/.agents/shared-guidance.md#safety) owns authorization, [`AGENTS.md`](../AGENTS.md) owns invariants, the linked configurations implement both, and [`maintenance.md`](maintenance.md) holds open gaps. [`/eyrsync`](../.agents/skills/eyrsync/SKILL.md#access-reconciliation) keeps these views aligned.
+The comparison point for Claude Code and OpenCode: what each agent may do, how each tool enforces it, and where the tools differ. [Global guidance](../agents/.agents/global-agents.md#safety) owns authorization, [`AGENTS.md`](../AGENTS.md) owns invariants, the linked configurations implement both, and [`maintenance.md`](maintenance.md) holds open gaps. [`/eyrsync`](../.agents/skills/eyrsync/SKILL.md#access-reconciliation) keeps these views aligned.
 
 ## Model
 
-The governing rule is the most freedom possible without exposing H, with the same outcome in both tools wherever each can express it. Exposure means secrets and personal data, remote or third-party effects, and destructive or hard-to-reverse changes. Everything else runs without a prompt.
+The governing rule is the most freedom possible without exposing H, with the same outcome in both tools wherever each can express it. Exposure means secrets and personal folders, remote or third-party effects, and destructive or hard-to-reverse changes. Everything else in the authorized scope runs without a prompt.
 
 | Outcome | Scope |
 | --- | --- |
-| Allow | Reads anywhere except secrets and personal folders; edits in the worktree and persistent scratch (`~/Projects/eyrie/scrape`); ordinary commands, read-only `gh` and Git commands; web fetch and search. |
-| Ask | Remote-changing `gh` subcommands and every `gh api` call; `git clean`, `reset`, `restore`, `checkout --`, `stash drop`/`clear`, branch deletion; Git configuration writes (global, system, unset, aliases, hooks path, pager, credential helpers) and remote changes; `ssh`, `scp`, `sftp`. OpenCode also asks before edits outside the worktree and scratch; Claude Code's auto-mode classifier reviews those instead. |
-| Deny | Secrets and personal folders (read and edit); edits to `.git/**`, `~/.agents/hooks`, `~/.config/git` and `~/.config/gh`; `sudo`, `su`, `doas`, `pkexec`; `gh auth`, `secret`, `ssh-key`, `gpg-key`; `git push` until publication moves to native prompts; launching another AI agent client (the other tool, Copilot, Gemini, Cursor Agent, Crush). |
+| Allow | Reads anywhere except secrets and personal folders, and read forms of commands whose writes differ by a subcommand word; edits in the worktree and persistent scratch (`~/Projects/eyrie/scrape`); ordinary commands; web fetch and search. |
+| Ask | Remote-changing `gh` subcommands, every `gh api` call and `gh alias` changes; `git clean`, `reset`, `restore`, `checkout --`, `stash drop`/`clear`, branch deletion; Git configuration writes (a dotted key with a value, `-e`/`edit`, `set`, `unset`, `--unset`, `--add`, `--replace-all`, section renames and removals) and remote changes, also behind `git -C`, `-c` and long global options; `ssh`, `scp`, `sftp`. OpenCode also asks before edits outside the worktree and scratch; Claude Code's auto-mode classifier reviews those instead. |
+| Deny | Secrets and personal folders (read and edit); edits to `.git/**`, `~/.agents/hooks`, `~/.config/git` and `~/.config/gh`; `sudo`, `su`, `doas`, `pkexec`; all of `gh auth`, and secret and key writes; `git push` until publication moves to native prompts; every form of another agent client (the other tool, Copilot, Gemini, Cursor Agent, Crush), except OpenCode's exact version checks. |
 
 An Ask is a native prompt: the agent states what the command does and H selects. The commit gate additionally blocks raw commit-producing Git commands before either tool's shell runs them; the [commit](../agents/.agents/skills/commit/SKILL.md) and [publish](../agents/.agents/skills/publish/SKILL.md) skills own the approved path.
 
-Both tools use one `gh` verb table covering every top-level group in `gh` 2.101; groups that only read or change local `gh` settings stay allowed. Claude Code lists each remote-changing verb as Ask. OpenCode asks for every subcommand of a gated group, then allows its read-only verbs, so a verb added in a later `gh` release asks in OpenCode and reaches Claude Code's classifier. `tests/config-contracts.py` holds both to the same decisions.
+Both tools use one `gh` verb table covering every top-level group in `gh` 2.101; groups that only read or change local `gh` settings stay allowed. Claude Code lists each remote-changing verb as Ask. OpenCode asks for every subcommand of a gated group, then allows its read-only verbs, so a verb added in a later `gh` release asks in OpenCode and reaches Claude Code's classifier. `tests/config-contracts.py` holds both to the same decisions, including flag combinations and global-option prefixes, and keeps a list of reads that must never prompt.
+
+Native rules see command text only. Where a family's read and write forms differ by flags that combine or reorder freely, it is gated whole, and its reads prompt or are refused: `gh api` (read through `gh` subcommands), `git clean` (preview with `git status --ignored`), `gh auth`, and other agent clients (check versions with `mise ls`). Git configuration reads shaped like writes, a dotted token followed by another argument, also prompt; read the configuration files directly instead. A read that passes a gated subcommand word as its own argument after a global option, such as `git --no-pager log --grep push`, is treated as that subcommand. `--help` on the gated Git commands and `ssh -V`/`-G` prompt too.
 
 ### Protected Paths
 
@@ -26,7 +28,7 @@ One inventory serves both primaries:
 - **Shapes anywhere:** `.env`, `.env.*`, `secrets/`, `credentials`, `credentials.*`, `auth.json`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `*.keytab`, private OpenSSH keys (`id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`) and private `ssh_host_*_key` files, including copies under any directory.
 - **Windows through WSL mounts:** browser profiles, 1Password, Bitwarden, Credential Manager, DPAPI keys and GitHub CLI under `AppData`.
 
-Root-only system secrets such as `/etc/shadow` rely on OS permissions, since the agents run unprivileged. `example.env`, `credentials-policy.md`, public host keys and ordinary configuration stay readable. A finite inventory cannot recognize a renamed secret; shared guidance still governs it.
+Root-only system secrets such as `/etc/shadow` rely on OS permissions, since the agents run unprivileged. `example.env`, `credentials-policy.md`, public host keys and ordinary configuration stay readable. A finite inventory cannot recognize a renamed secret; global guidance still governs it.
 
 ### Personal Folders
 
@@ -38,14 +40,14 @@ Each tool keeps out of the other's session root: Claude Code denies `/tmp/openco
 
 ## Enforcement Limits
 
-Rules are named forms, not containment. Path rules govern each tool's native file tools; an allowed command can still read or write any path the OS permits. Claude Code also applies Read and Edit denies to recognized file commands (`cat`, `head`, `tail`, `sed`, `tee`) and redirection targets, and its classifier reviews the rest; OpenCode checks directories for recognized file commands only. A command rule matches the literal form: `git push` rules miss `git -c x=y push` or `/usr/bin/git push`. Shared guidance binds where rules cannot reach.
+Rules are named forms, not containment. Path rules govern each tool's native file tools; an allowed command can still read or write any path the OS permits. Claude Code also applies Read and Edit denies to recognized file commands (`cat`, `head`, `tail`, `sed`, `tee`) and redirection targets, and its classifier reviews the rest; OpenCode checks directories for recognized file commands only. Command rules gate the spellings agents normally produce, including options before a `gh` verb, `git -C`, `-c` and long global options, and abbreviated Git long options. They are not a boundary against deliberate evasion: an absolute path (`/usr/bin/git push`), a wrapper, an environment prefix or a script escapes any text pattern, as does `git checkout <path>` without `--`, which reads like a branch switch. Global guidance forbids evasion, and Claude Code's classifier reviews what rules miss.
 
 | Surface | Claude Code | OpenCode |
 | --- | --- | --- |
 | Search | Grep and Glob honor Read denies on a best-effort basis | Grep returns matching lines without per-file Read checks; Glob lists names |
 | Edits outside scope | Classifier review | `../* = ask`; a non-Git worktree is `/`, where `../*` never matches |
 | Move destinations | Not applicable | See [Move Destinations](#move-destinations) |
-| Nested clients | `opencode` and other agent clients denied; `claude` runs under the same user rules | `claude`, `opencode` and other agent clients denied, except `--version` for the two tools |
+| Nested clients | Every form of `opencode` and other agent clients denied; `claude` runs under the same user rules | Every form of `claude`, `opencode` and other agent clients denied, except the two exact version checks |
 | Web | Available; no tracked domain rules | `webfetch` and `websearch` allowed |
 | Sharing | Off by guidance | `share = "disabled"` |
 
@@ -53,7 +55,7 @@ Web reads send queries and URLs to a service; that is not permission to upload o
 
 ### Auditors
 
-Both tools carry an `auditor` with the shared reviewer charter [`auditor.md`](../agents/.agents/agents/auditor.md). It has read, search, shell and web tools and no edit tools; the charter keeps it read-only, and its commands pass the primary's rules, so it never exceeds the primary. The [spar skill](../agents/.agents/skills/spar/SKILL.md)'s bridges run the other tool's reviewer: `spar-claude` runs Claude Code with the auditor's tool list and no MCP tools, `spar-opencode` runs OpenCode's `auditor` agent. Bridges are the sanctioned route; direct nested client launches stay denied.
+Both tools carry an `auditor` with the auditor charter [`auditor.md`](../agents/.agents/agents/auditor.md). It has read, search, shell and web tools and no edit tools; the charter keeps it read-only, and its commands pass the primary's rules, so it never exceeds the primary. The [spar skill](../agents/.agents/skills/spar/SKILL.md)'s bridges run the other tool's reviewer: `spar-claude` runs Claude Code with the auditor's tool list and no MCP tools, `spar-opencode` runs OpenCode's `auditor` agent. Bridges are the sanctioned route; direct nested client launches stay denied.
 
 ## Untrusted Checkouts
 

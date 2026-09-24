@@ -5,7 +5,7 @@ description: Independent review of a plan, diff or decision, from concepts to de
 
 # Spar
 
-The session's model drafts; an independent reviewer challenges the work from a fresh context. Every reviewer follows the shared charter in `~/.agents/agents/auditor.md`: full context, read-only, shared guidance as the standard. H rules on what stays open.
+The session's model drafts; an independent reviewer challenges the work from a fresh context. Every reviewer follows the shared charter in `~/.agents/agents/auditor.md`: full context, read-only, global guidance as the standard. H rules on what stays open.
 
 ## When
 

@@ -5,7 +5,7 @@ description: Take substantive work from goal clarification through planning, exe
 
 # Develop
 
-Own delivery from H's intent to a verified result. Shared guidance owns professional standards and authority; this skill coordinates the work. A clear task needs efficient execution, not a compulsory brainstorming ceremony.
+Own delivery from H's intent to a verified result. Global guidance owns professional standards and authority; this skill coordinates the work. A clear task needs efficient execution, not a compulsory brainstorming ceremony.
 
 ## Start Or Resume
 

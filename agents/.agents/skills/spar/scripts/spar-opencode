@@ -4,7 +4,7 @@
 # Usage: spar-opencode review [--resume SESSION] "<request>"
 #
 # Runs `opencode run --agent auditor` from the repository root under H's normal
-# OpenCode configuration; the auditor agent carries the shared reviewer charter
+# OpenCode configuration; the auditor agent carries the auditor charter
 # and denies edits, and a headless run rejects anything that would prompt.
 # Normal configuration loads project settings, so use it only in trusted
 # checkouts. OpenCode silently substitutes its default agent when the named one

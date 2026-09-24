@@ -1,1 +1,1 @@
-../../agents/.agents/shared-guidance.md
+../../agents/.agents/global-agents.md

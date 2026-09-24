@@ -26,7 +26,7 @@ make_clone() {
     "$repo/opencode/.config/opencode" "$repo/opencode/.config/mise/conf.d" \
     "$repo/scripts" "$repo/templates/hooks"
   printf 'tracked\n' >"$repo/claude-code/.claude/settings.json"
-  printf 'guidance\n' >"$repo/agents/.agents/shared-guidance.md"
+  printf 'guidance\n' >"$repo/agents/.agents/global-agents.md"
   cp -- "$ROOT/agents/.agents/skills/develop/SKILL.md" "$repo/agents/.agents/skills/develop/"
   ln -s ../../../../agents/.agents/skills/develop/SKILL.md "$repo/claude-code/.claude/skills/develop/SKILL.md"
   for resource in workstream verification; do
@@ -35,7 +35,7 @@ make_clone() {
   done
   printf 'skill\n' >"$repo/agents/.agents/skills/commit/SKILL.md"
   printf 'script\n' >"$repo/agents/.agents/skills/commit/scripts/commit-apply"
-  ln -s ../../agents/.agents/shared-guidance.md "$repo/claude-code/.claude/CLAUDE.md"
+  ln -s ../../agents/.agents/global-agents.md "$repo/claude-code/.claude/CLAUDE.md"
   ln -s ../../../../agents/.agents/skills/commit/SKILL.md "$repo/claude-code/.claude/skills/commit/SKILL.md"
   ln -s ../../../../../agents/.agents/skills/commit/scripts/commit-apply "$repo/claude-code/.claude/skills/commit/scripts/commit-apply"
   printf 'skill\n' >"$repo/agents/.agents/skills/publish/SKILL.md"
@@ -122,9 +122,9 @@ case_no_folding() {
   done
   [[ $(readlink -f -- "$home/.claude/skills/develop/references/workstream.md") == "$repo/agents/.agents/skills/develop/references/workstream.md" ]] ||
     fail "develop's workstream resource is unavailable through Claude's skill path"
-  [[ $(readlink -f -- "$home/.agents/shared-guidance.md") == "$repo/agents/.agents/shared-guidance.md" ]] ||
+  [[ $(readlink -f -- "$home/.agents/global-agents.md") == "$repo/agents/.agents/global-agents.md" ]] ||
     fail "leaf link does not resolve into the clone"
-  [[ $(readlink -f -- "$home/.claude/CLAUDE.md") == "$repo/agents/.agents/shared-guidance.md" ]] ||
+  [[ $(readlink -f -- "$home/.claude/CLAUDE.md") == "$repo/agents/.agents/global-agents.md" ]] ||
     fail "Claude user instructions symlink did not deploy"
   [[ $(readlink -f -- "$home/.claude/skills/commit/SKILL.md") == "$repo/agents/.agents/skills/commit/SKILL.md" ]] ||
     fail "Claude skill symlink did not deploy"

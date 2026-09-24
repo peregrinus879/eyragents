@@ -560,7 +560,7 @@
     },
     {
       "title": "Read scope and persistent scratch",
-      "text": "Shared guidance authorizes reads everywhere except secrets and personal folders, and in-scope implementation in the repository and ~/Projects/eyrie/scrape. Remote-changing and destructive commands raise a native prompt. Persistent scratch is preserved project work. The access policy maps each client's rules and remaining limits; restart affected clients after configuration changes.",
+      "text": "Global guidance authorizes reads everywhere except secrets and personal folders, and in-scope implementation in the repository and ~/Projects/eyrie/scrape. Remote-changing and destructive commands raise a native prompt. Persistent scratch is preserved project work. The access policy maps each client's rules and remaining limits; restart affected clients after configuration changes.",
       "sources": [
         "agents-access"
       ]

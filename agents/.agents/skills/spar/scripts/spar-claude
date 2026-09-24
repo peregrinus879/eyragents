@@ -5,7 +5,7 @@
 #
 # Runs from the repository root under H's normal Claude Code settings in auto
 # mode, with the auditor's tools only (read, shell, web) and no MCP tools; the
-# shared reviewer charter is appended to the system prompt, and the model is the
+# auditor charter is appended to the system prompt, and the model is the
 # moving `fable` alias. Normal settings load project configuration, so use it
 # only in trusted checkouts. A review needs a clean client exit and a reply
 # ending with the charter's VERDICT line. The reply goes to stdout; the session
@@ -33,7 +33,7 @@ if [[ ${1:-} == --resume ]]; then
 fi
 [[ $# == 1 && -n $1 ]] || usage
 [[ $TIMEOUT =~ ^[1-9][0-9]*$ ]] || usage
-[[ -r $CHARTER ]] || fail "reviewer charter missing: $CHARTER"
+[[ -r $CHARTER ]] || fail "auditor charter missing: $CHARTER"
 repo=$(git rev-parse --show-toplevel 2>/dev/null) || { printf 'SPAR-BRIDGE ERROR: run from inside a Git worktree\n' >&2; exit 64; }
 
 # Every client call runs in its own process group under a hard timeout; the

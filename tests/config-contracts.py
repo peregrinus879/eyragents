@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the managed tool configurations against the shared guidance.
+"""Check the managed tool configurations against the global guidance.
 
 Both tools must reach the same decision for the same command or path: read
 freely, ask before remote or destructive actions, and deny secrets, personal
@@ -142,18 +142,70 @@ GH_WRITE = {
     "skill": ["install", "update", "publish"], "agent-task": ["create"], "extension": ["install", "upgrade", "remove"],
 }
 COMMANDS = {
-    "gh api repos/owner/repo": "ask", "gh api -X POST repos/owner/repo/issues": "ask",
-    "gh auth token": "deny", "gh auth status": "deny", "gh secret set TOKEN": "deny", "gh ssh-key add key.pub": "deny",
-    "git status": "allow", "git log --oneline": "allow", "git diff": "allow", "git fetch": "allow",
-    "git clean -fd": "ask", "git -C /x clean -fd": "ask", "git reset --hard HEAD": "ask", "git -C /x reset --hard": "ask",
+    # gh api is gated whole: method, field and input flags combine and reorder freely (-iX, -if, -XPOST).
+    "gh api repos/o/r": "ask", "gh api -X GET repos/o/r": "ask", "gh api -iX DELETE repos/o/r": "ask",
+    "gh api -iXDELETE repos/o/r": "ask", "gh api -if title=x repos/o/r/issues": "ask",
+    "gh api -iF title=x repos/o/r/issues": "ask", "gh api --method PATCH user": "ask",
+    "gh api graphql -f query='mutation { x }'": "ask",
+    "gh alias set co 'pr checkout'": "ask", "gh alias import aliases.yml": "ask", "gh alias delete co": "ask",
+    # Credentials are H's: all of gh auth, key and secret writes.
+    "gh auth status": "deny", "gh auth status -at": "deny", "gh auth token": "deny", "gh auth login": "deny",
+    "gh secret set TOKEN": "deny", "gh secret delete TOKEN": "deny", "gh ssh-key add key.pub": "deny",
+    "gh gpg-key delete 1": "deny",
+    # git clean is gated whole: -i and clean.requireForce=false delete without -f.
+    "git clean -fd": "ask", "git clean -dfx": "ask", "git clean -i": "ask", "git clean -d": "ask", "git clean -n": "ask",
+    "git -C /x clean -fd": "ask",
+    "git reset --hard HEAD": "ask", "git reset": "ask", "git -C /x reset --hard": "ask", "git -C /x reset": "ask",
     "git restore file": "ask", "git checkout -- file": "ask", "git stash drop": "ask", "git branch -D topic": "ask",
-    "git config --global user.name x": "ask", "git config core.hooksPath hooks": "ask", "git remote set-url origin u": "ask",
+    # Git configuration writes: a dotted key with a value, editors, and every mutating option or subcommand.
+    "git config --global user.name x": "ask", "git config core.hooksPath hooks": "ask", "git config set user.name x": "ask",
+    "git config --unset user.name": "ask", "git config --global --unset alias.co": "ask", "git config --edit": "ask",
+    "git config --global -e": "ask", "git config --system -e": "ask", "git -C /x config --global -e": "ask",
+    "git config --global --add include.path x": "ask", "git config --global --replace-all core.pager less": "ask",
+    "git config --remove-section alias": "ask", "git config edit": "ask", "git -C /x config user.name y": "ask",
+    "git -c core.pager=cat config --global user.name y": "ask",
+    "git remote set-url origin u": "ask", "git -C /x remote add up u": "ask",
     "ssh host": "ask", "scp a host:b": "ask", "sudo pacman -Syu": "deny", "su": "deny", "pkexec true": "deny",
-    "git push": "deny", "git push origin main": "deny", "git -C /x push": "deny",
+    # Global options before the subcommand do not open a way around the push rule.
+    "git push": "deny", "git push origin main": "deny", "git -C /x push": "deny", "git -c push.default=current push": "deny",
+    "git --no-pager push origin main": "deny", "git --git-dir=/x/.git push": "deny",
+    # Every form of another agent client is gated: launches, exports, auth, uninstall.
+    "opencode": "deny", "opencode .": "deny", "opencode run x": "deny", "opencode serve": "deny",
+    "opencode export ses_1": "deny", "opencode auth login": "deny", "opencode uninstall --force": "deny",
     "gh copilot": "deny", "gh copilot -p x": "deny", "copilot -p x": "deny", "gemini": "deny", "cursor-agent -p x": "deny",
-    "crush run x": "deny", "gh status": "allow", "gh co 12": "allow", "gh config set editor nvim": "allow",
+    "crush run x": "deny",
+    "git status": "allow", "git log --oneline": "allow", "git diff": "allow", "git fetch": "allow",
+    "gh status": "allow", "gh co 12": "allow", "gh config set editor nvim": "allow",
     "ls -la": "allow", "make check": "allow", "pacman -Qi git": "allow",
+    # Options before the verb, abbreviated long options and destructive checkout forms.
+    "gh secret -R o/r set TOKEN": "deny", "gh secret --repo o/r delete TOKEN": "deny", "gh ssh-key -R x add k": "deny",
+    "gh issue -R o/r comment 1 -b x": "ask", "gh pr --repo o/r merge 1": "ask", "gh release -R o/r delete v1": "ask",
+    "git config --global --rename alias renamed": "ask", "git config --global --remove alias": "ask",
+    "git config --global --ad include.path x": "ask", "git config --global --unset-all x": "ask",
+    "git config --global --ed": "ask", "git branch --del topic": "ask", "git branch -dr origin/x": "ask",
+    "git branch -Df topic": "ask", "git checkout .": "ask", "git checkout HEAD -- file": "ask",
+    "git checkout -f main": "ask", "git switch --discard-changes main": "ask", "git switch -f main": "ask",
+    "git remote --verbose add up u": "ask",
 }
+# Reads never prompt, except in families gated whole (gh api, git clean, gh auth, other agent
+# clients) and a few Git configuration reads shaped like writes (a dotted token followed by another
+# argument). Prompt-free paths exist for those: gh subcommands, `git status --ignored`, and reading
+# the Git configuration files directly.
+READS = [
+    "git config --global --get core.excludesFile", "git config --get user.email", "git config user.email",
+    "git config --list", "git config --global --list", "git config -l", "git config --get-regexp alias",
+    "git config --show-origin --list", "git config get user.email", "git config list", "git config alias.co",
+    "git config core.hooksPath", "git config credential.helper", "git -C /x config --get user.email",
+    "git remote -v", "git remote show origin", "git remote get-url origin", "git branch -a", "git branch --list",
+    "git stash list", "git stash show -p", "git status --ignored", "git log -1", "git show HEAD",
+    "git diff --cached", "git var GIT_AUTHOR_IDENT", "git log --grep push",
+    "gh secret list", "gh ssh-key list", "gh gpg-key list", "gh variable list", "gh alias list",
+    "gh run view 1 --log", "gh workflow view ci", "gh repo view", "gh search repos x", "gh cache list",
+    "gh label list", "gh release list", "claude --version",
+    "git config --get my.flag-example", "gh issue -R o/r list", "gh pr --repo o/r view 1",
+    "git branch --sort=-committerdate", "git checkout main", "git checkout -b feat", "git switch main",
+]
+COMMANDS.update({command: "allow" for command in READS})
 for group, verbs in GH_READ.items():
     COMMANDS.update({f"gh {group} {verb} 1": "allow" for verb in verbs})
 for group, verbs in GH_WRITE.items():
@@ -166,9 +218,10 @@ for command, expected in COMMANDS.items():
     got_opencode = oc_last(oc_rules(opencode["permission"], "bash"), command)
     require(got_claude == expected, f"Claude decides {got_claude} for `{command}`, expected {expected}")
     require(got_opencode == expected, f"OpenCode decides {got_opencode} for `{command}`, expected {expected}")
-require(claude_decision("Bash", "opencode run x") == "deny", "Claude can launch a nested OpenCode client")
-for command in ("claude -p x", "opencode run x"):
-    require(oc_last(oc_rules(opencode["permission"], "bash"), command) == "deny", f"OpenCode can launch `{command}`")
+for command in ("claude -p x", "claude --bg review", "claude remote-control", "claude", "opencode --help"):
+    require(oc_last(oc_rules(opencode["permission"], "bash"), command) == "deny", f"OpenCode can run `{command}`")
+require(claude_decision("Bash", "opencode --version") == "deny", "Claude can run the OpenCode client")
+require(oc_last(oc_rules(opencode["permission"], "bash"), "opencode --version") == "allow", "OpenCode version check denied")
 
 # --- Paths: secrets and personal folders denied, everything else readable --------------------
 PROTECTED = [
@@ -279,9 +332,10 @@ require(oc_file("read", expand("~/.ssh/id_rsa"), auditor) == "deny", "OpenCode a
 
 # --- Loading and skills ----------------------------------------------------------------------
 guidance = ROOT / "opencode/.config/opencode/AGENTS.md"
-require(guidance.is_symlink() and guidance.resolve() == (ROOT / "agents/.agents/shared-guidance.md").resolve(),
-        "OpenCode global guidance is not linked to shared guidance")
-require((ROOT / "CLAUDE.md").read_text().strip() == "@AGENTS.md", "project CLAUDE.md import changed")
+require(guidance.is_symlink() and guidance.resolve() == (ROOT / "agents/.agents/global-agents.md").resolve(),
+        "OpenCode global guidance is not linked to global guidance")
+# Claude Code 2.1.277+ reads AGENTS.md natively; a project CLAUDE.md would take precedence over it.
+require(not (ROOT / "CLAUDE.md").exists(), "a project CLAUDE.md would stop Claude Code reading AGENTS.md")
 for skill, script in (("commit", "commit-candidate"), ("commit", "commit-apply"), ("publish", "publish-bind"),
                       ("publish", "publish-apply"), ("publish", "publish-verify")):
     source = ROOT / "agents/.agents/skills" / skill / "scripts" / script
