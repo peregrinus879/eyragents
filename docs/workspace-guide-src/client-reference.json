@@ -509,7 +509,7 @@
   "workflows": [
     {
       "title": "Shared workflows",
-      "text": "Ship commits and publishes: every card of a round first, then one native prompt for the set, and publication only after H's go. Spar gives independent review, and long work keeps a live plan file. Use the installed skill picker or name the relevant skill; procedures live in the skills, not this guide.",
+      "text": "Ship commits and publishes: every card of a round first, then a native prompt per commit, and publication only after H's go. Spar gives independent review, and long work keeps a live plan file. Use the installed skill picker or name the relevant skill; procedures live in the skills, not this guide.",
       "sources": [
         "agents"
       ]
