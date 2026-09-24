@@ -10,7 +10,7 @@ Broad reasoning does not authorize broad action. Surface useful omissions and ma
 
 ## Native approvals
 
-H approves each commit and each push at the tool's native permission prompt. The ship skill writes every card of a round in the chat before the first prompt, and each command names its repository and subject; publication additionally waits for H's go. Git history is the record; no receipt, binding or shell gate stands between the card and the prompt. Destructive or hard-to-reverse commands keep their own prompts.
+H approves each round of commits, and each round of pushes, at the tool's native permission prompt. The ship skill writes every card of the round in the chat, then runs one command for the round, since chat text written after a prompt may not show before the next one; publication additionally waits for H's go. Git history is the record; no receipt, binding or shell gate stands between the card and the prompt. Destructive or hard-to-reverse commands keep their own prompts.
 
 Authentication is host-owned: GitHub uses HTTPS and the standard `gh` helper, and H controls login, storage and recovery. Credential access supplies capability, not approval. No broker, nested-client workaround or permission override is provided.
 
