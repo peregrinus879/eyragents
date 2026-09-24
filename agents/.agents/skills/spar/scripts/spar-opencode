@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# spar-opencode - cross-vendor review: OpenCode reviews work drafted in another tool.
+#
+# Usage: spar-opencode review [--resume SESSION] "<request>"
+#
+# Runs `opencode run --agent auditor` from the repository root under H's normal
+# OpenCode configuration; the auditor agent carries the shared reviewer charter
+# and denies edits, and a headless run rejects anything that would prompt.
+# Normal configuration loads project settings, so use it only in trusted
+# checkouts. OpenCode silently substitutes its default agent when the named one
+# is missing or cannot run as a primary, so a preflight through `opencode agent
+# list` (no model call) must show the auditor as primary-capable with edits
+# denied before the request is sent. A review needs a clean client exit and a
+# reply ending with the charter's VERDICT line. The reply goes to stdout; the
+# session ID goes to stderr as "SPAR-BRIDGE ID:".
+# Exit codes: 0 reply, 3 usage limit, 5 reviewer failure, 64 usage,
+# 124 timeout (SPAR_BRIDGE_TIMEOUT seconds, default 1800), 130 interrupted.
+set -euo pipefail
+
+TIMEOUT=${SPAR_BRIDGE_TIMEOUT:-1800}
+LIMIT_RE="usage limit|rate limit|hit your [a-z' ]*limit|limiting requests|quota|too many requests|overloaded|429|529"
+VERDICT_RE='^VERDICT: (CONVERGED|OPEN [0-9]+ BLOCKING / [0-9]+ NON-BLOCKING)$'
+
+usage() { printf 'usage: spar-opencode review [--resume SESSION] "<request>"\n' >&2; exit 64; }
+fail() { printf 'SPAR-BRIDGE ERROR: %s\n' "$1" >&2; [[ -z ${2:-} ]] || tail -c 2000 <<<"$2" >&2; exit 5; }
+[[ ${1:-} == review ]] || usage
+shift
+resume=()
+if [[ ${1:-} == --resume ]]; then
+  [[ -n ${2:-} ]] || usage
+  resume=(--session "$2")
+  shift 2
+fi
+[[ $# == 1 && -n $1 ]] || usage
+[[ $TIMEOUT =~ ^[1-9][0-9]*$ ]] || usage
+repo=$(git rev-parse --show-toplevel 2>/dev/null) || { printf 'SPAR-BRIDGE ERROR: run from inside a Git worktree\n' >&2; exit 64; }
+
+# Every client call runs in its own process group under a hard timeout; the
+# group is killed when the call ends, times out or the bridge is interrupted.
+work=$(mktemp -d)
+pid=""
+trap 'rm -rf -- "$work"' EXIT
+trap '[[ -z $pid ]] || { kill -TERM -- "-$pid" 2>/dev/null || kill -TERM -- "$pid" 2>/dev/null; sleep 1; kill -KILL -- "-$pid" 2>/dev/null; }; exit 130' INT TERM HUP
+supervise() { # seconds stdin stdout stderr command... ; sets rc
+  (cd "$repo" && exec timeout --kill-after=10 "$1" "${@:5}") <"$2" >"$3" 2>"$4" &
+  pid=$!
+  rc=0
+  wait "$pid" || rc=$?
+  kill -KILL -- "-$pid" 2>/dev/null || true
+  pid=""
+}
+
+# Preflight: the agent listing prints "name (mode)" and then its merged rules.
+supervise 60 /dev/null "$work/agents" "$work/err" opencode agent list
+((rc == 0)) || fail "cannot list OpenCode agents (exit $rc)" "$(<"$work/err")"
+rules=$(awk '/^auditor \((primary|all)\)$/ { found = 1; next } found && /^[^ \t]/ && /\((primary|subagent|all)\)$/ { exit } found' \
+  "$work/agents")
+[[ -n $rules ]] || fail "the auditor agent is missing or cannot run as a primary agent"
+jq -e 'map(select(.permission == "edit")) | last | .pattern == "*" and .action == "deny"' <<<"$rules" >/dev/null 2>&1 ||
+  fail "the auditor agent does not deny edits"
+
+supervise "$TIMEOUT" /dev/null "$work/out" "$work/err" opencode run --agent auditor --format json "${resume[@]}" -- "$1"
+
+if ((rc == 124 || rc == 137)); then
+  printf 'SPAR-BRIDGE TIMEOUT: no reply within %ss\n' "$TIMEOUT" >&2
+  exit 124
+fi
+if fallback=$(grep -m 1 'Falling back to default agent' "$work/err"); then
+  fail "OpenCode could not run the auditor agent: $fallback"
+fi
+# Stdout events can quote any text a reviewed file holds; judge limits and
+# errors only from stderr and error events.
+errors=$(jq -c 'select(.type == "error")' "$work/out" 2>/dev/null || true)
+if { cat -- "$work/err"; printf '%s\n' "$errors"; } | grep -qiE "$LIMIT_RE"; then
+  printf 'SPAR-BRIDGE LIMIT: the reviewer hit a usage limit\n' >&2
+  exit 3
+fi
+((rc == 0)) || fail "the reviewer exited $rc" "$(<"$work/err")"
+[[ -z $errors ]] || fail "the reviewer reported an error" "$errors"
+reply=$(jq -rs 'map(select(.type == "text")) | last | .part.text // empty' "$work/out" 2>/dev/null || true)
+[[ -n $reply ]] || fail "the reviewer ended without a reply" "$(<"$work/err")"
+printf 'SPAR-BRIDGE ID: %s\n' "$(jq -rs 'map(.sessionID // empty) | first // "unknown"' "$work/out")" >&2
+grep -v '^[[:space:]]*$' <<<"$reply" | tail -n 1 | grep -qE "$VERDICT_RE" ||
+  fail "the reply does not end with a VERDICT line; not a review" "$reply"
+printf '%s\n' "$reply"

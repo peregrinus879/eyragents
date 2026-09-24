@@ -43,8 +43,8 @@ make_clone() {
   ln -s ../../../../../agents/.agents/skills/publish/scripts/publish-apply "$repo/claude-code/.claude/skills/publish/scripts/publish-apply"
   printf 'tracked\n' >"$repo/agents/.agents/skills/spar/scripts/spar-claude"
   printf 'tracked\n' >"$repo/agents/.agents/skills/spar/scripts/spar-payload-scan"
-  printf 'tracked\n' >"$repo/agents/.agents/skills/spar/scripts/review-brief"
-  for tool in review-brief spar-claude spar-payload-scan; do
+  printf 'tracked\n' >"$repo/agents/.agents/skills/spar/scripts/spar-opencode"
+  for tool in spar-claude spar-opencode spar-payload-scan; do
     ln -s "../../../../../agents/.agents/skills/spar/scripts/$tool" "$repo/claude-code/.claude/skills/spar/scripts/$tool"
   done
   printf '{}\n' >"$repo/opencode/.config/opencode/opencode.json"
@@ -133,7 +133,7 @@ case_no_folding() {
   [[ -x $home/.agents/skills/publish/scripts/publish-apply &&
      $(readlink -f -- "$home/.claude/skills/publish/scripts/publish-apply") == "$repo/agents/.agents/skills/publish/scripts/publish-apply" ]] ||
     fail "exact-publication wrapper did not deploy through both skill paths"
-  for tool in review-brief spar-claude spar-payload-scan; do
+  for tool in spar-claude spar-opencode spar-payload-scan; do
     [[ $(readlink -f -- "$home/.claude/skills/spar/scripts/$tool") == "$repo/agents/.agents/skills/spar/scripts/$tool" ]] ||
       fail "Claude spar link for $tool does not reach its own source"
   done

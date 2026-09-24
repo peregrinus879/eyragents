@@ -14,15 +14,12 @@
   },
   "agent": {
     "auditor": {
-      "description": "Read-only audit of a plan, diff, or decision from a fresh context; the spar loop without the second vendor. Never edits.",
-      "mode": "subagent",
+      "description": "Independent read-only review of a plan, diff or decision from a fresh context, from concepts to details.",
+      "mode": "all",
       "prompt": "{file:~/.agents/agents/auditor.md}",
       "permission": {
         "edit": "deny",
-        "bash": "deny",
         "task": "deny",
-        "webfetch": "deny",
-        "websearch": "deny",
         "todowrite": "deny"
       }
     }

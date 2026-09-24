@@ -93,7 +93,7 @@ test:
 	python3 tests/reference-migration.py
 	bash tests/statusline.sh
 	bash tests/prepare-stow.sh
-	bash tests/review-brief.sh
+	bash tests/payload-scan.sh
 	bash tests/spar-bridges.sh
 	bash tests/commit-gate.sh
 	bash tests/canary.sh
@@ -169,7 +169,7 @@ verify-deploy:
 	  if [[ ! -e $$target && ! -L $$target ]]; then :; \
 	  else echo "FAIL: generated OpenCode state reached the package source: $$target"; fail=1; fi; \
 	done; \
-	for b in review-brief spar-claude spar-payload-scan commit-candidate commit-apply publish-bind publish-apply publish-verify publish-clip; do \
+	for b in spar-claude spar-opencode spar-payload-scan commit-candidate commit-apply publish-bind publish-apply publish-verify publish-clip; do \
 	  skill=spar; [[ $$b == commit-* ]] && skill=commit; [[ $$b == publish-* ]] && skill=publish; \
 	  if [[ -x "$$HOME/.agents/skills/$$skill/scripts/$$b" ]]; then echo "ok:   $$b executable"; else echo "FAIL: $$b missing or not executable"; fail=1; fi; \
 	done; \

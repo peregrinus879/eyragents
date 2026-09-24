@@ -30,21 +30,19 @@ Rules live at the lowest layer that can hold them. A sandbox constrains the surf
 
 ## One trust model, two enforcement points
 
-The [access policy](access.md) makes that distinction inspectable across tools: one outcome table for both, enforcement limits, implementation references and official semantics. It is the comparison owner, not another source of permission grants. `/eyrsync` reconciles intent, matrix, implementation, upstream behavior and evidence together. Parity means equivalent authorized work and safety intent where enforceable, not weakening a stricter tool until the tables look identical.
+The [access policy](access.md) makes that distinction inspectable across tools: one outcome table for both, enforcement limits, implementation references and official semantics. It is the comparison owner, not another source of permission grants. `/eyrsync` reconciles intent, the access policy, implementation, upstream behavior and evidence together. Parity means equivalent authorized work and safety intent where enforceable, not weakening a stricter tool until the tables look identical.
 
 The tools enforce the same intent to different depths. Claude Code combines deterministic rules with an auto-mode classifier; OpenCode has only static rules, so it asks where Claude Code's classifier would review. Both allow what does not expose H and gate the rest: secrets and personal folders are denied, and remote, destructive or configuration-changing commands ask. Neither is shell containment. The [access policy](access.md) owns the rules and their limits.
 
-Broad standing read authority is implemented with scoped positive grants where flat native exclusions cannot reopen allowed descendants. OpenCode uses path-specific metadata checks: an unknown or stacked mount withholds grants in its affected subtree; an inaccessible declared store retains its literal exclusion without pretending its hidden outward aliases were discovered. Requested targets still require strict resolution. The finite system/copy inventory protects credential stores and raw interfaces while retaining ordinary configuration, package metadata and sysfs diagnostics. These choices preserve useful access without equating guidance, native capability and complete containment.
-
-## Read-only cross-vendor review
-
-A second opinion is worth most when it comes from a different model family that reads the same files. The bridges give one read-only, offline, single-turn reviewer with no write, web, plugin, or subagent surface, launched from a scrubbed environment under a hard timeout. Hard-coded flags prevent callers from extending that authority. Unset repository consent permits review; a configured value must be literal `true`, so empty or malformed opt-outs cannot become accidental disclosure grants. A finite scanner supports, but does not replace, that disclosure decision.
-
-Retained cross-vendor artifacts belong to a workstream's `spar/` directory; in-tool audit artifacts belong separately to `audit/`. The primary authors both sets and saves returned results, without granting either counterparty write access. Private caller-selected `TMPDIR` holds disposable execution files and necessary external temporary artifacts, not a permanent review archive. Scanned artifacts are inlined, separating broad non-secret diagnostic reads from artifact disclosure and eliminating any reviewer scratch-write need. The scanner's `--` separator prevents artifact names from becoming root options. Safe returned provenance reports effective model, effort, tier, and client version only where exposed; `unknown` is more useful than asserting a configured preference was used.
-
-Claude Code and OpenCode also carry an in-tool `auditor` with one shared charter. OpenCode's auditor inherits the primary's read rules and denies edits, shell, delegation and web, so it sees what the primary sees and changes nothing. Review is recommended where it earns its cost, not mandatory for every trivial edit.
+Reads are broad and secrets are denied by one finite inventory in both tools, so ordinary configuration, package metadata and diagnostics stay readable. A finite inventory cannot recognize a renamed secret; shared guidance still binds there.
 
 Persistent scratch (`~/Projects/eyrie/scrape`) is writable in both tools; OpenCode also writes its session scratch under `/tmp/opencode`. Persistent work there is preserved project work, not disposable by location.
+
+## Independent review
+
+A second opinion is worth most from a fresh context, and more from a different model family. Every reviewer, in-tool or cross-vendor, follows one [charter](../agents/.agents/agents/auditor.md): full context, a top-down review from goal and approach to presentation against shared guidance, and read-only conduct. Reviewers have read, search, shell and web tools without edit tools, under the primary's rules, so they verify claims instead of trusting a curated brief. The drafter states what it already did, and the reviewer spends its effort on what was not covered. The bridges run the other tool's client under H's normal settings with the same reviewer tools, Claude Code by tool list and OpenCode through its `auditor` agent, with a hard timeout; a reply without the charter's verdict line fails. Review is recommended where it earns its cost, never mandatory.
+
+Retained requests and replies belong to a workstream's `spar/` (cross-vendor) or `audit/` (in-tool) directory; the primary writes them, never a reviewer.
 
 ## One neutral source
 
@@ -81,8 +79,6 @@ GitHub documents [rename redirects](https://docs.github.com/en/repositories/crea
 ## The gate contract
 
 Develop, commit and publish share one [verification contract](../agents/.agents/skills/develop/references/verification.md): `lint` and `check` are repository checks, `restow` and `verify` host verification, and `verify-published` the post-push check. A repository declares gates through its targets; host-bound targets refuse on the wrong host or clone. Develop establishes implementation evidence, commit checks the exact staged candidate, and publish checks the reviewed publication. Valid evidence is reused only for unchanged tested contents and context.
-
-`review-brief` combines requested Make goals once, preserving argument order and reporting the combined exit status rather than invented per-target results; dependencies determine recipe order. Inherited Make control variables refuse gate execution instead of risking a dry-run or ignored error masquerading as success. Its before/after evidence compares raw Git blob bytes/modes with indexed entries, bypassing filter/stat shortcuts; direct internal tracked regular-file symlink targets can be attested from the same manifest. Worktree diffs refuse configured clean/process filters so collection cannot invoke those commands, and lookup errors never establish absence. Untracked contents, ignored inputs, external/chained/directory links, gitlinks and runtime/host context remain outside that proof. Fingerprints are not candidate tree IDs or automatic gate reuse: bind the exact candidate and relevant context separately. Failed gates or drift retain scanned diagnostics and return failure; plan-only mode still reads no source content and runs no gates. Its repository-write exception remains only new ignored/untracked Markdown leaves in owned private `audit/` or `spar/` directories, never source/Git metadata, ignore rules or reviewer writes.
 
 ## Standalone deployment
 

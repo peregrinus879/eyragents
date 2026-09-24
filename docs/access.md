@@ -53,7 +53,7 @@ Web reads send queries and URLs to a service; that is not permission to upload o
 
 ### Auditors
 
-Both tools carry a read-only `auditor` with the shared charter [`auditor.md`](../agents/.agents/agents/auditor.md). Claude Code's has Read, Grep and Glob only. OpenCode's inherits the primary's read rules and denies edits, shell, delegation, web and todo tools. Neither widens any primary rule. The [spar skill](../agents/.agents/skills/spar/SKILL.md) owns the cross-vendor reviewer bridge and its own fixed read-only profile.
+Both tools carry an `auditor` with the shared reviewer charter [`auditor.md`](../agents/.agents/agents/auditor.md). It has read, search, shell and web tools and no edit tools; the charter keeps it read-only, and its commands pass the primary's rules, so it never exceeds the primary. The [spar skill](../agents/.agents/skills/spar/SKILL.md)'s bridges run the other tool's reviewer: `spar-claude` runs Claude Code with the auditor's tool list and no MCP tools, `spar-opencode` runs OpenCode's `auditor` agent. Bridges are the sanctioned route; direct nested client launches stay denied.
 
 ## Untrusted Checkouts
 
@@ -64,7 +64,7 @@ claude --safe-mode --setting-sources user
 OPENCODE_DISABLE_PROJECT_CONFIG=1 OPENCODE_DISABLE_EXTERNAL_SKILLS=1 opencode
 ```
 
-Claude's safe mode ignores project instructions, hooks, and settings. OpenCode disables project configuration and external skills, but has no equivalent untrusted mode or shell sandbox. These launches do not make instructions encountered in file contents trustworthy, nor do they remove every client/app surface.
+Claude's safe mode ignores project instructions, hooks, and settings. OpenCode disables project configuration and external skills, but has no equivalent untrusted mode or shell sandbox. The spar bridges launch the other client with normal settings, so a restricted parent does not restrict the reviewer; use the in-tool auditor there. These launches do not make instructions encountered in file contents trustworthy, nor do they remove every client/app surface.
 
 ## Implementation And Semantics
 
@@ -92,6 +92,6 @@ Checked 1.18.32 sources: [permission evaluation](https://github.com/anomalyco/op
 
 ## Evidence And Refresh
 
-[`tests/config-contracts.py`](../tests/config-contracts.py) models both matchers and requires the same decision in both tools for every listed command and path, the scratch grants from several worktree locations, and read-only auditors. It checks configuration, not live dispatch. [The canary](../scripts/canary.sh) is behavioral smoke through the real clients; a model-reported refusal is not proof of a native denial. The [eyrsync source table](../.agents/skills/eyrsync/SKILL.md#sources) owns the reference strategy.
+[`tests/config-contracts.py`](../tests/config-contracts.py) models both matchers and requires the same decision in both tools for every listed command and path, the scratch grants from several worktree locations, and both auditors' tools (no edit tools). It checks configuration, not live dispatch. [The canary](../scripts/canary.sh) is behavioral smoke through the real clients; a model-reported refusal is not proof of a native denial. The [eyrsync source table](../.agents/skills/eyrsync/SKILL.md#sources) owns the reference strategy.
 
 Source and configuration reconciled **2026-09-24** against Claude Code 2.1.281 official documentation and OpenCode 1.18.32 source. Every `/eyrsync` pass reconciles decision, implementation, current official semantics and evidence for both tools, and records unresolved drift in the ledger. Do not change policy just to make a check pass.

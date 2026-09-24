@@ -256,18 +256,24 @@ require(opencode.get("skills") == {"paths": ["~/.agents/skills"]}, "OpenCode sha
 plugins = sorted(p.name for p in (ROOT / "opencode/.config/opencode/plugins").iterdir())
 require(plugins == ["commit-gate.js"], f"unexpected OpenCode plugins: {plugins}")
 
-# Auditors: the same charter, read-only in both tools.
+# Auditors: the same charter in both tools; no edit tools, shell and web under the primary rules.
 charter = (ROOT / "agents/.agents/agents/auditor.md").read_text(encoding="utf-8")
 claude_auditor = (ROOT / "claude-code/.claude/agents/auditor.md").read_text(encoding="utf-8")
 front, body = claude_auditor.split("---\n", 2)[1:]
 fields = dict(line.split(":", 1) for line in front.strip().splitlines())
 require(body.strip() == charter.strip(), "Claude auditor body differs from the shared charter")
-require({t.strip() for t in fields["tools"].split(",")} == {"Read", "Grep", "Glob"}, "Claude auditor is not Read/Grep/Glob only")
+require({t.strip() for t in fields["tools"].split(",")} == {"Read", "Bash", "WebFetch", "WebSearch"},
+        "Claude auditor tools drifted: read, shell and web, never edit")
 require(fields.get("effort", "").strip() == "xhigh", "Claude auditor effort is not xhigh")
 auditor = opencode["agent"]["auditor"]
-require(auditor["mode"] == "subagent" and auditor["prompt"] == "{file:~/.agents/agents/auditor.md}", "OpenCode auditor charter drifted")
-for key in ("edit", "bash", "task", "webfetch", "websearch"):
+# "all" lets spar-opencode run the auditor headless; a subagent would fall back to the build agent.
+require(auditor["mode"] == "all" and auditor["prompt"] == "{file:~/.agents/agents/auditor.md}", "OpenCode auditor charter drifted")
+for key in ("edit", "task"):
     require(oc_last(oc_rules(opencode["permission"], key, auditor), "*") == "deny", f"OpenCode auditor can use {key}")
+for key in ("webfetch", "websearch"):
+    require(oc_last(oc_rules(opencode["permission"], key, auditor), "*") == "allow", f"OpenCode auditor lacks {key}")
+require(oc_last(oc_rules(opencode["permission"], "bash", auditor), "git log -1") == "allow" and
+        oc_last(oc_rules(opencode["permission"], "bash", auditor), "git push") == "deny", "OpenCode auditor shell does not follow the primary rules")
 require(oc_file("read", expand("{w}/src/app.py"), auditor) == "allow", "OpenCode auditor cannot read the repository")
 require(oc_file("read", expand("~/.ssh/id_rsa"), auditor) == "deny", "OpenCode auditor reads secrets")
 
@@ -295,4 +301,4 @@ require(references == {"claude-code": "github:R_kgDON91aYw", "opencode": "github
         "reference identities differ from the reviewed set")
 
 print(f"ok: {len(COMMANDS)} commands and {len(PROTECTED) + len(PERSONAL) + len(READABLE)} paths decide alike in both tools; "
-      "auditors read-only; configuration contracts hold (modeled matching, not live dispatch)")
+      "auditors share one charter without edit tools; configuration contracts hold (modeled matching, not live dispatch)")

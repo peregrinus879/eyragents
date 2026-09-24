@@ -242,7 +242,7 @@
         "@auditor"
       ],
       "source": "opencode-tui",
-      "detail": "Tab cycles primary agents. @auditor invokes the configured read-only auditor. Agent mode and permissions are distinct settings.",
+      "detail": "Tab cycles primary agents, including the read-only auditor; @auditor invokes it as a subagent. Agent mode and permissions are distinct settings.",
       "mode": "OpenCode prompt",
       "essential": false,
       "warning": "",

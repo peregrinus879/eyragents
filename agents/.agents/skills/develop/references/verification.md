@@ -10,9 +10,9 @@ Run `make lint` and `make check` when defined, else `npm run check`; then `make 
 
 ## Evidence And Reuse
 
-Record actual commands/results, source or candidate identity and relevant runtime/host inputs in the checkpoint or an existing scanned review brief. Keep detailed evidence as a linked artifact when needed. Configuration inspection, source inspection, synthetic tests, native dispatch and model-reported behavior are different evidence levels.
+Record actual commands/results, source or candidate identity and relevant runtime/host inputs in the checkpoint. Keep detailed evidence as a linked artifact when needed. Configuration inspection, source inspection, synthetic tests, native dispatch and model-reported behavior are different evidence levels.
 
-Reuse same-workstream results only after re-reading the original passing evidence and establishing that its exact tested contents and relevant inputs/context are unchanged. A receipt, a new `--no-gates` brief or tracked-file equality alone is insufficient. Unknown inputs, untracked contents, unverified symlink targets or source changes forbid reuse. Recheck at handoff rather than rerunning merely because the conversation changed turns.
+Reuse same-workstream results only after re-reading the original passing evidence and establishing that its exact tested contents and relevant inputs/context are unchanged. A receipt or tracked-file equality alone is insufficient. Unknown inputs, untracked contents, unverified symlink targets or source changes forbid reuse. Recheck at handoff rather than rerunning merely because the conversation changed turns.
 
 Commit preparation must establish coverage of the exact staged candidate. A different working tree is not a superset or attestation of the index. Validate the staged snapshot in an appropriate disposable context without deploying it, or defer a mixed candidate. Coordinated repository changes need the exact final pair, not a check against an earlier peer.
 
