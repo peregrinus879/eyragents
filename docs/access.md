@@ -49,7 +49,9 @@ Rules are named forms, not containment. Path rules govern each tool's native fil
 | Move destinations | Not applicable | See [Move Destinations](#move-destinations) |
 | Nested clients | Every form of `opencode` and other agent clients denied; `claude` runs under the same user rules | Every form of `claude`, `opencode` and other agent clients denied, except the two exact version checks |
 | Web | Available; no tracked domain rules | `webfetch` and `websearch` allowed |
-| Sharing | Off by guidance | `share = "disabled"` |
+| Sharing | `/feedback`, `/bug`, `/share`, Claude-drafted feedback, the session survey and error reports off in `env` | `share = "disabled"` |
+
+Claude Code's usage metrics stay on: they carry no code, prompts or paths, and `DISABLE_TELEMETRY` also stops the feature flags behind pasted-text marking, the Monitor and PushNotification tools and artifact comments. Auto mode is unaffected, since `defaultMode` sets it.
 
 Web reads send queries and URLs to a service; that is not permission to upload or change anything remote.
 

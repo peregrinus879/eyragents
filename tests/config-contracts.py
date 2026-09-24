@@ -305,6 +305,10 @@ for section in ("allow", "soft_deny", "hard_deny"):
 require("personal folders" in " ".join(claude["autoMode"]["hard_deny"]), "Claude classifier lacks the personal-folder rule")
 require(claude.get("attribution", {}).get("sessionUrl") is False, "Claude would add a session URL to commits")
 require(claude.get("env", {}).get("CLAUDE_CODE_EFFORT_LEVEL") == "xhigh", "Claude Code effort is not xhigh")
+# Uploads of conversation content and error reports stay off; metrics stay on for feature flags (docs/access.md).
+for switch in ("DISABLE_FEEDBACK_COMMAND", "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY", "DISABLE_ERROR_REPORTING"):
+    require(claude.get("env", {}).get(switch) == "1", f"Claude Code {switch} is not set")
+require("DISABLE_TELEMETRY" not in claude.get("env", {}), "Claude Code telemetry switch would stop feature flags")
 require("hooks" not in claude, "Claude settings carry hooks; commits and pushes use native prompts")
 
 require(opencode["share"] == "disabled" and opencode["autoupdate"] is False, "OpenCode sharing or autoupdate drifted")
