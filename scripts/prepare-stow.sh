@@ -130,7 +130,7 @@ clean_links() {
     done < <(find "$root" -xtype l -print0 2>/dev/null)
   done
   # Managed directories the retired links leave behind, pruned only when empty, deepest first.
-  local -a retired=("$HOME"/.config/opencode/skills/*/ "$HOME/.config/opencode/skills" "$HOME/.claude/rules")
+  local -a retired=("$HOME"/.config/opencode/skills/*/ "$HOME/.config/opencode/skills" "$HOME/.config/opencode/lib" "$HOME/.claude/rules")
   for dir in "${retired[@]}"; do
     dir=${dir%/}
     [[ -d $dir && ! -L $dir ]] || continue

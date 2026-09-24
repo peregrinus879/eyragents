@@ -1367,7 +1367,4 @@ for name, patterns in (
 print(f"ok: the reviewer profile retains scope and mask {len(set(cases['denied']))} synthetic payload paths; {len(cases['positive'])} positives usable")
 PY
 
-if ! $FIXTURES_ONLY; then
-  SPAR_BRIDGE_FIXTURES="$TMP" env -u CONFIG_CONTRACT_ROOT python3 -B "$ROOT/tests/config-contracts.py"
-fi
 printf 'ok: spar bridges relay scanned one-pass reviews from a scrubbed environment and honor opt-out\n'

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Check the authority boundaries of the managed tool configurations.
+"""Check the managed tool configurations against the shared guidance.
 
-Check source configuration, modeled path rules and selected real guard functions.
-These are configured-baseline and plugin-derived contracts, not proof of client
-dispatch, sandbox construction, mount isolation or classifier decisions. The
-dedicated plugin/bridge suites own layout, alias, approval and execution fixtures.
-Precise authority invariants remain alongside the shared synthetic Safety corpus.
+Both tools must reach the same decision for the same command or path: read
+freely, ask before remote or destructive actions, and deny secrets, personal
+folders and privilege escalation. This models each tool's documented matching
+(Claude Code: deny, then ask, then allow; OpenCode: last matching rule wins).
+It checks configuration, not live dispatch.
 """
 
 from __future__ import annotations
@@ -14,666 +14,285 @@ import json
 import os
 import posixpath
 import re
-import runpy
-import subprocess
-from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(os.environ.get("CONFIG_CONTRACT_ROOT", Path(__file__).resolve().parent.parent))
-
-# Directory stores end with /** in Claude and OpenCode rules; file stores do not.
-CREDENTIAL_DIRECTORIES = (
-    "~/.aws",
-    "~/.config/BraveSoftware",
-    "~/.config/chromium",
-    "~/.gnupg",
-    "~/.kube",
-    "~/.local/share/keyrings",
-    "~/.mozilla",
-    "~/.ssh",
-)
-CREDENTIAL_FILES = (
-    "~/.bash_history",
-    "~/.claude/.credentials.json",
-    "~/.codex/auth.json",
-    "~/.config/gh/hosts.yml",
-    "~/.docker/config.json",
-    "~/.local/share/opencode/auth.json",
-    "~/.netrc",
-    "~/.npmrc",
-    "~/.pypirc",
-    "~/.zsh_history",
-)
-# Credential stores that may be copied into a repository; every copy stays unreadable.
-PROJECT_STORE_DIRECTORIES = (".aws", ".gnupg", ".kube", ".ssh", ".config/BraveSoftware", ".config/chromium", ".local/share/keyrings", ".mozilla")
-PROJECT_STORE_FILES = (".claude/.credentials.json", ".codex/auth.json", ".config/gh/hosts.yml", ".docker/config.json", ".local/share/opencode/auth.json", ".bash_history", ".zsh_history")
-PROJECT_STORES = (*PROJECT_STORE_DIRECTORIES, *PROJECT_STORE_FILES)
-# Standing read authorization is separate from OpenCode's external location asks.
-SYSTEM_READ_TREES = ("/bin", "/boot", "/efi", "/etc", "/lib", "/lib64", "/opt",
-                     "/sbin", "/srv", "/sys", "/usr", "/var", "/var/lib/pacman")
-# Temp read authorization excludes the other tools' session roots.
-TEMP_READ_TREES = ("/tmp", "/var/tmp")
-HOME_READ_PATHS = (".config/nvim/init.lua", ".local/bin/ordinary-tool", ".local/share/mise/runtime",
-                   ".local/share/nvim/plugin.lua", ".local/share/fonts/font.ttf", ".local/share/man/page.1",
-                   ".bashrc", ".bash_profile", ".profile", ".zshrc", ".zprofile", ".gitconfig", ".inputrc")
-FIXTURE_HOME = "/fixture-home"
-FIXTURE_CWD = FIXTURE_HOME + "/Projects/repo"
-
-CREDENTIAL_SHAPES = (
-    ".env",
-    ".env.*",
-    ".netrc",
-    ".npmrc",
-    ".pypirc",
-    "*.key",
-    "*.p12",
-    "*.pem",
-    "*.pfx",
-    "auth.json",
-    "credentials",
-    "credentials.*",
-    "id_dsa",
-    "id_ecdsa",
-    "id_ed25519",
-    "id_rsa",
-    "secrets/**",
-)
-HARD_DENIED_GIT = ("git clean *", "git push", "git push *")
-APPROVAL_GIT = (
-    "git checkout -- *",
-    "git reset *",
-    "git restore *",
-    "git stash clear *",
-    "git stash drop *",
-)
-PRIVILEGE = ("doas *", "pkexec *", "su *", "sudo *")
-REPOSITORY_HOST = (
-    "gh gist create*",
-    "gh issue create*",
-    "gh pr create*",
-    "gh pr merge*",
-    "gh release create*",
-)
-REPOSITORY_HOST_EXTENDED = (
-    "gh api *",
-    "gh auth *",
-    "gh gpg-key *",
-    "gh repo create*",
-    "gh repo delete*",
-    "gh run cancel*",
-    "gh secret *",
-    "gh ssh-key *",
-    "gh workflow run*",
-)
+HOME = "/fixture-home"
+WORKTREE = HOME + "/Projects/eyrie/repo"
 
 
-def load_json(path: str):
-    with (ROOT / path).open(encoding="utf-8") as handle:
-        return json.load(handle)
+def fail(message: str) -> None:
+    raise SystemExit(f"FAIL: {message}")
 
 
 def require(condition: bool, message: str) -> None:
     if not condition:
-        raise SystemExit(f"FAIL: {message}")
+        fail(message)
 
 
-def denies_come_last(rules: dict, label: str) -> None:
-    """Last match wins, so every allow or ask precedes every deny or it reopens one."""
-    actions = list(rules.values())
-    opens = [index for index, action in enumerate(actions) if action != "deny"]
-    denies = [index for index, action in enumerate(actions) if action == "deny"]
-    if opens and denies:
-        require(max(opens) < min(denies), f"OpenCode {label}: an allow or ask follows a deny and reopens it")
+def load(path: str):
+    return json.loads((ROOT / path).read_text(encoding="utf-8"))
 
 
-def relative_deny(rules: dict, path: str) -> bool:
-    """A worktree-relative subject is denied at depth by a **/ rule on the path, its basename,
-    or an ancestor, and at the worktree root by the bare form, since **/ needs a slash."""
-    parts = path.split("/")
-    deep = {f"**/{path}", f"**/{parts[-1]}"}
-    bare = {path}
-    for index in range(1, len(parts)):
-        deep.add(f"**/{'/'.join(parts[:index])}/**")
-        bare.add(f"{'/'.join(parts[:index])}/**")
-    return any(rules.get(c) == "deny" for c in deep) and any(rules.get(c) == "deny" for c in bare)
+claude = load("claude-code/.claude/settings.json")
+opencode = load("opencode/.config/opencode/opencode.json")
 
 
-def covered(rules: set[str], tool: str, path: str) -> bool:
-    """A store path is covered by an exact rule or by a /** rule on an ancestor."""
-    candidates = {f"{tool}({path})", f"{tool}({path}/**)"}
-    parts = path.split("/")
-    for index in range(1, len(parts)):
-        candidates.add(f"{tool}({'/'.join(parts[:index])}/**)")
-    return bool(rules & candidates)
+# Claude Code matching: https://code.claude.com/docs/en/permissions
+def claude_bash_match(rule: str, command: str) -> bool:
+    if rule.endswith(" *") and rule.count("*") == 1:
+        pattern = re.escape(rule[:-2]) + "(?: .*)?"
+    else:
+        pattern = ".*".join(re.escape(part) for part in rule.split("*"))
+    return re.fullmatch(pattern, command, re.S) is not None
 
 
-def wildcard(subject: str, pattern: str) -> bool:
-    """OpenCode util/wildcard.ts: stars include slashes, **/ needs a slash."""
-    expression = re.escape(pattern.replace("\\", "/")).replace(r"\*", ".*").replace(r"\?", ".")
-    return re.fullmatch(expression, subject.replace("\\", "/"), re.S) is not None
+def claude_path_regex(rule: str) -> str:
+    if rule.startswith("//"):
+        rule = rule[1:]
+    elif rule.startswith("~/"):
+        rule = HOME + rule[1:]
+    out, i = "", 0
+    while i < len(rule):
+        if rule.startswith("/**/", i):
+            out, i = out + "/(?:.*/)?", i + 4
+        elif rule.startswith("/**", i) and i + 3 == len(rule):
+            out, i = out + "(?:/.*)?", i + 3
+        elif rule.startswith("**", i):
+            out, i = out + ".*", i + 2
+        elif rule[i] == "*":
+            out, i = out + "[^/]*", i + 1
+        else:
+            out, i = out + re.escape(rule[i]), i + 1
+    return out
 
 
-def evaluate(tool: str, subject: str, *configs: dict) -> str:
-    """permission/index.ts fromConfig, merge and last-matching evaluate."""
-    result = "ask"
-    for config in configs:
-        for permission, value in config.items():
-            if not wildcard(tool, permission):
+def claude_decision(tool: str, subject: str) -> str:
+    permissions = claude["permissions"]
+    for action in ("deny", "ask", "allow"):
+        for rule in permissions.get(action, []):
+            name, _, body = rule.partition("(")
+            if name != tool or not body.endswith(")"):
                 continue
-            for pattern, action in ({"*": value} if isinstance(value, str) else value).items():
-                if wildcard(subject, pattern.replace("~/", "/fixture-home/", 1)):
-                    result = action
+            body = body[:-1]
+            if tool == "Bash":
+                hit = claude_bash_match(body, subject)
+            else:
+                hit = re.fullmatch(claude_path_regex(body), subject) is not None
+            if hit:
+                return action
+    return "auto"  # the auto-mode classifier decides; not a rule outcome
+
+
+# OpenCode matching: packages/opencode/src/util/wildcard.ts and permission/index.ts
+def oc_match(subject: str, pattern: str) -> bool:
+    if pattern.startswith("~/"):
+        pattern = HOME + pattern[1:]
+    escaped = "".join(".*" if ch == "*" else "." if ch == "?" else re.escape(ch) for ch in pattern)
+    if escaped.endswith(r"\ .*"):
+        escaped = escaped[:-4] + "(?: .*)?"
+    return re.fullmatch(escaped, subject, re.S) is not None
+
+
+def oc_rules(permission: dict, key: str, agent: dict | None = None):
+    rules = []
+    for source in (permission, (agent or {}).get("permission", {})):
+        value = source.get(key)
+        if isinstance(value, str):
+            rules.append(("*", value))
+        elif isinstance(value, dict):
+            rules += list(value.items())
+    return rules
+
+
+def oc_last(rules, subject: str) -> str:
+    result = "allow"  # OpenCode's own default is "*": "allow"
+    for pattern, action in rules:
+        if oc_match(subject, pattern):
+            result = action
     return result
 
 
-@lru_cache(maxsize=4096)
-def path_pattern(pattern: str):
-    # Managed POSIX path-pattern subset: * stays in a segment and **/ can
-    # match zero directories. This is not OpenCode's wildcard matcher above.
-    expression = re.escape(pattern).replace(r"\*\*/", "(?:.*/)?").replace(r"\*\*", ".*")
-    return re.compile(expression.replace(r"\*", "[^/]*").replace(r"\?", "[^/]"))
+def oc_file(key: str, path: str, agent: dict | None = None, worktree: str = WORKTREE) -> str:
+    """Decision for a native read or edit of an absolute path; subjects are worktree-relative."""
+    inside = path == worktree or path.startswith(worktree + "/")
+    if not inside:
+        external = oc_last(oc_rules(opencode["permission"], "external_directory", agent), posixpath.dirname(path) + "/*")
+        if external == "deny":
+            return "deny"
+    return oc_last(oc_rules(opencode["permission"], key, agent), posixpath.relpath(path, worktree))
 
 
-def path_glob(subject: str, pattern: str) -> bool:
-    return path_pattern(pattern).fullmatch(subject) is not None
-
-
-def below_path(path: str, root: str) -> bool:
-    return root == "/" or path == root or path.startswith(root.rstrip("/") + "/")
-
-
-def claude_file_rule(rule: str, tool: str, target: str, action: str, cwd=FIXTURE_CWD, home=FIXTURE_HOME) -> bool:
-    if rule == tool:
-        return True
-    if not rule.startswith(tool + "(") or not rule.endswith(")"):
-        return False
-    pattern = rule[len(tool) + 1:-1]
-    relative_rule = False
-    if pattern.startswith("//"):
-        anchor, pattern = "/", pattern[2:]
-    elif pattern.startswith("~/"):
-        anchor, pattern = home, pattern[2:]
-    elif pattern.startswith("/"):
-        anchor, pattern = home + "/.claude", pattern[1:]
-    else:
-        anchor, pattern = cwd, pattern.removeprefix("./")
-        relative_rule = True
-    if not below_path(target, anchor):
-        return False
-    subject = posixpath.relpath(target, anchor)
-    # Basenames follow gitignore depth rules. The corpus uses anchored
-    # multi-segment paths for subtree boundaries, not negation/extended globs.
-    if "/" not in pattern:
-        pattern = "**/" + pattern
-    elif relative_rule and action in ("deny", "ask") and pattern.endswith("/**") and "/" not in pattern[:-3]:
-        pattern = "**/" + pattern
-    return path_glob(subject, pattern)
-
-
-def claude_file_action(config: dict, tool: str, target: str) -> str | None:
-    for action in ("deny", "ask", "allow"):
-        if any(claude_file_rule(rule, tool, target, action) for rule in config.get(action, [])):
-            return action
-    # No rule match is not a denial or a classifier verdict in auto mode.
-    return None
-
-
-SAFETY = load_json("tests/safety-paths.json")
-SYSTEM_FILES = (*SAFETY["system_files"], *SAFETY["raw_files"])
-SYSTEM_TREES = (*SAFETY["system_trees"], *SAFETY["raw_trees"])
-for paths in (SYSTEM_FILES, SYSTEM_TREES, SAFETY["positive_files"]):
-    require(len(paths) == len(set(paths)) and all(path and not path.startswith("/") and
-            all(part not in ("", ".", "..") for part in path.split("/")) for path in paths), "invalid synthetic Safety path corpus")
-
-
-# Claude Code
-claude = load_json("claude-code/.claude/settings.json")
-permissions = claude["permissions"]
-require(permissions["defaultMode"] == "auto", "Claude default mode is not auto")
-require(permissions["disableBypassPermissionsMode"] == "disable", "Claude bypass mode is enabled")
-require("sandbox" not in claude, "Claude tracked settings enable sandboxing")
-require("$defaults" in claude["autoMode"]["hard_deny"], "Claude auto mode dropped the built-in hard denies")
-for section in ("allow", "soft_deny"):
-    require("$defaults" in claude["autoMode"][section], f"Claude auto mode dropped built-in {section} rules")
-claude_deny = set(permissions["deny"])
-for command in (*HARD_DENIED_GIT, *PRIVILEGE, *REPOSITORY_HOST):
-    require(f"Bash({command})" in claude_deny, f"Claude deny missing: {command}")
-for command in APPROVAL_GIT:
-    require(f"Bash({command})" not in claude_deny, f"Claude denies an approval-based Git command outright: {command}")
-soft_denies = " ".join(claude["autoMode"]["soft_deny"])
-for phrase in ("git reset", "git remote", "gh auth", "startup files"):
-    require(phrase in soft_denies, f"Claude classifier rule missing for: {phrase}")
-require(not any(rule.startswith("Bash(") and wildcard("gh run rerun 123 --repo owner/repo --job 456", rule[5:-1])
-                for rule in claude_deny), "Claude hard-denies publication CI reruns before classifier review")
-for path in (*CREDENTIAL_DIRECTORIES, *CREDENTIAL_FILES):
-    require(covered(claude_deny, "Read", path), f"Claude credential store readable: {path}")
-    require(covered(claude_deny, "Edit", path), f"Claude credential store writable: {path}")
-for shape in CREDENTIAL_SHAPES:
-    require(f"Read(//**/{shape})" in claude_deny, f"Claude credential-shaped read deny missing: {shape}")
-    require(f"Edit(//**/{shape})" in claude_deny, f"Claude credential-shaped edit deny missing: {shape}")
-for rule in claude_deny:
-    if rule.startswith("Read(") and (rule.startswith("Read(~/") or rule.startswith("Read(//")):
-        require(rule.replace("Read(", "Edit(", 1) in claude_deny or covered(claude_deny, "Edit", rule[5:-1]),
-                f"Claude read deny has no write mirror: {rule}")
-require("Edit(//**/.git/**)" in claude_deny and "Edit(~/.config/git/**)" in claude_deny, "Claude Git internals are writable")
-for rule in permissions["allow"]:
-    require(
-        not rule.startswith(("Bash(git push", "Bash(gh ", "Bash(sudo")),
-        f"Claude automatic allow reaches a guarded command: {rule}",
-    )
-for path in (*HOME_READ_PATHS, "Projects/sibling/README.md"):
-    require(claude_file_action(permissions, "Read", FIXTURE_HOME + "/" + path) == "allow", f"Claude scoped home read is shadowed: {path}")
-require(claude_file_action(permissions, "Edit", FIXTURE_HOME + "/Projects/eyrie/scrape/result.md") == "allow", "Claude lacks scoped persistent-scratch editing")
-for target in ("/ordinary.md", FIXTURE_HOME + "/Documents/ordinary.md", "/home/other/.config/ordinary.md"):
-    require(claude_file_action(permissions, "Read", target) != "allow", f"Claude adds an unreviewed broad read grant: {target}")
-for target in (FIXTURE_HOME + "/Projects/scratch/result.md", FIXTURE_HOME + "/Projects/eyrie/scrape-other/result.md",
-               FIXTURE_HOME + "/Projects/eyrie/result.md", FIXTURE_HOME + "/Projects/eyrie/sibling/result.md",
-               FIXTURE_HOME + "/Projects/eyrie-other/scrape/result.md", FIXTURE_HOME + "/Projects/quarry/result.md", FIXTURE_HOME + "/.bashrc"):
-    require(claude_file_action(permissions, "Edit", target) != "allow", f"Claude scratch allowance reaches another edit scope: {target}")
-# Classifier prose is reviewed as policy, not simulated as deterministic matching.
-hard_denies = " ".join(claude["autoMode"]["hard_deny"])
-require("credentials" in hard_denies and "even when the user names the file" in hard_denies,
-        "Claude classifier reintroduces a named-file credential exception")
-require("implicit" in hard_denies and "normal OS interfaces" in hard_denies, "Claude classifier conflates agent inspection with normal program runtime")
-require("specific credential file" not in soft_denies, "Claude credentials remain a waivable soft rule")
-require("reviewed repository ID" in soft_denies and "explicit push URLs" in soft_denies, "Claude lost the pinned-reference classifier exception")
-
-# OpenCode
-opencode = load_json("opencode/.config/opencode/opencode.json")
-require(opencode["share"] == "disabled", "OpenCode sharing is enabled")
-require(opencode["autoupdate"] is False, "OpenCode autoupdate competes with the wrapper")
-bash = opencode["permission"]["bash"]
-require(next(iter(bash.items())) == ("*", "allow"), "OpenCode Bash autonomy catch-all is not first")
-for command in (*HARD_DENIED_GIT, *PRIVILEGE, *REPOSITORY_HOST, *REPOSITORY_HOST_EXTENDED, "claude *", "opencode *"):
-    require(bash.get(command) == "deny", f"OpenCode Bash deny missing: {command}")
-for command in (*APPROVAL_GIT, "git remote set-url *", "git config core.hooksPath*", "git config credential*"):
-    require(bash.get(command) == "ask", f"OpenCode Bash approval missing: {command}")
-# Native capability only: the publish workflow checks conversational approval,
-# the exact published repo/SHA, failed-job ownership, cause and repeated effects.
-# A static wildcard matcher cannot establish those semantic conditions.
-for command in (
-    "gh run rerun 123 --repo owner/repo --job 456",
-    "gh run rerun 123 --repo owner/repo --failed",
-    "gh run rerun --help",
-):
-    require(evaluate("bash", command, opencode["permission"]) == "allow", f"OpenCode blocks CI rerun capability: {command}")
-for command in (
-    "gh run cancel 123 --repo owner/repo",
-    "gh workflow run test.yml --repo owner/repo",
-    "gh api repos/owner/repo/actions/runs/123/rerun -X POST",
-    "git push origin main",
-):
-    require(evaluate("bash", command, opencode["permission"]) == "deny", f"CI rerun exception reopened another mutation: {command}")
-read_rules = opencode["permission"]["read"]
-edit_rules = opencode["permission"]["edit"]
-external_rules = opencode["permission"]["external_directory"]
-require(read_rules["*"] == "allow" and edit_rules["*"] == "allow", "OpenCode workspace autonomy drifted")
-require("*" not in external_rules, "OpenCode read adapter cannot distinguish explicit asks from a copied fallback")
-require(evaluate("external_directory", "/unlisted/location/*", opencode["permission"]) == "ask", "OpenCode native external fallback no longer asks")
-require((ROOT / "opencode/.config/opencode/plugins/read-permissions.js").is_file(), "OpenCode read adapter is missing")
-require((ROOT / "opencode/.config/opencode/plugins/scratch-permissions.js").is_file(), "OpenCode guarded scratch adapter is missing")
-safety_helper = ROOT / "opencode/.config/opencode/lib/safety-paths.mjs"
-require(safety_helper.is_file(), "OpenCode shared native-file Safety helper is missing")
-require(not (ROOT / "opencode/.config/opencode/plugins/safety-paths.mjs").exists(), "OpenCode Safety helper is in the plugin autoload directory")
-# Read and edit subjects are worktree-relative; external subjects are the parent
-# directory plus /*, so an external rule that names a file can never match and
-# file stores are denied by **/ rules in read and edit, while directory stores
-# under $HOME rely on the external directory globs and the ask default.
-for rule in external_rules:
-    require(rule == "*" or rule.endswith("/*") or rule.endswith("/**"), f"OpenCode external rule can never match a parent-directory subject: {rule}")
-require(edit_rules.get("../*") == "ask", "OpenCode edits outside a non-root worktree without asking")
-# Persisted baseline only: the scratch plugin adds checked per-call exceptions.
-# Its fixture suite, not this untransformed map, verifies persistent writes.
-for subject in ("../../tmp/opencode/session/result.md", "../sibling/tmp/opencode/result.md"):
-    require(evaluate("edit", subject, opencode["permission"]) == "ask", "OpenCode unsafe relative temp write exception reopened")
-for tree in ("eyrie/scrape", "quarry"):
-    require(evaluate("edit", f"../{tree}/result.md", opencode["permission"]) == "ask", f"OpenCode {tree} location grant silently permits native edits")
-    # Non-Git worktree '/' produces no ../ prefix; do not claim universal edit asks.
-    require(evaluate("edit", f"fixture-home/Projects/{tree}/result.md", opencode["permission"]) == "allow", "OpenCode non-Git root-worktree edit behavior changed")
-for path in CREDENTIAL_DIRECTORIES:
-    glob = "**/" + path.removeprefix("~/") + "/**"
-    require(external_rules.get(glob) == "deny", f"OpenCode external credential store deny missing: {glob}")
-require(external_rules.get("**/.config/git/**") == "deny", "OpenCode Git configuration directory is reachable")
-for shape in CREDENTIAL_SHAPES:
-    for label, rules in (("read", read_rules), ("edit", edit_rules)):
-        require(rules.get(f"**/{shape}") == "deny", f"OpenCode credential-shaped {label} deny missing: {shape}")
-        require(rules.get(shape) == "deny", f"OpenCode credential-shaped {label} deny missing at the worktree root: {shape}")
-require(edit_rules.get("**/.git/**") == "deny", "OpenCode Git internals are writable by file tools")
-for label, rules in (("read", read_rules), ("edit", edit_rules), ("external_directory", external_rules)):
-    denies_come_last(rules, label)
-reference_trees = ("/usr", "/var/lib/pacman")
-require({path for path, action in external_rules.items() if action == "allow"} == {
-    "/tmp/opencode/*", "~/Projects/eyrie/scrape/**", "~/Projects/quarry/**", "~/.agents/skills/**", "/usr/**", "/var/lib/pacman/**",
-}, "OpenCode external preapprovals differ from the reviewed location set")
-for tree in reference_trees:
-    require(external_rules.get(f"{tree}/**") == "allow", f"OpenCode OS reference location is not preapproved: {tree}")
-for tree in ("~/Projects", "/etc", "/opt", "/sys", *TEMP_READ_TREES):
-    require(f"{tree}/**" not in external_rules, f"OpenCode retains a broad external directory grant: {tree}")
-require(opencode["permission"].get("webfetch") == "allow" and opencode["permission"].get("websearch") == "allow", "OpenCode primary web research drifted")
-external_cases = {
-    f"{tree}{suffix}": "allow" if tree in reference_trees else "ask"
-    for tree in ("/fixture-home/Projects", *SYSTEM_READ_TREES, *TEMP_READ_TREES)
-    for suffix in ("/*", "/ordinary/deep/*")
+# --- Commands: the same decision in both tools --------------------------------------------
+GH_READ = {
+    "issue": ["list", "status", "view"], "pr": ["list", "status", "view", "checks", "diff", "checkout"],
+    "release": ["list", "view", "download", "verify"], "gist": ["list", "view"], "repo": ["view", "clone", "read-file"],
+    "run": ["list", "view", "watch"], "workflow": ["list", "view"], "label": ["list"], "variable": ["list", "get"],
+    "codespace": ["list", "view", "logs"], "discussion": ["list", "view"], "skill": ["list", "search"],
+    "agent-task": ["list", "view"], "extension": ["list", "exec"], "search": ["issues", "prs"], "ruleset": ["list"],
 }
-external_cases.update({
-    "/usr/lib/*": "allow",
-    "/usr-other/*": "ask",
-    "/var/lib/*": "ask",
-    "/var/lib/pacman-other/*": "ask",
-    "/usr/share/.ssh/*": "deny",
-    "/var/lib/pacman/.aws/*": "deny",
-    "/fixture-home/Projects/eyrie/scrape/*": "allow",
-    "/fixture-home/Projects/eyrie/scrape/session/deep/*": "allow",
-    "/fixture-home/Projects/scratch/*": "ask",
-    "/fixture-home/Projects/eyrie/*": "ask",
-    "/fixture-home/Projects/eyrie/sibling/*": "ask",
-    "/fixture-home/Projects/eyrie/scrape-other/*": "ask",
-    "/fixture-home/Projects/eyrie-other/scrape/*": "ask",
-    "/fixture-home/Projects/sibling/eyrie/scrape/*": "ask",
-    "/fixture-home/Projects/quarry/*": "allow",
-    "/fixture-home/Projects/quarry/opencode/src/*": "allow",
-    "/fixture-home/Projects/quarry-other/*": "ask",
-    "/fixture-home/Projects/sibling/quarry/*": "ask",
-    "/fixture-home/Projects/quarry/opencode/.ssh/*": "deny",
-    "/fixture-home/Projects/quarry/opencode/.config/git/*": "deny",
-    "/tmp/opencode/*": "allow",
-    "/tmp/opencode/session/deep/*": "allow",
-    "/tmp/opencode-other/*": "ask",
-    "/fixture-home/.agents/skills/*": "allow",
-    "/fixture-home/.agents/skills/spar/scripts/*": "allow",
-    "/fixture-home/.agents/skills-other/*": "ask",
-    "/fixture-home/.agents/hooks/*": "deny",
-    "/tmp/claude-1000/*": "deny",
-    "/tmp/claude-1000/session/*": "deny",
-    "/fixture-home/.ssh/*": "deny",
-    "/outside/*": "ask",
-    "/fixture-home/.local/share/opencode/tool-output/*": "deny",
-})
-for subject, expected in external_cases.items():
-    require(evaluate("external_directory", subject, opencode["permission"]) == expected, f"OpenCode external location action drifted: {subject}")
-for tree in TEMP_READ_TREES:
-    require(f"Read(//{tree.lstrip('/')}/**)" in claude["permissions"]["allow"], f"Claude Code lacks the standing read allow on {tree}")
-require(external_rules.get("/tmp/claude-*/**") == "deny", "OpenCode reads Claude Code's session root under /tmp")
-require(external_rules.get("~/.agents/skills/**") == "allow", "OpenCode asks before its shell runs the skill scripts under ~/.agents/skills")
-require(external_rules.get("~/.agents/hooks/**") == "deny", "OpenCode reaches the installed commit gate under ~/.agents/hooks")
-require("Read(//tmp/opencode/**)" in claude["permissions"]["deny"], "Claude Code reads OpenCode's session root under /tmp")
-claude = load_json("claude-code/.claude/settings.json")
-def frontmatter(path):
-    """Parse the YAML subset the agent files use: top-level `key: value` and one nested block of `  key: value`."""
-    text = path.read_text(encoding="utf-8")
-    require(text.startswith("---\n"), f"agent file has no frontmatter: {path.name}")
-    fields, nested, current = {}, {}, None
-    for line in text.split("---\n", 2)[1].splitlines():
-        if line.startswith("  ") and current:
-            key, _, value = line.strip().partition(":")
-            nested.setdefault(current, {})[key.strip()] = value.strip()
-        elif ":" in line:
-            key, _, value = line.partition(":")
-            current = key.strip()
-            fields[current] = value.strip()
-    return fields, nested
+GH_WRITE = {
+    "issue": ["create", "comment", "edit", "close", "reopen", "delete", "develop", "lock", "transfer"],
+    "pr": ["create", "comment", "edit", "review", "ready", "merge", "close", "revert", "update-branch"],
+    "release": ["create", "edit", "upload", "delete", "delete-asset"], "gist": ["create", "edit", "rename", "delete"],
+    "repo": ["create", "edit", "rename", "fork", "sync", "archive", "delete", "deploy-key"],
+    "run": ["rerun", "cancel", "delete"], "workflow": ["run", "enable", "disable"], "label": ["create", "delete"],
+    "variable": ["set", "delete"], "cache": ["delete"], "project": ["create", "item-add", "delete"],
+    "codespace": ["create", "delete", "ssh", "ports", "cp", "stop"], "discussion": ["create", "comment", "edit"],
+    "skill": ["install", "update", "publish"], "agent-task": ["create"], "extension": ["install", "upgrade", "remove"],
+}
+COMMANDS = {
+    "gh api repos/owner/repo": "ask", "gh api -X POST repos/owner/repo/issues": "ask",
+    "gh auth token": "deny", "gh auth status": "deny", "gh secret set TOKEN": "deny", "gh ssh-key add key.pub": "deny",
+    "git status": "allow", "git log --oneline": "allow", "git diff": "allow", "git fetch": "allow",
+    "git clean -fd": "ask", "git -C /x clean -fd": "ask", "git reset --hard HEAD": "ask", "git -C /x reset --hard": "ask",
+    "git restore file": "ask", "git checkout -- file": "ask", "git stash drop": "ask", "git branch -D topic": "ask",
+    "git config --global user.name x": "ask", "git config core.hooksPath hooks": "ask", "git remote set-url origin u": "ask",
+    "ssh host": "ask", "scp a host:b": "ask", "sudo pacman -Syu": "deny", "su": "deny", "pkexec true": "deny",
+    "git push": "deny", "git push origin main": "deny", "git -C /x push": "deny",
+    "gh copilot": "deny", "gh copilot -p x": "deny", "copilot -p x": "deny", "gemini": "deny", "cursor-agent -p x": "deny",
+    "crush run x": "deny", "gh status": "allow", "gh co 12": "allow", "gh config set editor nvim": "allow",
+    "ls -la": "allow", "make check": "allow", "pacman -Qi git": "allow",
+}
+for group, verbs in GH_READ.items():
+    COMMANDS.update({f"gh {group} {verb} 1": "allow" for verb in verbs})
+for group, verbs in GH_WRITE.items():
+    COMMANDS.update({f"gh {group} {verb} 1": "ask" for verb in verbs})
+    COMMANDS.update({f"gh {group} {verb}": "ask" for verb in verbs})
 
+for command, expected in COMMANDS.items():
+    got_claude = claude_decision("Bash", command)
+    got_claude = "allow" if got_claude == "auto" else got_claude
+    got_opencode = oc_last(oc_rules(opencode["permission"], "bash"), command)
+    require(got_claude == expected, f"Claude decides {got_claude} for `{command}`, expected {expected}")
+    require(got_opencode == expected, f"OpenCode decides {got_opencode} for `{command}`, expected {expected}")
+require(claude_decision("Bash", "opencode run x") == "deny", "Claude can launch a nested OpenCode client")
+for command in ("claude -p x", "opencode run x"):
+    require(oc_last(oc_rules(opencode["permission"], "bash"), command) == "deny", f"OpenCode can launch `{command}`")
 
-charter = (ROOT / "agents/.agents/agents/auditor.md").read_text(encoding="utf-8")
-require(charter.strip() and "VERDICT" in charter, "the shared auditor charter is missing or has no verdict line")
-claude_auditor = ROOT / "claude-code/.claude/agents/auditor.md"
-require(claude_auditor.is_file(), "Claude Code auditor agent is missing")
-fields, nested = frontmatter(claude_auditor)
-require(fields.get("name") == "auditor", "Claude auditor agent name drifted")
-require(set(fields.get("tools", "").replace(",", " ").split()) == {"Read", "Grep", "Glob"}, "Claude auditor agent is not exactly Read, Grep, Glob")
-require(fields.get("effort") == "xhigh", "Claude auditor agent effort is not xhigh")
-CLAUDE_AGENT_FIELDS = {"name", "description", "tools", "model", "effort"}
-require(set(fields) <= CLAUDE_AGENT_FIELDS, f"Claude auditor agent carries fields outside the permitted set: {set(fields) - CLAUDE_AGENT_FIELDS}")
-require(claude_auditor.read_text(encoding="utf-8").split("---\n", 2)[2].strip() == charter.strip(), "Claude auditor body differs from the shared charter")
-for agent_file in (ROOT / "claude-code/.claude/agents").glob("*.md"):
-    agent_fields, _ = frontmatter(agent_file)
-    require(set(agent_fields.get("tools", "x").replace(",", " ").split()) <= {"Read", "Grep", "Glob"}, f"Claude agent is not read-only: {agent_file.name}")
-    require(set(agent_fields) <= CLAUDE_AGENT_FIELDS, f"Claude agent carries fields outside the permitted set: {agent_file.name}")
-
-opencode_agents = opencode.get("agent", {})
-auditor = opencode_agents.get("auditor", {})
-require(auditor.get("mode") == "subagent", "OpenCode auditor agent is not a subagent")
-require(opencode["provider"]["openai"]["models"][opencode["model"].split("/", 1)[1]]["options"]["reasoningEffort"] == "xhigh", "OpenCode primary model is not configured at xhigh")
-require(auditor.get("prompt") == "{file:~/.agents/agents/auditor.md}", "OpenCode auditor does not read the shared charter")
-auditor_plugin = ROOT / "opencode/.config/opencode/plugins/auditor-permissions.js"
-require(auditor_plugin.is_file(), "OpenCode auditor permission derivation plugin is missing")
-# Execute the real transform, not a hand-written copy of its expected grants.
-# A data URL avoids module/cache files and the fake home is used only as a path.
-derived = subprocess.run([
-    "node", "--input-type=module", "-e",
-    'let text = ""; for await (const chunk of process.stdin) text += chunk; '
-    'const {source, config} = JSON.parse(text); '
-    'const {AuditorPermissions} = await import("data:text/javascript;base64," + Buffer.from(source).toString("base64")); '
-    'await (await AuditorPermissions()).config(config); process.stdout.write(JSON.stringify(config.agent));',
-], input=json.dumps({"source": auditor_plugin.read_text(encoding="utf-8"), "config": opencode}),
-    capture_output=True, text=True, timeout=15,
-    env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": "/fixture-home", "XDG_DATA_HOME": "/fixture-home/.local/share"})
-require(derived.returncode == 0, "OpenCode auditor permission derivation failed")
-derived_agents = json.loads(derived.stdout)
-for name, agent in opencode_agents.items():
-    bootstrap = agent.get("permission", {})
-    require(list(bootstrap.items()) == [("*", {}), ("read", {}), ("glob", {}), ("external_directory", {}), ("**", "deny")], f"OpenCode agent bootstrap is not fail-closed: {name}")
-    permissions = derived_agents[name]["permission"]
-    require(next(iter(permissions.items()), None) == ("**", "deny"), f"OpenCode agent does not deny unknown permissions: {name}")
-    require(set(permissions) == {"**", "read", "glob", "external_directory"}, f"OpenCode agent tool allowlist drifted: {name}")
-    require(evaluate("glob", "**/*.py", opencode["permission"], permissions) == "allow", f"OpenCode agent cannot discover local filenames: {name}")
-    for tool in ("read", "glob", "external_directory", "edit", "bash", "custom_future_tool"):
-        require(evaluate(tool, "ordinary", opencode["permission"], bootstrap) == "deny", f"OpenCode agent grants authority without its plugin: {name}: {tool}")
-    for tool in ("edit", "write", "apply_patch", "bash", "grep", "webfetch", "websearch", "task", "skill", "lsp", "custom_future_tool", "mcp_server_mutate"):
-        require(evaluate(tool, "*", opencode["permission"], permissions) == "deny", f"OpenCode agent permits {tool}: {name}")
-    require(evaluate("read", "mcp:server:resource", opencode["permission"], permissions) == "deny", f"OpenCode agent reads MCP resources: {name}")
-    for subject, expected in external_cases.items():
-        require(evaluate("external_directory", subject, opencode["permission"], permissions) == expected, f"OpenCode agent changes inherited external action: {name}: {subject}")
-    require("tools" not in agent, f"OpenCode agent uses the deprecated tools field: {name}")
-require(not (ROOT / "opencode/.config/opencode/agents").exists(), "OpenCode markdown agents exist beside the config agents")
-require(claude.get("attribution", {}).get("sessionUrl") is False, "Claude Code would add a session URL trailer to commits")
-require("classifyAllShell" not in claude.get("autoMode", {}), "Claude Code re-classifies its allow-listed commands for no gain")
-for store in PROJECT_STORES:
-    glob = f"//**/{store}/**" if store in PROJECT_STORE_DIRECTORIES else f"//**/{store}"
-    for tool in ("Read", "Edit"):
-        require(f"{tool}({glob})" in claude["permissions"]["deny"], f"Claude Code file tools reach a credential store copy: {tool}({glob})")
-    for label, rules in (("read", read_rules), ("edit", edit_rules)):
-        if store in PROJECT_STORE_DIRECTORIES:
-            require(rules.get(f"**/{store}/**") == "deny" and rules.get(f"{store}/**") == "deny", f"OpenCode {label} rules reach a credential store copy: {store}")
-        else:
-            require(relative_deny(rules, store), f"OpenCode {label} rules reach a credential store copy: {store}")
-    if store in PROJECT_STORE_DIRECTORIES:
-        require(external_rules.get(f"**/{store}/**") == "deny", f"OpenCode external directory rule reaches a credential store copy: {store}")
-require("Read(~/Projects/**)" in claude["permissions"]["allow"], "Claude Code lacks the standing read allow under ~/Projects")
-for tree in SYSTEM_READ_TREES:
-    require(f"Read(//{tree.lstrip('/')}/**)" in claude["permissions"]["allow"], f"Claude Code lacks the standing read allow on {tree}")
-require(opencode.get("skills", {}).get("paths") == ["~/.agents/skills"], "OpenCode skill paths are not exactly the neutral source")
-guidance = ROOT / "opencode/.config/opencode/AGENTS.md"
-require(guidance.is_symlink() and guidance.resolve() == (ROOT / "agents/.agents/shared-guidance.md").resolve(), "OpenCode native global guidance is not linked to its canonical source")
-require(not opencode.get("instructions"), "OpenCode appends duplicate explicit global instructions")
-require((ROOT / "CLAUDE.md").read_text().strip() == "@AGENTS.md", "project CLAUDE compatibility import changed")
-load_json("opencode/.config/opencode/tui.json")
-
-# Models: a moving alias or catalog default where the tool offers one, a
-# concrete id only where it does not (AGENTS.md, Tool Configuration).
-require(claude.get("env", {}).get("CLAUDE_CODE_EFFORT_LEVEL") == "xhigh", "Claude Code effort is not xhigh")
-spar_claude = (ROOT / "agents/.agents/skills/spar/scripts/spar-claude").read_text(encoding="utf-8")
-require('MODEL="fable"' in spar_claude and re.search(r'^\s*--model "\$MODEL"\s*$', spar_claude, re.M), "spar-claude does not review with the fable alias")
-require(re.search(r'ANTHROPIC_DEFAULT_FABLE_MODEL:\s*""', spar_claude) and spar_claude.count("ANTHROPIC_DEFAULT_") == 1, "spar-claude does not clear exactly the fable override")
-
-
-# Commit gate: every tool runs commit-gate before a shell command.
-claude = load_json("claude-code/.claude/settings.json")
-gate_hooks = [
-    hook["command"]
-    for entry in claude.get("hooks", {}).get("PreToolUse", [])
-    if entry.get("matcher") == "Bash"
-    for hook in entry.get("hooks", [])
-    if hook.get("type") == "command"
+# --- Paths: secrets and personal folders denied, everything else readable --------------------
+PROTECTED = [
+    "~/.ssh/id_ed25519", "~/.ssh/config", "~/.aws/credentials", "~/.gnupg/pubring.kbx", "~/.kube/config",
+    "~/.password-store/x.gpg", "~/.local/share/keyrings/login.keyring", "~/.mozilla/firefox/p/logins.json",
+    "~/.config/google-chrome/Default/Login Data", "~/.config/1Password/x", "~/.config/gh/hosts.yml",
+    "~/.docker/config.json", "~/.netrc", "~/.npmrc", "~/.pypirc", "~/.claude/.credentials.json", "~/.codex/auth.json",
+    "~/.local/share/opencode/auth.json", "~/.bash_history", "~/.zsh_history", "~/.local/share/fish/fish_history",
+    "~/.python_history", "~/.node_repl_history", "~/.psql_history", "~/.mysql_history",
+    "~/.claude/projects/p/session.jsonl", "~/.codex/sessions/s.jsonl", "~/.local/share/opencode/storage/s",
+    "/proc/1234/environ", "/var/lib/systemd/coredump/core.x.zst", "/var/crash/x",
+    "/mnt/c/Users/h/AppData/Local/Google/Chrome/User Data/Default/Login Data",
+    "/mnt/c/Users/h/AppData/Roaming/Microsoft/Credentials/x", "/mnt/c/Users/h/.ssh/id_rsa",
+    "{w}/.env", "{w}/.env.local", "{w}/config/server.key", "{w}/certs/site.pem", "{w}/id_rsa", "{w}/auth.json",
+    "{w}/credentials", "{w}/secrets/token.txt", "{w}/backup/.ssh/id_rsa", "{w}/etc/ssh/ssh_host_ed25519_key",
+    "~/Projects/other/.env",
 ]
-require(any(command.endswith(".agents/hooks/commit-gate") for command in gate_hooks), "Claude Code does not run the installed commit-gate before Bash")
-require(not any("\"if\"" in json.dumps(entry) for entry in claude.get("hooks", {}).get("PreToolUse", [])), "Claude Code narrows the gate hook with an if filter")
-require("Edit(~/.agents/hooks/**)" in claude["permissions"]["deny"], "Claude Code file tools may edit the installed commit gate")
-require(edit_rules.get("**/.agents/hooks/**") == "deny", "OpenCode file tools may edit the installed commit gate")
-require(external_rules.get("~/.agents/hooks/**") == "deny", "OpenCode may reach the installed commit gate")
-require((ROOT / "opencode/.config/opencode/plugins/commit-gate.js").is_file(), "OpenCode commit-gate plugin is missing")
-for skill, script in (("commit", "commit-candidate"), ("commit", "commit-apply"), ("publish", "publish-bind"), ("publish", "publish-apply"), ("publish", "publish-verify")):
-    require(os.access(ROOT / "agents/.agents/skills" / skill / "scripts" / script, os.X_OK), f"skill script missing or not executable: {skill}/scripts/{script}")
+PERSONAL = ["~/Desktop/a.txt", "~/Documents/tax.pdf", "~/Downloads/x.zip", "~/Music/a.mp3", "~/Pictures/a.jpg",
+            "~/Sync/notes.md", "~/Videos/a.mp4", "/mnt/c/Users/h/Documents/a.docx", "/mnt/c/Users/h/OneDrive/a.xlsx"]
+READABLE = ["{w}/README.md", "{w}/src/auth.py", "{w}/example.env", "{w}/docs/credentials-policy.md",
+            "~/Projects/other/README.md", "~/Projects/quarry/opencode/README.md", "~/Projects/eyrie/scrape/x.md",
+            "~/.bashrc", "~/.config/nvim/init.lua", "~/.config/git/config", "~/.config/gh/config.yml",
+            "~/.local/share/opencode/tool-output/out.txt", "~/.claude/projects/p/memory/MEMORY.md", "~/Work/tries/a.md",
+            "/etc/os-release", "/usr/share/omarchy/README.md", "/proc/cpuinfo", "/sys/class/net/lo/operstate",
+            "/var/lib/pacman/local/ALPM_DB_VERSION", "/tmp/x.txt"]
+
+
+def expand(path: str) -> str:
+    return path.replace("{w}", WORKTREE).replace("~/", HOME + "/")
+
+
+for path in PROTECTED + PERSONAL:
+    full = expand(path)
+    for tool, key in (("Read", "read"), ("Edit", "edit")):
+        require(claude_decision(tool, full) == "deny", f"Claude {tool} reaches protected {path}")
+        require(oc_file(key, full) == "deny", f"OpenCode {key} reaches protected {path}")
+for path in READABLE:
+    full = expand(path)
+    require(claude_decision("Read", full) == "allow", f"Claude cannot read {path}")
+    require(oc_file("read", full) == "allow", f"OpenCode cannot read {path}")
+
+# Writes: the repository and persistent scratch run freely; elsewhere needs H.
+for path in ("{w}/src/app.py", "~/Projects/eyrie/scrape/work/x.md"):
+    require(claude_decision("Edit", expand(path)) in ("allow", "auto") and oc_file("edit", expand(path)) == "allow",
+            f"routine edit blocked: {path}")
+require(claude_decision("Edit", expand("~/Projects/eyrie/scrape/work/x.md")) == "allow", "Claude lacks the scratch edit grant")
+# OpenCode matches edits relative to the worktree, so the grants must hold wherever the session starts.
+for worktree in (WORKTREE, HOME + "/Projects/quarry/opencode", HOME + "/Work/tries/a", "/tmp/canary.x/repo"):
+    require(oc_file("edit", expand("~/Projects/eyrie/scrape/work/x.md"), worktree=worktree) == "allow",
+            f"OpenCode cannot write persistent scratch from {worktree}")
+    for path in ("~/Projects/other/app.py", "~/.bashrc", "~/Projects/eyrie/other/scrape/x"):
+        require(oc_file("edit", expand(path), worktree=worktree) == "ask",
+                f"OpenCode edits {path} from {worktree} without asking")
+for worktree in (WORKTREE, HOME + "/Projects/quarry/opencode", HOME + "/Work/tries/a"):
+    require(oc_file("edit", "/tmp/opencode/session/x.md", worktree=worktree) == "allow",
+            f"OpenCode cannot write its own temp root from {worktree}")
+for path in ("~/Projects/other/app.py", "~/.bashrc"):
+    require(claude_decision("Edit", expand(path)) != "allow", f"Claude pre-approves an edit outside scope: {path}")
+for path in ("{w}/.git/config", "{w}/.git/hooks/pre-commit", "~/.agents/hooks/commit-gate", "~/.config/git/config"):
+    require(claude_decision("Edit", expand(path)) == "deny", f"Claude can edit {path}")
+    require(oc_file("edit", expand(path)) == "deny", f"OpenCode can edit {path}")
+require(claude_decision("Read", "/tmp/opencode/s/x") == "deny", "Claude reads OpenCode's session root")
+require(oc_file("read", "/tmp/claude-1000/s/x") == "deny", "OpenCode reads Claude Code's session root")
+
+# --- Tool settings ---------------------------------------------------------------------------
+permissions = claude["permissions"]
+require(permissions["defaultMode"] == "auto" and permissions["disableBypassPermissionsMode"] == "disable",
+        "Claude must run in auto mode with bypass disabled")
+require("sandbox" not in claude, "Claude tracked settings enable sandboxing")
+for section in ("allow", "soft_deny", "hard_deny"):
+    require(claude["autoMode"][section][0] == "$defaults", f"Claude auto mode dropped built-in {section} rules")
+require("personal folders" in " ".join(claude["autoMode"]["hard_deny"]), "Claude classifier lacks the personal-folder rule")
+require(claude.get("attribution", {}).get("sessionUrl") is False, "Claude would add a session URL to commits")
+require(claude.get("env", {}).get("CLAUDE_CODE_EFFORT_LEVEL") == "xhigh", "Claude Code effort is not xhigh")
+gate = [hook["command"] for entry in claude["hooks"]["PreToolUse"] if entry.get("matcher") == "Bash" for hook in entry["hooks"]]
+require(any(command.endswith(".agents/hooks/commit-gate") for command in gate), "Claude does not run the commit gate")
+
+require(opencode["share"] == "disabled" and opencode["autoupdate"] is False, "OpenCode sharing or autoupdate drifted")
+primary = opencode["model"].split("/", 1)[1]
+require(opencode["provider"]["openai"]["models"][primary]["options"]["reasoningEffort"] == "xhigh",
+        "OpenCode primary model is not configured at xhigh")
+require(not opencode.get("instructions"), "OpenCode duplicates native guidance")
+# Native discovery finds ~/.agents/skills; the explicit path keeps them in the restricted untrusted-checkout launch.
+require(opencode.get("skills") == {"paths": ["~/.agents/skills"]}, "OpenCode shared skill path drifted")
+plugins = sorted(p.name for p in (ROOT / "opencode/.config/opencode/plugins").iterdir())
+require(plugins == ["commit-gate.js"], f"unexpected OpenCode plugins: {plugins}")
+
+# Auditors: the same charter, read-only in both tools.
+charter = (ROOT / "agents/.agents/agents/auditor.md").read_text(encoding="utf-8")
+claude_auditor = (ROOT / "claude-code/.claude/agents/auditor.md").read_text(encoding="utf-8")
+front, body = claude_auditor.split("---\n", 2)[1:]
+fields = dict(line.split(":", 1) for line in front.strip().splitlines())
+require(body.strip() == charter.strip(), "Claude auditor body differs from the shared charter")
+require({t.strip() for t in fields["tools"].split(",")} == {"Read", "Grep", "Glob"}, "Claude auditor is not Read/Grep/Glob only")
+require(fields.get("effort", "").strip() == "xhigh", "Claude auditor effort is not xhigh")
+auditor = opencode["agent"]["auditor"]
+require(auditor["mode"] == "subagent" and auditor["prompt"] == "{file:~/.agents/agents/auditor.md}", "OpenCode auditor charter drifted")
+for key in ("edit", "bash", "task", "webfetch", "websearch"):
+    require(oc_last(oc_rules(opencode["permission"], key, auditor), "*") == "deny", f"OpenCode auditor can use {key}")
+require(oc_file("read", expand("{w}/src/app.py"), auditor) == "allow", "OpenCode auditor cannot read the repository")
+require(oc_file("read", expand("~/.ssh/id_rsa"), auditor) == "deny", "OpenCode auditor reads secrets")
+
+# --- Loading and skills ----------------------------------------------------------------------
+guidance = ROOT / "opencode/.config/opencode/AGENTS.md"
+require(guidance.is_symlink() and guidance.resolve() == (ROOT / "agents/.agents/shared-guidance.md").resolve(),
+        "OpenCode global guidance is not linked to shared guidance")
+require((ROOT / "CLAUDE.md").read_text().strip() == "@AGENTS.md", "project CLAUDE.md import changed")
+for skill, script in (("commit", "commit-candidate"), ("commit", "commit-apply"), ("publish", "publish-bind"),
+                      ("publish", "publish-apply"), ("publish", "publish-verify")):
+    source = ROOT / "agents/.agents/skills" / skill / "scripts" / script
     link = ROOT / "claude-code/.claude/skills" / skill / "scripts" / script
-    require(link.is_symlink() and link.resolve() == (ROOT / "agents/.agents/skills" / skill / "scripts" / script).resolve(),
-            f"Claude wrapper link missing or drifted: {script}")
-require(os.access(ROOT / "templates/hooks/commit-gate", os.X_OK), "templates/hooks/commit-gate is missing or not executable")
-
-# The sync workflow maintains role-appropriate references for every tool.
-references = {}
-for line in (ROOT / "references.txt").read_text(encoding="utf-8").splitlines():
-    fields = line.split("#", 1)[0].split()
-    if not fields:
-        continue
-    require(len(fields) == 3, "managed GitHub reference must name directory, URL and reviewed object ID")
-    require(fields[0] not in references, "duplicate reference manifest entry")
-    require(re.fullmatch(r"https://github\.com/[A-Za-z0-9-]+/[A-Za-z0-9_.-]+\.git", fields[1]),
-            "reference URL is not a canonical GitHub HTTPS endpoint")
-    references[fields[0]] = fields[2]
-require(references == {
-    "claude-code": "github:R_kgDON91aYw",
-    "opencode": "github:R_kgDOOiiGLw",
-}, "harness reference identities differ from the reviewed tool set")
-
-# Skills stay portable: the name matches the directory and only standard frontmatter fields appear.
-develop_root = ROOT / "agents/.agents/skills/develop"
-require((develop_root / "SKILL.md").is_file(), "develop workflow is missing")
-for resource in ("SKILL.md", "references/workstream.md", "references/verification.md"):
-    deployed_source = ROOT / "claude-code/.claude/skills/develop" / resource
-    require(deployed_source.is_symlink() and deployed_source.resolve() == (develop_root / resource).resolve(),
-            f"Claude develop resource missing or drifted: {resource}")
-develop_command = ROOT / "opencode/.config/opencode/commands/develop.md"
-require(develop_command.is_file(), "OpenCode develop command is missing")
-require("agent:" not in develop_command.read_text(encoding="utf-8").split("---\n", 2)[1],
-        "develop command overrides the caller's planning/implementation agent mode")
-STANDARD_SKILL_FIELDS = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
+    require(os.access(source, os.X_OK), f"skill script missing or not executable: {skill}/{script}")
+    require(link.is_symlink() and link.resolve() == source.resolve(), f"Claude skill link missing or drifted: {script}")
+require(os.access(ROOT / "templates/hooks/commit-gate", os.X_OK), "templates/hooks/commit-gate is not executable")
 for skill_dir in sorted([*(ROOT / "agents/.agents/skills").iterdir(), *(ROOT / ".agents/skills").iterdir()]):
-    text = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
-    require(text.startswith("---\n"), f"skill has no frontmatter: {skill_dir.name}")
-    frontmatter = text.split("---\n", 2)[1]
-    fields = {line.split(":", 1)[0].strip(): line.split(":", 1)[1].strip() for line in frontmatter.splitlines() if ":" in line and not line.startswith(" ")}
-    require(fields.get("name") == skill_dir.name, f"skill name does not match its directory: {skill_dir.name}")
-    require(bool(fields.get("description")), f"skill lacks a description: {skill_dir.name}")
-    require(set(fields) <= STANDARD_SKILL_FIELDS, f"skill uses non-standard frontmatter fields: {skill_dir.name}: {set(fields) - STANDARD_SKILL_FIELDS}")
+    front = (skill_dir / "SKILL.md").read_text(encoding="utf-8").split("---\n", 2)[1]
+    keys = {line.split(":", 1)[0] for line in front.splitlines() if ":" in line and not line.startswith(" ")}
+    require(f"name: {skill_dir.name}" in front and "description:" in front, f"skill frontmatter drifted: {skill_dir.name}")
+    require(keys <= {"name", "description", "license", "compatibility", "metadata", "allowed-tools"},
+            f"skill uses non-standard fields: {skill_dir.name}")
+references = {line.split()[0]: line.split()[2] for line in (ROOT / "references.txt").read_text().splitlines()
+              if line.strip() and not line.startswith("#")}
+require(references == {"claude-code": "github:R_kgDON91aYw", "opencode": "github:R_kgDOOiiGLw"},
+        "reference identities differ from the reviewed set")
 
-# One concrete path corpus exercises actual scanner predicates and modeled
-# configured rules. Keep tool-specific stronger/own-learning boundaries separate.
-scan = runpy.run_path(str(ROOT / "agents/.agents/skills/spar/scripts/spar-payload-scan"))
-additional_stores = (".config/google-chrome", ".config/1Password", ".config/Bitwarden", ".password-store")
-history_paths = (".codex/config.toml", ".codex/history.jsonl", ".claude/history.jsonl",
-                 ".claude/projects/fixture/session.jsonl", ".claude/projects/fixture/subagents/session.jsonl",
-                 ".claude/sessions/ordinary.txt", ".claude/session-env/ordinary.txt", ".claude/debug/ordinary.txt",
-                 ".codex/sessions/ordinary.txt", ".codex/archived_sessions/ordinary.txt",
-                 ".local/share/opencode/storage/ordinary.txt",
-                 ".local/share/opencode/log/ordinary.txt", ".local/share/opencode/opencode.db",
-                 ".local/share/opencode/opencode.db-wal", ".local/share/opencode/opencode.db-shm")
-corpus = list(dict.fromkeys([
-    *(store + suffix for store in (*PROJECT_STORE_DIRECTORIES, *additional_stores, *SYSTEM_TREES)
-      for suffix in ("/ordinary.txt", "/nested/ordinary.txt")),
-    *PROJECT_STORE_FILES, *SYSTEM_FILES, *history_paths,
-    *(shape.replace("*", "fixture") for shape in (*CREDENTIAL_SHAPES, *SAFETY["additional_shapes"]) if shape != "secrets/**"),
-    "secrets/ordinary.txt", "secrets/nested/ordinary.txt",
-    *(f"etc/ssh/ssh_host_{kind}_key" for kind in ("rsa", "dsa", "ecdsa", "ed25519")),
-]))
-safe_paths = tuple(dict.fromkeys([
-    "README.md", "credentials-policy.md", "example.env", "docs/authentication.md", ".config/gh-policy.md",
-    *SAFETY["positive_files"], "etc/shadow-policy.md", "etc/gshadow-policy.md", "etc/security/opasswd.policy",
-    "src/auth.py", "src/core_dump.py", "docs/keytab-policy.md", ".config/nvim/init.lua",
-    *(tree + "-public/ordinary.txt" for tree in SYSTEM_TREES),
-    *(f"etc/ssh/ssh_host_{kind}_key.pub" for kind in ("rsa", "dsa", "ecdsa", "ed25519")),
-]))
-bridge_fixtures = os.environ.get("SPAR_BRIDGE_FIXTURES")
-if bridge_fixtures:
-    argv = (Path(bridge_fixtures) / "spar-claude.argv").read_bytes().decode().rstrip("\0").split("\0")
-    bridge_claude_permissions = json.loads(argv[argv.index("--settings") + 1])["permissions"]
-    bridge_claude = bridge_claude_permissions["deny"]
-    require(argv[argv.index("--tools") + 1] == "Read,Glob,Grep" and argv[argv.index("--permission-mode") + 1] == "dontAsk",
-            "Claude reviewer tool/mode boundary drifted")
-    require({"Write", "Edit", "NotebookEdit", "Bash", "WebFetch", "WebSearch", "Task"} <= set(bridge_claude),
-            "Claude reviewer lost explicit capability denies")
-    require(all(rule.startswith("Read(") for rule in bridge_claude_permissions["allow"]), "Claude reviewer added a non-read allowance")
-
-for prefix in ("", "copy/deep/"):
-    for name, denied in [(name, True) for name in corpus] + [(name, False) for name in safe_paths]:
-        subject = prefix + name
-        require(scan["sensitive_path"](subject) == denied, f"scanner path corpus mismatch: {subject}")
-        absolute_target = FIXTURE_CWD + "/" + subject
-        for tool in ("Read", "Edit"):
-            require((claude_file_action(claude["permissions"], tool, absolute_target) == "deny") == denied,
-                    f"Claude primary {tool} path corpus mismatch: {subject}")
-        for permissions in (opencode["permission"], derived_agents["auditor"]["permission"]):
-            require((evaluate("read", subject, permissions) == "deny") == denied, f"OpenCode path corpus mismatch: {subject}")
-        require(evaluate("edit", subject, opencode["permission"]) == ("deny" if denied else "allow"),
-                f"OpenCode configured workspace edit mismatch: {subject}")
-        require(evaluate("edit", subject, derived_agents["auditor"]["permission"]) == "deny", f"OpenCode auditor can edit corpus path: {subject}")
-        if bridge_fixtures:
-            claude_denied = any(rule.startswith("Read(./") and path_glob(subject, rule[7:-1]) for rule in bridge_claude)
-            require(claude_denied == denied, f"Claude bridge path corpus mismatch: {subject}")
-            fixture = Path(bridge_fixtures) / "corpus" / subject
-            fixture.parent.mkdir(parents=True, exist_ok=True)
-            fixture.write_text("ordinary synthetic fixture\n")
-            scanned = subprocess.run([str(ROOT / "agents/.agents/skills/spar/scripts/spar-payload-scan"),
-                                      "outbound", "--scratch-root", bridge_fixtures, "--", str(fixture)],
-                                     input="Review synthetic fixture.", capture_output=True, text=True)
-            require(scanned.returncode == (2 if denied else 0), f"scanner artifact corpus mismatch: {subject}")
-# Preapproved project roots retain persisted read/edit restrictions. Actual
-# guarded scratch exceptions are exercised in tests/opencode-scratch.sh.
-for tree, location in (("scratch", "eyrie/scrape"), ("quarry", "quarry")):
-    for prefix in ("", "copy/deep/"):
-        for name, denied in [(name, True) for name in corpus] + [(name, False) for name in safe_paths]:
-            target = f"/fixture-home/Projects/{location}/" + prefix + name
-            subject = os.path.relpath(target, "/fixture-home/Projects/eyrie/repo")
-            external = os.path.dirname(target) + "/*"
-            for permissions in (opencode["permission"], derived_agents["auditor"]["permission"]):
-                require(evaluate("read", subject, permissions) == ("deny" if denied else "allow"), f"OpenCode {tree} read policy drifted: {subject}")
-                require(evaluate("external_directory", external, permissions) in (("allow", "deny") if denied else ("allow",)), f"OpenCode {tree} location policy drifted: {external}")
-            require(evaluate("edit", subject, opencode["permission"]) == ("deny" if denied else "ask"), f"OpenCode {tree} edit policy drifted: {subject}")
-            require(evaluate("edit", subject, opencode["permission"], derived_agents["auditor"]["permission"]) == "deny", f"OpenCode auditor can edit {tree}: {subject}")
-            for tool in ("Read", "Edit"):
-                action = claude_file_action(claude["permissions"], tool, target)
-                require((action == "deny") == denied, f"Claude {tree} {tool} protection mismatch: {subject}")
-                if not denied:
-                    require(action == "allow" if tool == "Read" or tree == "scratch" else action != "allow",
-                            f"Claude {tree} {tool} allowance mismatch: {subject}")
-            if name in (store + "/ordinary.txt" for store in PROJECT_STORE_DIRECTORIES) or name == "secrets/ordinary.txt":
-                for permissions in (opencode["permission"], derived_agents["auditor"]["permission"]):
-                    require(evaluate("external_directory", external, permissions) == "deny", f"OpenCode {tree} copied directory store reopened: {external}")
-
-# Exercise the real pure OpenCode predicate without calling filesystem layout,
-# mount-info, client dispatch or the approval adapter. Stronger no-adaptation
-# categories and auditor legacy eligibility stay with tests/opencode-read.sh.
-guard_cases = [("/" + prefix + name, denied) for prefix in ("", "copy/deep/")
-               for name, denied in [(name, True) for name in corpus] + [(name, False) for name in safe_paths]]
-guard = subprocess.run([
-    "node", "--input-type=module", "-e",
-    'let text=""; for await (const chunk of process.stdin) text+=chunk; '
-    'const {source, paths}=JSON.parse(text); '
-    'const {protectedPath}=await import("data:text/javascript;base64,"+Buffer.from(source).toString("base64")); '
-    'process.stdout.write(JSON.stringify(paths.map(path=>protectedPath(path))));',
-], input=json.dumps({"source": safety_helper.read_text(encoding="utf-8"), "paths": [path for path, _ in guard_cases]}),
-    capture_output=True, text=True, timeout=15, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": FIXTURE_HOME})
-require(guard.returncode == 0, "OpenCode pure Safety predicate failed to load/evaluate")
-guard_results = json.loads(guard.stdout)
-require(len(guard_results) == len(guard_cases), "OpenCode pure Safety predicate returned incomplete results")
-for (path, denied), result in zip(guard_cases, guard_results):
-    require(result == denied, f"OpenCode pure Safety predicate disagrees with shared corpus: {path}")
-
-# Positive read scopes are checked after system masks so a broad denial cannot
-# make an inventory-only test pass while hiding useful configuration/metadata.
-for name in SAFETY["positive_files"]:
-    if not name.startswith(("etc/", "usr/", "sys/", "var/")):
-        continue
-    require(claude_file_action(claude["permissions"], "Read", "/" + name) == "allow", f"Claude useful system read lost: {name}")
-for name in SYSTEM_FILES:
-    require(scan["sensitive_path"]("/" + name), f"scanner absolute protected-file mismatch: {name}")
-    for tool in ("Read", "Edit"):
-        require(claude_file_action(claude["permissions"], tool, "/" + name) == "deny", f"Claude absolute protected-file mismatch: {name}")
-for target in ("/proc/cpuinfo", "/dev/null", "/run/ordinary-status", FIXTURE_HOME + "/.local/state/ordinary/config.json"):
-    require(not scan["sensitive_path"](target), f"scanner confuses scope exclusion with protected material: {target}")
-    require(claude_file_action(claude["permissions"], "Read", target) != "deny", f"Claude blanket runtime/state denial: {target}")
-require(claude_file_action(claude["permissions"], "Edit", FIXTURE_HOME + "/.claude/projects/fixture/memory/MEMORY.md") != "deny",
-        "Claude transcript protection blocks its own memory")
-
-print(f"ok: source configuration authority boundaries ({2 * (len(corpus) + len(safe_paths))} corpus cases; "
-      f"{len(external_cases)} configured external locations; {4 * (len(corpus) + len(safe_paths))} scratch/quarry paths; "
-      f"real auditor transform and lexical guard predicates; {'captured bridge profiles' if bridge_fixtures else 'bridge capture checks deferred to spar-bridges.sh'}; no native dispatch proof)")
+print(f"ok: {len(COMMANDS)} commands and {len(PROTECTED) + len(PERSONAL) + len(READABLE)} paths decide alike in both tools; "
+      "auditors read-only; configuration contracts hold (modeled matching, not live dispatch)")

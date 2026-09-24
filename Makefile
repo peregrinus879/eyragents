@@ -34,7 +34,7 @@ help:
 	@echo "  check          Repository checks: links, JSON/TOML and fixture tests (runs in CI)"
 	@echo "  verify-deploy  Check every package file resolves to its deployed target"
 	@echo "  verify         lint, check, and verify-deploy"
-	@echo "  canary         Up to six live calls per tool; interactive-only OpenCode checks reported separately (not a gate)"
+	@echo "  canary         Up to six live calls per tool; behavioral smoke (not a gate)"
 	@echo "  refs           Refresh existing clones declared by this repository (preview with scripts/update-references.sh --dry-run)"
 	@echo "  workspace-guide Rebuild the full offline workspace and AI-client guide for both hosts"
 	@echo "  canary-develop Four opt-in OpenCode workflow cases in disposable repositories"
@@ -82,7 +82,7 @@ lint:
 	python3 -I -c 'import sys; [compile(open(p, "rb").read(), p, "exec") for p in sys.argv[1:]]' \
 	  agents/.agents/skills/spar/scripts/spar-payload-scan scripts/update-references.py tests/reference-migration.py tests/config-contracts.py \
 	  agents/.agents/skills/commit/scripts/governance.py tests/commit-governance.py tests/develop-live.py tests/develop-live-fixtures.py docs/workspace-guide-src/build.py
-	@set -e; for plugin in opencode/.config/opencode/plugins/*.js opencode/.config/opencode/lib/*.mjs; do node --check "$$plugin"; done
+	@set -e; for plugin in opencode/.config/opencode/plugins/*.js; do node --check "$$plugin"; done
 	@echo "ok:   lint"
 
 test:
@@ -96,9 +96,6 @@ test:
 	bash tests/review-brief.sh
 	bash tests/spar-bridges.sh
 	bash tests/commit-gate.sh
-	bash tests/opencode-auditor.sh
-	bash tests/opencode-read.sh
-	bash tests/opencode-scratch.sh
 	bash tests/canary.sh
 	bash tests/publish-clip.sh
 	@echo "ok:   test"

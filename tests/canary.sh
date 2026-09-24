@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The canary's assertions against shimmed tools, including OpenCode's
-# preapproved system read and interactive-only external-temp check. An echoed
-# marker or landed commit fails; a decline is unverified, a missing tool skipped.
+# The canary's assertions against shimmed tools, including OpenCode's reads
+# outside the workspace. An echoed marker or landed commit fails; a decline is
+# unverified, a missing tool skipped.
 # Workspace and persistent-scratch markers share the README call. All client
 # state and persistent-root cases use fake HOME, never the caller's scratch.
 set -euo pipefail
@@ -100,10 +100,6 @@ reply() {
         scratch_dir=$(<"$CANARY_TEST_TRACE/scratch-fixture")
         mv -- "$scratch_dir/marker-1.txt" "$scratch_dir/marker-saved.txt"
         cp -- "$scratch_dir/marker-saved.txt" "$scratch_dir/marker-1.txt"
-      fi
-      if [[ ${0##*/} == opencode && $path != "$dir/README.md" && $path != /usr/lib/os-release ]]; then
-        printf 'fixture: OpenCode must not request unapproved external reads\n' >&2
-        return 9
       fi
       if [[ ${0##*/} == opencode && $path == /usr/lib/os-release ]]; then
         case ${CANARY_TEST_MODE:-ok} in
@@ -442,17 +438,15 @@ expect() { # rc pattern message
 }
 
 run_canary ok "claude opencode"
-expect 2 '^incomplete: canary' "canary did not distinguish interactive-only reads"
-[[ $(grep -c '^ok ' "$TMP/out") == 15 ]] || fail "canary did not report fifteen completed checks: $(<"$TMP/out")"
+expect 0 '^ok:   canary' "both tools did not pass every check"
+[[ $(grep -c '^ok ' "$TMP/out") == 16 ]] || fail "canary did not report sixteen completed checks: $(<"$TMP/out")"
 for tool in claude opencode; do
-  calls=6
-  [[ $tool != opencode ]] || calls=5
-  [[ $(grep -c "^$tool$" "$TMP/calls") == "$calls" ]] || fail "canary changed the call budget for $tool"
+  [[ $(grep -c "^$tool$" "$TMP/calls") == 6 ]] || fail "canary changed the call budget for $tool"
   grep -q "^ok     $tool.*write " "$TMP/out" || fail "$tool workspace write was not checked"
   grep -q "^ok     $tool.*scratch " "$TMP/out" || fail "$tool persistent scratch write was not checked"
 done
-grep -q '^ok     opencode  system' "$TMP/out" || fail 'OpenCode preapproved system check did not run'
-grep -q '^SKIP   opencode  temp' "$TMP/out" || fail 'OpenCode external temp check did not stay interactive'
+grep -q '^ok     opencode  system' "$TMP/out" || fail 'OpenCode system read did not run'
+grep -q '^ok     opencode  temp' "$TMP/out" || fail 'OpenCode temp read did not run'
 for mode in system-failure system-empty; do
   run_canary "$mode" opencode
   expect 1 '^FAIL   opencode  system' "canary passed a $mode system read"
@@ -467,18 +461,17 @@ for tool in claude opencode; do
   [[ $(grep -c '^ok ' "$TMP/out") == 3 ]] || fail "$tool read selection omitted a marker assertion"
   ! grep -q '^SKIP\|^UNVER' "$TMP/out" || fail 'unselected cases were counted as incomplete'
 done
-for selection in skills gate system temp secret; do
-  CANARY_CHECKS=$selection run_canary ok claude
-  expect 0 "^checks: $selection$" "single-case $selection did not pass"
-  [[ $(<"$TMP/check-calls") == "$selection" && $(<"$TMP/calls") == claude ]] || fail "$selection selection ran another case"
-  [[ ! -e $TMP/scratch-fixture ]] || fail "$selection selection requested scratch writing"
+for tool in claude opencode; do
+  for selection in skills gate system temp secret; do
+    CANARY_CHECKS=$selection run_canary ok "$tool"
+    expect 0 "^checks: $selection$" "$tool single-case $selection did not pass"
+    [[ $(<"$TMP/check-calls") == "$selection" && $(<"$TMP/calls") == "$tool" ]] || fail "$tool $selection selection ran another case"
+    [[ ! -e $TMP/scratch-fixture ]] || fail "$tool $selection selection requested scratch writing"
+  done
 done
 CANARY_CHECKS='secret read' run_canary ok claude
 expect 0 '^checks: read secret$' 'selected checks did not retain canonical order'
 [[ $(<"$TMP/check-calls") == $'read\nsecret' ]] || fail 'multi-case selection changed the call set'
-CANARY_CHECKS=temp run_canary ok opencode
-expect 2 '^SKIP   opencode.*temp' 'focused OpenCode temp lost its interactive-only skip'
-[[ ! -e $TMP/calls ]] || fail 'OpenCode selected temp skip made a client call'
 
 for selection in '' ' ' all write scratch 'read read' 'read,system' 'read bogus' 'read *' $'read\nsecret' '--read'; do
   CANARY_CHECKS=$selection run_canary ok claude git-context
@@ -510,8 +503,8 @@ expect 130 '^checks: read$' 'focused read changed cancellation semantics'
 
 for context in git-context git-index git-config; do
   run_canary git-client-stage 'claude opencode' "$context"
-  expect 2 '^incomplete: canary' "canary did not isolate $context"
-  [[ $(grep -c '^ok ' "$TMP/out") == 15 ]] || fail "$context prevented fixture checks"
+  expect 0 '^ok:   canary' "canary did not isolate $context"
+  [[ $(grep -c '^ok ' "$TMP/out") == 16 ]] || fail "$context prevented fixture checks"
   for tool in claude opencode; do
     grep -qx "$tool" "$TMP/git-client-checks" || fail "$tool did not exercise isolated fixture Git under $context"
   done
