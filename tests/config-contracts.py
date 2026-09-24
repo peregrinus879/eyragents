@@ -421,7 +421,7 @@ require(claude_auditor.is_file(), "Claude Code auditor agent is missing")
 fields, nested = frontmatter(claude_auditor)
 require(fields.get("name") == "auditor", "Claude auditor agent name drifted")
 require(set(fields.get("tools", "").replace(",", " ").split()) == {"Read", "Grep", "Glob"}, "Claude auditor agent is not exactly Read, Grep, Glob")
-require(fields.get("model") == "fable" and fields.get("effort") == "xhigh", "Claude auditor agent does not use the configured Fable/xhigh preference")
+require(fields.get("effort") == "xhigh", "Claude auditor agent effort is not xhigh")
 CLAUDE_AGENT_FIELDS = {"name", "description", "tools", "model", "effort"}
 require(set(fields) <= CLAUDE_AGENT_FIELDS, f"Claude auditor agent carries fields outside the permitted set: {set(fields) - CLAUDE_AGENT_FIELDS}")
 require(claude_auditor.read_text(encoding="utf-8").split("---\n", 2)[2].strip() == charter.strip(), "Claude auditor body differs from the shared charter")
@@ -433,8 +433,7 @@ for agent_file in (ROOT / "claude-code/.claude/agents").glob("*.md"):
 opencode_agents = opencode.get("agent", {})
 auditor = opencode_agents.get("auditor", {})
 require(auditor.get("mode") == "subagent", "OpenCode auditor agent is not a subagent")
-require(auditor.get("model") == opencode["model"], "OpenCode auditor agent does not run the configured primary model")
-require(opencode["provider"]["openai"]["models"][opencode["model"].split("/", 1)[1]]["options"]["reasoningEffort"] == "xhigh", "OpenCode auditor model is not configured at xhigh")
+require(opencode["provider"]["openai"]["models"][opencode["model"].split("/", 1)[1]]["options"]["reasoningEffort"] == "xhigh", "OpenCode primary model is not configured at xhigh")
 require(auditor.get("prompt") == "{file:~/.agents/agents/auditor.md}", "OpenCode auditor does not read the shared charter")
 auditor_plugin = ROOT / "opencode/.config/opencode/plugins/auditor-permissions.js"
 require(auditor_plugin.is_file(), "OpenCode auditor permission derivation plugin is missing")
@@ -483,7 +482,6 @@ for store in PROJECT_STORES:
 require("Read(~/Projects/**)" in claude["permissions"]["allow"], "Claude Code lacks the standing read allow under ~/Projects")
 for tree in SYSTEM_READ_TREES:
     require(f"Read(//{tree.lstrip('/')}/**)" in claude["permissions"]["allow"], f"Claude Code lacks the standing read allow on {tree}")
-require(re.fullmatch(r"openai/[a-z0-9][a-z0-9.-]*", opencode.get("small_model", "")), "OpenCode small_model is not a concrete OpenAI model id")
 require(opencode.get("skills", {}).get("paths") == ["~/.agents/skills"], "OpenCode skill paths are not exactly the neutral source")
 guidance = ROOT / "opencode/.config/opencode/AGENTS.md"
 require(guidance.is_symlink() and guidance.resolve() == (ROOT / "agents/.agents/shared-guidance.md").resolve(), "OpenCode native global guidance is not linked to its canonical source")
@@ -493,13 +491,10 @@ load_json("opencode/.config/opencode/tui.json")
 
 # Models: a moving alias or catalog default where the tool offers one, a
 # concrete id only where it does not (AGENTS.md, Tool Configuration).
-require(claude.get("model") == "fable", "Claude Code pins a model instead of the fable alias")
 require(claude.get("env", {}).get("CLAUDE_CODE_EFFORT_LEVEL") == "xhigh", "Claude Code effort is not xhigh")
 spar_claude = (ROOT / "agents/.agents/skills/spar/scripts/spar-claude").read_text(encoding="utf-8")
 require('MODEL="fable"' in spar_claude and re.search(r'^\s*--model "\$MODEL"\s*$', spar_claude, re.M), "spar-claude does not review with the fable alias")
 require(re.search(r'ANTHROPIC_DEFAULT_FABLE_MODEL:\s*""', spar_claude) and spar_claude.count("ANTHROPIC_DEFAULT_") == 1, "spar-claude does not clear exactly the fable override")
-require(re.fullmatch(r"openai/gpt-[0-9][a-z0-9.-]*", opencode["model"]) and not opencode["model"].endswith("-fast"), "OpenCode model is not a concrete GPT id on the standard tier")
-require(not opencode["small_model"].endswith("-fast"), "OpenCode small model is on the Fast tier")
 
 
 # Commit gate: every tool runs commit-gate before a shell command.

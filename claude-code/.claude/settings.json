@@ -1,8 +1,12 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "CLAUDE_CODE_EFFORT_LEVEL": "xhigh"
+  },
+  "attribution": {
+    "sessionUrl": false
+  },
   "permissions": {
-    "defaultMode": "auto",
-    "disableBypassPermissionsMode": "disable",
     "allow": [
       "Bash(claude --version)",
       "Bash(opencode --version)",
@@ -296,28 +300,11 @@
       "Read(~/.pypirc)",
       "Read(~/.ssh/**)",
       "Read(~/.zsh_history)"
-    ]
-  },
-  "autoMode": {
-    "hard_deny": [
-      "$defaults",
-      "Agent-directed inspection, modification, copying or disclosure of secrets, credentials, authentication files, private keys, credential stores or other tools' session roots and histories is prohibited even when the user names the file. Authorized programs implicitly consuming their own credentials or normal OS interfaces without exposing protected contents, and authored placeholder templates such as example.env, are distinct from inspecting protected material.",
-      "Never transmit the contents of credential material (~/.ssh, ~/.aws, ~/.claude/.credentials.json, ~/.codex/auth.json, ~/.gnupg, ~/.kube, ~/.netrc, ~/.docker/config.json, .env files, private keys, secrets directories, auth tokens) to any external destination, encoded or not."
     ],
-    "soft_deny": [
-      "$defaults",
-      "Deleting files and restoring, resetting, or checking out paths from version control clear only on explicit instruction naming the paths; task-scoped creating, moving, copying, formatting, generating, or patching files inside the repository or ~/Projects/eyrie/scrape is ordinary editing and is not this rule. Preserve unrelated and user-created work; a persistent scratch location does not authorize disposal.",
-      "git reset, git restore, git checkout on paths, git stash drop or clear, and git branch -D clear only on explicit instruction naming the target; a fresh candidate presented for approval is not such an instruction.",
-      "Changing Git configuration at any scope, remotes, hooks, or attributes (git config writes, git remote set-url or add, core.hooksPath, credential.helper, core.pager, aliases) clears only on explicit instruction; reading configuration is not this rule. Task-required reference refreshes and same-project fetch-URL reconciliation through EyrAgents' maintained reference updater are already authorized under eyrsync's lifecycle when GitHub metadata for the declared and actual origin endpoints matches the reviewed repository ID. That workflow preserves local work, tags and explicit push URLs and refuses ambiguous identity or unsafe reconciliation. Other Git configuration changes retain the explicit-instruction requirement.",
-      "gh api requests other than GET, and gh auth, secret, variable, ssh-key, gpg-key, repo delete, repo create, workflow run, and run cancel clear only on explicit instruction. A necessary gh run rerun for failed CI on the exact repository and commit H approved and successfully published is covered by that commit/publication approval under the publish skill's CI rerun procedure; it needs no additional instruction. Other reruns, including changed workflow effects or unrelated commits, require explicit instruction.",
-      "Editing shell startup files, systemd user units, autostart entries, or mise configuration clears only on explicit instruction naming the file.",
-      "Changing the installed commit gate under ~/.agents/hooks, or the tracked tool settings, hooks, plugins, or skills in the harness repository, clears only on H's explicit instruction naming the file; make stow and make restow deploying a reviewed candidate are not this rule."
-    ],
-    "allow": [
-      "$defaults",
-      "Task-scoped ordinary implementation in ~/Projects/eyrie/scrape is authorized on the same terms as repository editing. This does not authorize destructive operations, unrelated changes, protected-file access, Git configuration changes, or commits and publication without the exact approvals required by EyrAgents."
-    ]
+    "defaultMode": "auto",
+    "disableBypassPermissionsMode": "disable"
   },
+  "model": "opus[1m]",
   "hooks": {
     "PreToolUse": [
       {
@@ -332,13 +319,6 @@
       }
     ]
   },
-  "attribution": {
-    "sessionUrl": false
-  },
-  "env": {
-    "CLAUDE_CODE_EFFORT_LEVEL": "xhigh"
-  },
-  "model": "fable",
   "disableWorkflows": false,
   "workflowSizeGuideline": "large",
   "statusLine": {
@@ -347,5 +327,25 @@
     "refreshInterval": 60
   },
   "tui": "fullscreen",
-  "skipWorkflowUsageWarning": true
+  "skipWorkflowUsageWarning": true,
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Task-scoped ordinary implementation in ~/Projects/eyrie/scrape is authorized on the same terms as repository editing. This does not authorize destructive operations, unrelated changes, protected-file access, Git configuration changes, or commits and publication without the exact approvals required by EyrAgents."
+    ],
+    "soft_deny": [
+      "$defaults",
+      "Deleting files and restoring, resetting, or checking out paths from version control clear only on explicit instruction naming the paths; task-scoped creating, moving, copying, formatting, generating, or patching files inside the repository or ~/Projects/eyrie/scrape is ordinary editing and is not this rule. Preserve unrelated and user-created work; a persistent scratch location does not authorize disposal.",
+      "git reset, git restore, git checkout on paths, git stash drop or clear, and git branch -D clear only on explicit instruction naming the target; a fresh candidate presented for approval is not such an instruction.",
+      "Changing Git configuration at any scope, remotes, hooks, or attributes (git config writes, git remote set-url or add, core.hooksPath, credential.helper, core.pager, aliases) clears only on explicit instruction; reading configuration is not this rule. Task-required reference refreshes and same-project fetch-URL reconciliation through EyrAgents' maintained reference updater are already authorized under eyrsync's lifecycle when GitHub metadata for the declared and actual origin endpoints matches the reviewed repository ID. That workflow preserves local work, tags and explicit push URLs and refuses ambiguous identity or unsafe reconciliation. Other Git configuration changes retain the explicit-instruction requirement.",
+      "gh api requests other than GET, and gh auth, secret, variable, ssh-key, gpg-key, repo delete, repo create, workflow run, and run cancel clear only on explicit instruction. A necessary gh run rerun for failed CI on the exact repository and commit H approved and successfully published is covered by that commit/publication approval under the publish skill's CI rerun procedure; it needs no additional instruction. Other reruns, including changed workflow effects or unrelated commits, require explicit instruction.",
+      "Editing shell startup files, systemd user units, autostart entries, or mise configuration clears only on explicit instruction naming the file.",
+      "Changing the installed commit gate under ~/.agents/hooks, or the tracked tool settings, hooks, plugins, or skills in the harness repository, clears only on H's explicit instruction naming the file; make stow and make restow deploying a reviewed candidate are not this rule."
+    ],
+    "hard_deny": [
+      "$defaults",
+      "Agent-directed inspection, modification, copying or disclosure of secrets, credentials, authentication files, private keys, credential stores or other tools' session roots and histories is prohibited even when the user names the file. Authorized programs implicitly consuming their own credentials or normal OS interfaces without exposing protected contents, and authored placeholder templates such as example.env, are distinct from inspecting protected material.",
+      "Never transmit the contents of credential material (~/.ssh, ~/.aws, ~/.claude/.credentials.json, ~/.codex/auth.json, ~/.gnupg, ~/.kube, ~/.netrc, ~/.docker/config.json, .env files, private keys, secrets directories, auth tokens) to any external destination, encoded or not."
+    ]
+  }
 }
