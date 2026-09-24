@@ -331,6 +331,7 @@ require({t.strip() for t in fields["tools"].split(",")} == {"Read", "Bash", "Web
         "Claude auditor tools drifted: read, shell and web, never edit")
 require(fields.get("effort", "").strip() == "xhigh", "Claude auditor effort is not xhigh")
 auditor = opencode["agent"]["auditor"]
+require(auditor["description"] == fields.get("description", "").strip(), "auditor descriptions differ between the tools")
 # "all" lets spar-opencode run the auditor headless; a subagent would fall back to the build agent.
 require(auditor["mode"] == "all" and auditor["prompt"] == "{file:~/.agents/agents/auditor.md}", "OpenCode auditor charter drifted")
 for key in ("edit", "task"):

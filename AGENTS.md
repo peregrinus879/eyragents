@@ -44,7 +44,7 @@ OpenCode 1.18.32 Apply Patch omits Move-to destinations from its Edit request, s
 
 ## Reviewer Bridges
 
-- Each tool reviews with the other's model through a bridge in the spar skill's `scripts/`: `spar-opencode` from Claude Code, `spar-claude` from OpenCode. A bridge runs one reviewer from the repository root under H's normal settings for that tool (Claude Code with the auditor's tool list and no MCP tools; OpenCode's `auditor` agent), with the shared charter, a hard timeout and session resume. Bridges are the sanctioned route; direct nested client launches stay denied.
+- Each tool reviews with the other's model through a bridge in the spar skill's `scripts/`: `spar-opencode` from Claude Code, `spar-claude` from OpenCode. A bridge runs the other tool's `auditor` agent from the repository root under H's normal settings for that tool (without MCP tools in Claude Code), with a hard timeout and session resume. The in-tool auditor is spar's default reviewer. Bridges are the sanctioned route; direct nested client launches stay denied.
 - Review-recommended paths: a change to `claude-code/.claude/settings.json`, `opencode/.config/opencode/opencode.json`, a bridge, the auditor charter, or `agents/.agents/global-agents.md` is where a spar or auditor review before the commit card earns its cost. No review is mandatory; findings and their dispositions go in the plan file.
 
 ## State and Deployment

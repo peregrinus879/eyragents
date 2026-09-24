@@ -3,21 +3,20 @@
 #
 # Usage: spar-claude review [--resume SESSION] "<request>"
 #
-# Runs from the repository root under H's normal Claude Code settings in auto
-# mode, with the auditor's tools only (read, shell, web) and no MCP tools; the
-# auditor charter is appended to the system prompt, and the model is the
-# moving `fable` alias. Normal settings load project configuration, so use it
-# only in trusted checkouts. A review needs a clean client exit and a reply
+# Runs Claude Code's `auditor` agent (~/.claude/agents/auditor.md: the auditor
+# charter, read, shell and web tools, the moving `fable` alias) as the whole
+# session, from the repository root under H's normal settings in auto mode, with
+# no MCP tools. An unknown agent name makes Claude Code exit with an error; a
+# project agent named `auditor` would take precedence, so such a project is
+# refused. Normal settings load project configuration, so use it only in
+# trusted checkouts. A review needs a clean client exit and a reply
 # ending with the charter's VERDICT line. The reply goes to stdout; the session
 # ID and observed model go to stderr as "SPAR-BRIDGE ID:" and "SPAR-BRIDGE MODEL:".
 # Exit codes: 0 reply, 3 usage limit, 5 reviewer failure, 64 usage,
 # 124 timeout (SPAR_BRIDGE_TIMEOUT seconds, default 1800), 130 interrupted.
 set -euo pipefail
 
-MODEL=fable
-TOOLS=Read,Bash,WebFetch,WebSearch
 TIMEOUT=${SPAR_BRIDGE_TIMEOUT:-1800}
-CHARTER="$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")/../../../agents/auditor.md"
 LIMIT_RE="usage limit|rate limit|hit your [a-z' ]*limit|limiting requests|quota|too many requests|overloaded|429|529"
 VERDICT_RE='^VERDICT: (CONVERGED|OPEN [0-9]+ BLOCKING / [0-9]+ NON-BLOCKING)$'
 
@@ -33,8 +32,9 @@ if [[ ${1:-} == --resume ]]; then
 fi
 [[ $# == 1 && -n $1 ]] || usage
 [[ $TIMEOUT =~ ^[1-9][0-9]*$ ]] || usage
-[[ -r $CHARTER ]] || fail "auditor charter missing: $CHARTER"
 repo=$(git rev-parse --show-toplevel 2>/dev/null) || { printf 'SPAR-BRIDGE ERROR: run from inside a Git worktree\n' >&2; exit 64; }
+! grep -rqsE '^name:[[:space:]]*["'\'']?auditor["'\'']?[[:space:]]*$' -- "$repo/.claude/agents" ||
+  fail "the project defines its own auditor agent, which would replace the user auditor"
 
 # Every client call runs in its own process group under a hard timeout; the
 # group is killed when the call ends, times out or the bridge is interrupted.
@@ -51,9 +51,8 @@ supervise() { # seconds stdin stdout stderr command... ; sets rc
   pid=""
 }
 printf '%s' "$1" >"$work/request"
-supervise "$TIMEOUT" "$work/request" "$work/out" "$work/err" claude -p --permission-mode auto --model "$MODEL" \
-  --effort xhigh --tools "$TOOLS" --disallowedTools 'mcp__*' --strict-mcp-config --output-format json \
-  --append-system-prompt "$(<"$CHARTER")" "${resume[@]}"
+supervise "$TIMEOUT" "$work/request" "$work/out" "$work/err" claude -p --permission-mode auto --agent auditor \
+  --disallowedTools 'mcp__*' --strict-mcp-config --output-format json "${resume[@]}"
 
 if ((rc == 124 || rc == 137)); then
   printf 'SPAR-BRIDGE TIMEOUT: no reply within %ss\n' "$TIMEOUT" >&2

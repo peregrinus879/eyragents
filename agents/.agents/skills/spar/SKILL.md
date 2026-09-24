@@ -1,6 +1,6 @@
 ---
 name: spar
-description: Independent review of a plan, diff or decision, from concepts to details, by the in-tool auditor or a cross-vendor reviewer.
+description: Independent review of a plan, diff or decision, from concepts to details, by the in-tool auditor or a cross-vendor reviewer. Use at your discretion before a plan goes to H, after implementation, or wherever outside review could change the outcome.
 ---
 
 # Spar
@@ -9,12 +9,12 @@ The session's model drafts; an independent reviewer challenges the work from a f
 
 ## When
 
-Review before a plan goes to H for approval, after implementation before the commit card, and wherever outside review can change the outcome. It is never mandatory. One review with at most one follow-up round is the default.
+At your discretion, whenever outside review can change the outcome, such as before a plan goes to H or after implementation before the cards; it is never mandatory. One review with at most one follow-up round is the default.
 
 ## Reviewer
 
-- **Cross-vendor**, for an independent view from another model family: from Claude Code, `~/.agents/skills/spar/scripts/spar-opencode`; from OpenCode, `~/.agents/skills/spar/scripts/spar-claude`.
-- **In-tool**: the `auditor` agent, when a same-tool follow-up is more useful or the other vendor is unavailable.
+- **In-tool** (default): the `auditor` agent.
+- **Cross-vendor**, when a view from another model family is worth its extra time, such as for a consequential or security-relevant decision: from Claude Code, `~/.agents/skills/spar/scripts/spar-opencode`; from OpenCode, `~/.agents/skills/spar/scripts/spar-claude`. Each bridge runs the other tool's `auditor` agent.
 
 H's named reviewer overrides this choice. Report which reviewer ran; an in-tool audit is never cross-vendor review.
 

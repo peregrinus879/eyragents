@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # The spar bridges against fake claude and opencode clients: arguments, working
-# directory, charter, OpenCode agent preflight, reply and session relay, resume,
+# directory, auditor agent, project-auditor refusal, OpenCode agent preflight, reply and session relay, resume,
 # process-group cleanup and every failure exit.
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 SCRIPTS="$ROOT/agents/.agents/skills/spar/scripts"
-CHARTER="$ROOT/agents/.agents/agents/auditor.md"
 WORK=$(mktemp -d)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null FAKE_TRACE="$WORK/trace"
 mkdir -p "$WORK/bin" "$WORK/trace"
@@ -161,11 +160,15 @@ run ok spar-claude review 'Review the diff. Already ran make check.'
 [[ $(<"$WORK/trace/stdin") == 'Review the diff. Already ran make check.' ]] || fail 'spar-claude did not send the request'
 { grep -qx 'SPAR-BRIDGE ID: c-123' "$WORK/err" && grep -qx 'SPAR-BRIDGE MODEL: claude-fable-5-1' "$WORK/err"; } ||
   fail 'spar-claude did not report session and model'
-expected=$(printf '%s\n' -p --permission-mode auto --model fable --effort xhigh --tools Read,Bash,WebFetch,WebSearch \
-  --disallowedTools 'mcp__*' --strict-mcp-config --output-format json --append-system-prompt)
-[[ $(argv | sed '/^--append-system-prompt$/q') == "$expected" ]] || fail "spar-claude flags drifted: $(argv | sed '/^--append-system-prompt$/q')"
-[[ $(argv | sed -n '/^--append-system-prompt$/,$p' | sed 1d) == "$(<"$CHARTER")" ]] ||
-  fail 'spar-claude did not append the shared charter'
+expected=$(printf '%s\n' -p --permission-mode auto --agent auditor --disallowedTools 'mcp__*' --strict-mcp-config \
+  --output-format json)
+[[ $(argv) == "$expected" ]] || fail "spar-claude flags drifted: $(argv)"
+# A project agent named auditor would take precedence over the user auditor: refused before any call.
+mkdir -p "$repo/.claude/agents/nested"
+printf -- '---\nname: "auditor"\ntools: Read, Edit\n---\nShadow.\n' >"$repo/.claude/agents/nested/shadow.md"
+run ok spar-claude review 'Review.'
+[[ $RC == 5 && ! -e $WORK/trace/argv ]] || fail 'spar-claude ran with a project-defined auditor'
+rm -rf -- "$repo/.claude"
 run ok spar-claude review --resume c-123 'Round two.'
 [[ $(argv | tail -n 2) == $'--resume\nc-123' ]] || fail 'spar-claude did not resume the named session'
 
@@ -186,4 +189,4 @@ for agent in missing subagent edits; do
   [[ $RC == 5 && ! -e $WORK/trace/argv ]] || fail "spar-opencode sent a review to an unsafe auditor ($agent)"
 done
 
-printf 'ok: spar bridges run the shared charter from the repository root and fail closed\n'
+printf 'ok: spar bridges run each tool'\''s auditor agent from the repository root and fail closed\n'

@@ -1,6 +1,6 @@
 ---
 name: auditor
-description: Independent read-only review of a plan, diff or decision from a fresh context, from concepts to details. Use before a plan is presented for approval, after implementation before the commit card, or whenever outside review could change the outcome.
+description: Independent read-only review of a plan, diff or decision from a fresh context, from concepts to details. Use at your discretion before a plan goes to H, after implementation, or whenever outside review could change the outcome.
 tools: Read, Bash, WebFetch, WebSearch
 model: fable
 effort: xhigh

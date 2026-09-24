@@ -57,7 +57,7 @@ Web reads send queries and URLs to a service; that is not permission to upload o
 
 ### Auditors
 
-Both tools carry an `auditor` with the auditor charter [`auditor.md`](../agents/.agents/agents/auditor.md). It has read, search, shell and web tools and no edit tools; the charter keeps it read-only, and its commands pass the primary's rules, so it never exceeds the primary. The [spar skill](../agents/.agents/skills/spar/SKILL.md)'s bridges run the other tool's reviewer: `spar-claude` runs Claude Code with the auditor's tool list and no MCP tools, `spar-opencode` runs OpenCode's `auditor` agent. Bridges are the sanctioned route; direct nested client launches stay denied.
+Both tools carry an `auditor` with the auditor charter [`auditor.md`](../agents/.agents/agents/auditor.md). It has read, search, shell and web tools and no edit tools; the charter keeps it read-only, and its commands pass the primary's rules, so it never exceeds the primary. The [spar skill](../agents/.agents/skills/spar/SKILL.md)'s bridges run the other tool's reviewer: each runs the other tool's `auditor` agent, and `spar-claude` also drops MCP tools and refuses a project that defines its own `auditor`. Bridges are the sanctioned route; direct nested client launches stay denied.
 
 ## Untrusted Checkouts
 
