@@ -113,10 +113,13 @@ def oc_last(rules, subject: str) -> str:
     return result
 
 
-def oc_file(key: str, path: str, agent: dict | None = None, worktree: str = WORKTREE) -> str:
-    """Decision for a native read or edit of an absolute path; subjects are worktree-relative."""
-    inside = path == worktree or path.startswith(worktree + "/")
-    if not inside:
+def oc_file(key: str, path: str, agent: dict | None = None, worktree: str = WORKTREE, launch: str | None = None) -> str:
+    """Decision for a native read or edit of an absolute path; subjects are worktree-relative.
+
+    OpenCode skips the external-directory check for paths under the worktree or the launch directory."""
+    def under(base: str) -> bool:
+        return base == "/" or path == base or path.startswith(base + "/")
+    if not (under(worktree) or under(launch or worktree)):
         external = oc_last(oc_rules(opencode["permission"], "external_directory", agent), posixpath.dirname(path) + "/*")
         if external == "deny":
             return "deny"
@@ -135,7 +138,7 @@ GH_WRITE = {
     "issue": ["create", "comment", "edit", "close", "reopen", "delete", "develop", "lock", "transfer"],
     "pr": ["create", "comment", "edit", "review", "ready", "merge", "close", "revert", "update-branch"],
     "release": ["create", "edit", "upload", "delete", "delete-asset"], "gist": ["create", "edit", "rename", "delete"],
-    "repo": ["create", "edit", "rename", "fork", "sync", "archive", "delete", "deploy-key"],
+    "repo": ["create", "edit", "rename", "fork", "sync", "archive", "delete"],
     "run": ["rerun", "cancel", "delete"], "workflow": ["run", "enable", "disable"], "label": ["create", "delete"],
     "variable": ["set", "delete"], "cache": ["delete"], "project": ["create", "item-add", "delete"],
     "codespace": ["create", "delete", "ssh", "ports", "cp", "stop"], "discussion": ["create", "comment", "edit"],
@@ -213,8 +216,19 @@ READS = [
     "git notes show HEAD", "git notes list", "git notes", "git notes --ref=x show HEAD",
     # Stash entries are local and recoverable, and never reach the reviewed history: not gated.
     "git stash", "git stash push -m checkpoint", "git stash pop",
+    "gh -R o/r pr view 1", "gh --repo o/r issue list", "gh repo autolink list", "gh repo -R o/r autolink view 1",
+    "gh repo deploy-key list", "gh -R o/r repo deploy-key list", "git reflog", "git worktree list", "git gc",
+    "npm view x", "docker pull x", "cargo build",
 ]
 COMMANDS.update({command: "allow" for command in READS})
+# Leading options before the gh group, nested gh write verbs, history-destroying Git and publication.
+COMMANDS.update({command: "ask" for command in (
+    "gh --repo o/r pr merge 1", "gh -R o/r issue comment 1 -b x", "gh -R o/r api repos/o/r",
+    "gh repo autolink create x y", "gh repo -R o/r autolink delete 1", "gh repo deploy-key add k.pub",
+    "gh -R o/r repo deploy-key delete 1", "git reflog expire --expire=now --all", "git -C /x reflog delete HEAD@{1}",
+    "git gc --prune=now", "git -C /x gc --aggressive --prune=now", "git worktree remove ../w",
+    "npm publish", "npm --workspace x publish", "pnpm publish --access public", "yarn npm publish",
+    "cargo publish", "docker push r/i:t", "docker image push r/i", "twine upload dist/*")})
 for group, verbs in GH_READ.items():
     COMMANDS.update({f"gh {group} {verb} 1": "allow" for verb in verbs})
 for group, verbs in GH_WRITE.items():
@@ -229,6 +243,16 @@ for command, expected in COMMANDS.items():
     require(got_opencode == expected, f"OpenCode decides {got_opencode} for `{command}`, expected {expected}")
 for command in ("claude -p x", "claude --bg review", "claude remote-control", "claude", "opencode --help"):
     require(oc_last(oc_rules(opencode["permission"], "bash"), command) == "deny", f"OpenCode can run `{command}`")
+# Remote Control is a sharing surface in both tools; a nested `claude -p` stays open in Claude Code.
+for command in ("claude remote-control", "claude --remote-control", "claude --rc work", "claude -c --rc"):
+    require(claude_decision("Bash", command) == "deny", f"Claude can start Remote Control: `{command}`")
+require(claude_decision("Bash", "claude -p x") == "auto", "Claude refuses a nested print session")
+# OpenCode has no classifier, so recursive or forced deletion asks there; Claude Code's classifier reviews it.
+for command in ("rm -rf build", "rm -f x", "rm --recursive d", "rm d -r"):
+    require(oc_last(oc_rules(opencode["permission"], "bash"), command) == "ask", f"OpenCode deletes without asking: `{command}`")
+    require(claude_decision("Bash", command) == "auto", f"Claude has a rule for `{command}`; its classifier decides")
+for command in ("rm x", "rm my-file.txt"):
+    require(oc_last(oc_rules(opencode["permission"], "bash"), command) == "allow", f"OpenCode asks for `{command}`")
 require(claude_decision("Bash", "opencode --version") == "deny", "Claude can run the OpenCode client")
 require(oc_last(oc_rules(opencode["permission"], "bash"), "opencode --version") == "allow", "OpenCode version check denied")
 
@@ -240,7 +264,10 @@ PROTECTED = [
     "~/.docker/config.json", "~/.netrc", "~/.npmrc", "~/.pypirc", "~/.claude/.credentials.json", "~/.codex/auth.json",
     "~/.local/share/opencode/auth.json", "~/.bash_history", "~/.zsh_history", "~/.local/share/fish/fish_history",
     "~/.python_history", "~/.node_repl_history", "~/.psql_history", "~/.mysql_history",
-    "~/.claude/projects/p/session.jsonl", "~/.codex/sessions/s.jsonl", "~/.local/share/opencode/storage/s",
+    "~/.claude.json", "~/.claude/backups/.claude.json.backup.1", "~/.claude/.credentials.json.bak",
+    "/etc/shadow", "{w}/backup/etc/shadow", "{w}/backup/etc/gshadow-", "/proc/kcore", "{w}/backup/proc/kcore",
+    "/etc/NetworkManager/system-connections/wifi.nmconnection",
+    "{w}/backup/etc/NetworkManager/system-connections/wifi.nmconnection",
     "/proc/1234/environ", "/var/lib/systemd/coredump/core.x.zst", "/var/crash/x",
     "/mnt/c/Users/h/AppData/Local/Google/Chrome/User Data/Default/Login Data",
     "/mnt/c/Users/h/AppData/Roaming/Microsoft/Credentials/x", "/mnt/c/Users/h/.ssh/id_rsa",
@@ -249,7 +276,11 @@ PROTECTED = [
     "~/Projects/other/.env",
 ]
 PERSONAL = ["~/Desktop/a.txt", "~/Documents/tax.pdf", "~/Downloads/x.zip", "~/Music/a.mp3", "~/Pictures/a.jpg",
-            "~/Sync/notes.md", "~/Videos/a.mp4", "/mnt/c/Users/h/Documents/a.docx", "/mnt/c/Users/h/OneDrive/a.xlsx"]
+            "~/Sync/notes.md", "~/Videos/a.mp4", "/mnt/c/Users/h/Documents/a.docx", "/mnt/c/Users/h/OneDrive/a.xlsx",
+            "/mnt/c/Users/h/Sync/a.md"]
+# Conversation transcripts are readable and never editable.
+TRANSCRIPTS = ["~/.claude/projects/p/session.jsonl", "~/.claude/projects/p/s/subagents/a.jsonl", "~/.codex/sessions/s.jsonl",
+               "~/.local/share/opencode/storage/session/s.json", "~/.local/share/opencode/opencode.db"]
 READABLE = ["{w}/README.md", "{w}/src/auth.py", "{w}/example.env", "{w}/docs/credentials-policy.md",
             "~/Projects/other/README.md", "~/Projects/quarry/opencode/README.md", "~/Projects/eyrie/scrape/x.md",
             "~/.bashrc", "~/.config/nvim/init.lua", "~/.config/git/config", "~/.config/gh/config.yml",
@@ -271,6 +302,15 @@ for path in READABLE:
     full = expand(path)
     require(claude_decision("Read", full) == "allow", f"Claude cannot read {path}")
     require(oc_file("read", full) == "allow", f"OpenCode cannot read {path}")
+for path in TRANSCRIPTS:
+    full = expand(path)
+    require(claude_decision("Read", full) == "allow" and oc_file("read", full) == "allow", f"a tool cannot read {path}")
+    require(claude_decision("Edit", full) == "deny" and oc_file("edit", full) == "deny", f"a tool can edit {path}")
+# A session launched from a home directory or / sees personal folders under its own launch directory,
+# where OpenCode skips the external-directory check; the read and edit rules still deny them.
+for path in ("/home/h/Documents/tax.pdf", "/home/h/Sync/n.md", "/mnt/c/Users/h/Documents/a.docx", "/mnt/c/Users/h/Sync/a.md"):
+    for key in ("read", "edit"):
+        require(oc_file(key, path, worktree="/", launch="/home/h") == "deny", f"OpenCode {key} reaches {path} from a home launch")
 
 # Writes: the repository and persistent scratch run freely; elsewhere needs H.
 for path in ("{w}/src/app.py", "~/Projects/eyrie/scrape/work/x.md"):
@@ -289,9 +329,15 @@ for worktree in (WORKTREE, HOME + "/Projects/quarry/opencode", HOME + "/Work/tri
             f"OpenCode cannot write its own temp root from {worktree}")
 for path in ("~/Projects/other/app.py", "~/.bashrc"):
     require(claude_decision("Edit", expand(path)) != "allow", f"Claude pre-approves an edit outside scope: {path}")
-for path in ("{w}/.git/config", "{w}/.git/hooks/pre-commit", "~/.config/git/config"):
+for path in ("{w}/.git/config", "{w}/.git/hooks/pre-commit", "~/.config/git/config", "~/.config/gh/config.yml"):
     require(claude_decision("Edit", expand(path)) == "deny", f"Claude can edit {path}")
     require(oc_file("edit", expand(path)) == "deny", f"OpenCode can edit {path}")
+for worktree in (HOME + "/dotfiles", HOME + "/Projects/eyrie/eyragents", "/tmp/canary.x/repo"):
+    require(oc_file("edit", expand("~/.config/git/config"), worktree=worktree) == "deny", f"OpenCode edits Git config from {worktree}")
+require(oc_file("edit", "/home/h/.config/git/config", worktree="/", launch="/home/h") == "deny", "OpenCode edits Git config from /")
+# A repository's tracked source for the deployed configuration, as in EyrWSL's git package, stays editable.
+eyrwsl = HOME + "/Projects/eyrie/eyrwsl"
+require(oc_file("edit", eyrwsl + "/git/.config/git/config", worktree=eyrwsl) == "allow", "OpenCode refuses EyrWSL's Git config source")
 require(claude_decision("Read", "/tmp/opencode/s/x") == "deny", "Claude reads OpenCode's session root")
 require(oc_file("read", "/tmp/claude-1000/s/x") == "deny", "OpenCode reads Claude Code's session root")
 
@@ -304,9 +350,11 @@ for section in ("allow", "soft_deny", "hard_deny"):
     require(claude["autoMode"][section][0] == "$defaults", f"Claude auto mode dropped built-in {section} rules")
 require("personal folders" in " ".join(claude["autoMode"]["hard_deny"]), "Claude classifier lacks the personal-folder rule")
 require(claude.get("attribution", {}).get("sessionUrl") is False, "Claude would add a session URL to commits")
-require(claude.get("env", {}).get("CLAUDE_CODE_EFFORT_LEVEL") == "xhigh", "Claude Code effort is not xhigh")
+require(claude.get("effortLevel") == "xhigh", "Claude Code effort is not xhigh")
+require("CLAUDE_CODE_EFFORT_LEVEL" not in claude.get("env", {}), "the effort env var would override /effort and per-agent effort")
+require(claude["autoMode"].get("environment", [None])[0] == "$defaults", "Claude auto mode lacks its environment entries")
 # Uploads of conversation content and error reports stay off; metrics stay on for feature flags (docs/access.md).
-for switch in ("DISABLE_FEEDBACK_COMMAND", "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY", "DISABLE_ERROR_REPORTING"):
+for switch in ("DISABLE_FEEDBACK_COMMAND", "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY", "DISABLE_ERROR_REPORTING", "DISABLE_AUTOUPDATER"):
     require(claude.get("env", {}).get(switch) == "1", f"Claude Code {switch} is not set")
 require("DISABLE_TELEMETRY" not in claude.get("env", {}), "Claude Code telemetry switch would stop feature flags")
 require("hooks" not in claude, "Claude settings carry hooks; commits and pushes use native prompts")
@@ -368,5 +416,5 @@ references = {line.split()[0]: line.split()[2] for line in (ROOT / "references.t
 require(references == {"claude-code": "github:R_kgDON91aYw", "opencode": "github:R_kgDOOiiGLw"},
         "reference identities differ from the reviewed set")
 
-print(f"ok: {len(COMMANDS)} commands and {len(PROTECTED) + len(PERSONAL) + len(READABLE)} paths decide alike in both tools; "
+print(f"ok: {len(COMMANDS)} commands and {len(PROTECTED) + len(PERSONAL) + len(READABLE) + len(TRANSCRIPTS)} paths decide alike in both tools; "
       "auditors share one charter without edit tools; configuration contracts hold (modeled matching, not live dispatch)")

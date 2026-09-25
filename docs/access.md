@@ -9,12 +9,12 @@ The governing rule is the most freedom possible without exposing H, with the sam
 | Outcome | Scope |
 | --- | --- |
 | Allow | Reads anywhere except secrets and personal folders, and read forms of commands whose writes differ by a subcommand word; edits in the worktree and persistent scratch (`~/Projects/eyrie/scrape`); ordinary commands; web fetch and search. |
-| Ask | Remote-changing `gh` subcommands, every `gh api` call and `gh alias` changes; `git clean`, `reset`, `restore`, `checkout --`, `stash drop`/`clear`, branch deletion; Git configuration writes (a dotted key with a value, `-e`/`edit`, `set`, `unset`, `--unset`, `--add`, `--replace-all`, section renames and removals) and remote changes, also behind `git -C`, `-c` and long global options; `ssh`, `scp`, `sftp`; every commit-producing Git command (`commit`, `merge`, `pull`, `rebase`, `cherry-pick`, `revert`, `am`, and the ref and history rewriters) and `git push`. OpenCode also asks before edits outside the worktree and scratch; Claude Code's auto-mode classifier reviews those instead. |
-| Deny | Secrets and personal folders (read and edit); edits to `.git/**`, `~/.config/git` and `~/.config/gh`; `sudo`, `su`, `doas`, `pkexec`; all of `gh auth`, and secret and key writes; every form of another agent client (the other tool, Copilot, Gemini, Cursor Agent, Crush), except OpenCode's exact version checks. |
+| Ask | Remote-changing `gh` subcommands, every `gh api` call and `gh alias` changes; `git clean`, `reset`, `restore`, `checkout --`, `stash drop`/`clear`, branch deletion; Git configuration writes (a dotted key with a value, `-e`/`edit`, `set`, `unset`, `--unset`, `--add`, `--replace-all`, section renames and removals) and remote changes, also behind `git -C`, `-c` and long global options; `ssh`, `scp`, `sftp`; every commit-producing Git command (`commit`, `merge`, `pull`, `rebase`, `cherry-pick`, `revert`, `am`, and the ref and history rewriters) and `git push`; history-destroying Git (`reflog expire`/`delete`, `gc --prune`, `worktree remove`); package and image publication (`npm`, `pnpm` and `yarn publish`, `cargo publish`, `docker push`, `twine upload`). OpenCode also asks before edits outside the worktree and scratch, and for recursive or forced `rm`; Claude Code's auto-mode classifier reviews those instead. |
+| Deny | Secrets and personal folders (read and edit); edits to `.git/**`, `~/.config/git` and `~/.config/gh`; `sudo`, `su`, `doas`, `pkexec`; all of `gh auth`, and secret and key writes; Remote Control (`claude remote-control`, `--remote-control`, `--rc`); every form of another agent client (the other tool, Copilot, Gemini, Cursor Agent, Crush), except OpenCode's exact version checks. |
 
 An Ask is a native prompt: the agent states what the command does and H selects. The [ship skill](../agents/.agents/skills/ship/SKILL.md) ends a turn with every card of a round; H's reply brings one command that commits or pushes the round at a single prompt.
 
-Both tools use one `gh` verb table covering every top-level group in `gh` 2.101; groups that only read or change local `gh` settings stay allowed. Claude Code lists each remote-changing verb as Ask. OpenCode asks for every subcommand of a gated group, then allows its read-only verbs, so a verb added in a later `gh` release asks in OpenCode and reaches Claude Code's classifier. `tests/config-contracts.py` holds both to the same decisions, including flag combinations and global-option prefixes, and keeps a list of reads that must never prompt.
+Both tools use one `gh` verb table covering every top-level group in `gh` 2.101; groups that only read or change local `gh` settings stay allowed. Claude Code lists each remote-changing verb as Ask. OpenCode asks for every subcommand of a gated group, then allows its read-only verbs, so a verb added in a later `gh` release asks in OpenCode and reaches Claude Code's classifier. Every `gh` rule also covers options before the group (`gh --repo o/r pr merge`), and nested groups gate only their writing verbs (`gh repo autolink create`, `gh repo deploy-key add`). `tests/config-contracts.py` holds both to the same decisions, including flag combinations and global-option prefixes, and keeps a list of reads that must never prompt.
 
 Native rules see command text only. Where a family's read and write forms differ by flags that combine or reorder freely, it is gated whole, and its reads prompt or are refused: `gh api` (read through `gh` subcommands), `git clean` (preview with `git status --ignored`), `gh auth`, and other agent clients (check versions with `mise ls`). Git configuration reads shaped like writes, a dotted token followed by another argument, also prompt; read the configuration files directly instead. A read that passes a gated subcommand word as its own argument after a global option, such as `git --no-pager log --grep push`, is treated as that subcommand. `--help` on the gated Git commands and `ssh -V`/`-G` prompt too.
 
@@ -23,16 +23,16 @@ Native rules see command text only. Where a family's read and write forms differ
 One inventory serves both primaries:
 
 - **Home stores:** `.ssh`, `.aws`, `.gnupg`, `.kube`, `.password-store`, keyrings, browser and password-manager profiles (Firefox, Chrome, Chromium, Brave, 1Password, Bitwarden), `gh` hosts, Docker config, `.netrc`, `.npmrc`, `.pypirc`.
-- **Client state:** Claude Code credentials, history, sessions and transcripts (`.claude/projects/**/*.jsonl`, not its memory files); OpenCode auth, database, storage and logs; the Codex desktop app's auth, config, history and sessions.
+- **Client state:** Claude Code's credentials (`.credentials.json` and copies), sign-in session (`~/.claude.json` and its `backups/`), prompt history and session state; OpenCode's auth and logs; the Codex desktop app's auth, config and history. Conversation transcripts (Claude Code's `projects/**/*.jsonl`, OpenCode's storage and database, Codex sessions) are readable and never editable; a credential found in one is still a secret.
 - **Histories and runtime:** Bash, Zsh, fish, Python, Node, psql and MySQL histories; `/proc/*/environ`; `/var/lib/systemd/coredump`; `/var/crash`.
 - **Shapes anywhere:** `.env`, `.env.*`, `secrets/`, `credentials`, `credentials.*`, `auth.json`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `*.keytab`, private OpenSSH keys (`id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`) and private `ssh_host_*_key` files, including copies under any directory.
 - **Windows through WSL mounts:** browser profiles, 1Password, Bitwarden, Credential Manager, DPAPI keys and GitHub CLI under `AppData`.
 
-Root-only system secrets such as `/etc/shadow` rely on OS permissions, since the agents run unprivileged. `example.env`, `credentials-policy.md`, public host keys and ordinary configuration stay readable. A finite inventory cannot recognize a renamed secret; global guidance still governs it.
+Root-only system secrets rely on OS permissions, since the agents run unprivileged; their recognizable copies (`shadow`, `gshadow`, NetworkManager connections, `kcore`) are denied by name anywhere. `example.env`, `credentials-policy.md`, public host keys and ordinary configuration stay readable. A finite inventory cannot recognize a renamed secret; global guidance still governs it.
 
 ### Personal Folders
 
-`~/Desktop`, `~/Documents`, `~/Downloads`, `~/Music`, `~/Pictures`, `~/Sync` and `~/Videos`, plus the WSL `/mnt/*/Users/*` counterparts and OneDrive, are denied for read and edit. Rules for folders absent on a host have no effect. Claude Code's classifier also prohibits reaching them through the shell.
+`~/Desktop`, `~/Documents`, `~/Downloads`, `~/Music`, `~/Pictures`, `~/Sync` and `~/Videos`, plus the WSL `/mnt/*/Users/*` counterparts and OneDrive, are denied for read and edit. OpenCode carries them in its read and edit rules as well, because a session launched from a directory above them skips its external-directory check. Rules for folders absent on a host have no effect. Claude Code's classifier also prohibits reaching them through the shell.
 
 ### Temporary Directories
 
@@ -44,12 +44,16 @@ Rules are named forms, not containment. Path rules govern each tool's native fil
 
 | Surface | Claude Code | OpenCode |
 | --- | --- | --- |
-| Search | Grep and Glob honor Read denies on a best-effort basis | Grep returns matching lines without per-file Read checks; Glob lists names |
+| Search | On Linux and WSL, `find` and `grep` run embedded in Bash and reach permission rules as Bash calls; Grep and Glob exist only without Bash | Grep returns matching lines without per-file Read checks; Glob lists names |
+| Symlinks | Read and Edit rules check the link and its target | Read and Edit check the path as given, not a symlink's target (1.18.32) |
+| Deletion | Classifier review | Recursive or forced `rm` asks; other deletion forms (`find -delete`, scripts) run |
+| Auto-approve | `bypassPermissions` disabled | `--auto` or its palette toggle approves every Ask; keep it off |
 | Edits outside scope | Classifier review | `../* = ask`; a non-Git worktree is `/`, where `../*` never matches |
 | Move destinations | Not applicable | See [Move Destinations](#move-destinations) |
 | Nested clients | Every form of `opencode` and other agent clients denied; `claude` runs under the same user rules | Every form of `claude`, `opencode` and other agent clients denied, except the two exact version checks |
 | Web | Available; no tracked domain rules | `webfetch` and `websearch` allowed |
-| Sharing | `/feedback`, `/bug`, `/share`, Claude-drafted feedback, the session survey and error reports off in `env` | `share = "disabled"` |
+| Sharing | `/feedback`, `/bug`, `/share`, Claude-drafted feedback, the session survey and error reports off in `env`; Remote Control denied | `share = "disabled"` |
+| Updates | `DISABLE_AUTOUPDATER`; mise owns versions | `autoupdate = false` |
 
 Claude Code's usage metrics stay on: they carry no code, prompts or paths, and `DISABLE_TELEMETRY` also stops the feature flags behind pasted-text marking, the Monitor and PushNotification tools and artifact comments. Auto mode is unaffected, since `defaultMode` sets it.
 
