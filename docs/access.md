@@ -48,7 +48,7 @@ Conversation transcripts (Claude Code's `projects/**/*.jsonl`, OpenCode's storag
 
 ### Temporary Directories
 
-Each tool keeps out of the other's session directory: Claude Code denies `/tmp/opencode` and OpenCode denies `/tmp/claude-*`. The rest of `/tmp` is ordinary, and OpenCode writes its own session scratch under `/tmp/opencode`.
+Each tool keeps out of the other's session directory: Claude Code denies `/tmp/opencode` and OpenCode denies `/tmp/claude-*`. The rest of `/tmp` is ordinary, and OpenCode writes its own session scratch under `/tmp/opencode`. [Design](design.md#files-and-lifetimes) sets which files belong in each location.
 
 ## Enforcement Limits
 

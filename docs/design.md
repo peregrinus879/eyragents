@@ -49,6 +49,18 @@ Stow links the packages into place without folding directories, so the tools can
 
 Two upstream references anchor reconciliation: OpenCode's client source, and Claude Code's public release and support repository, which is not its CLI source. Official documentation states the supported interface, release notes show changes, source explains available implementation, and runtime checks show only what was observed; none substitutes for the others, and disagreements stay explicit. Reference clones are pinned to GitHub node IDs, because a redirect or shared history alone does not prove a project's identity. The [eyrsync skill](../.agents/skills/eyrsync/SKILL.md#sources) owns this.
 
+## Files and Lifetimes
+
+A file lives where its lifetime belongs:
+
+| Tier | Where | Lifetime | Holds |
+| --- | --- | --- | --- |
+| Records | `~/Projects/eyrie/scrape` (persistent scratch) | Survives crashes and reboots | H's scratch projects; plan files in `plans/`, including review findings and their dispositions |
+| Session scratch | Claude Code's scratchpad under `/tmp/claude-*`; OpenCode's `/tmp/opencode` | Ends with the session or at reboot | One session's working files, such as commit message files and review requests |
+| Script temp | `mktemp` under `/tmp` | Deleted when the script exits | The bridges' request, reply and error files; the canary's fixture repository |
+
+The canary also creates one uniquely named child in persistent scratch, to prove the scratch permission, and removes it.
+
 ## Records
 
 Durable decisions live in the repository, open work in the [maintenance ledger](maintenance.md), and provenance in Git history. Work that spans sessions keeps one live plan file outside the repositories, deleted when the work is done; steps pending on another host live in the ledger's host pass, or in a handoff file where a repository keeps one, as EyrWSL does. Native memory is a revisable local cache, never authority.
