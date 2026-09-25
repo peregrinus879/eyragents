@@ -41,7 +41,7 @@ Each is documented at its owner and rechecked when its trigger fires.
 
 ## Deferred Work
 
-- **Skill behavior evaluations.** `claude plugin eval` scenarios: free text never commits, a commit runs only after its cards and at the native prompt, a push waits for H's go. Closes when evaluation beyond the canary is adopted.
+- **Skill behavior evaluations.** `claude plugin eval` scenarios: free text never commits, a commit runs only after its cards, or H's exact command, and at the native prompt, a push waits for H's go. Closes when evaluation beyond the canary is adopted.
 - **Permission prompt review.** Run `/fewer-permission-prompts` on accumulated sessions and promote only durable read-only rules, keeping `gh api` gated.
 - **Reproducible test images** for local and hosted checks of exact staged states, if environment-driven CI failures recur; container infrastructure needs its own approval.
 - **omasecboot gates.** Give omasecboot a `check` target that runs its tests, once H's current work there is done.
