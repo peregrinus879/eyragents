@@ -1,6 +1,6 @@
 ---
 name: spar
-description: Independent review of a plan, diff or decision, from concepts to details, by the in-tool auditor or a cross-vendor reviewer. Use at your discretion before a plan goes to H, after implementation, or wherever outside review could change the outcome.
+description: Independent review of a plan, diff or decision, from concepts to details, by the in-tool auditor or a cross-vendor reviewer. Use at your discretion when a second opinion could change a consequential decision.
 ---
 
 # Spar
@@ -9,7 +9,7 @@ The session's model drafts; an independent reviewer challenges the work from a f
 
 ## When
 
-At your discretion, whenever outside review can change the outcome, such as before a plan goes to H or after implementation before the cards; it is never mandatory. One review with at most one follow-up round is the default.
+At your discretion, when a second opinion could change a consequential decision; it is never mandatory. One review with at most one follow-up round is the default.
 
 ## Reviewer
 
