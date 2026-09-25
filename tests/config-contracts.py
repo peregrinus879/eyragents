@@ -324,6 +324,9 @@ for worktree in (WORKTREE, HOME + "/Projects/quarry/opencode", HOME + "/Work/tri
     for path in ("~/Projects/other/app.py", "~/.bashrc", "~/Projects/eyrie/other/scrape/x"):
         require(oc_file("edit", expand(path), worktree=worktree) == "ask",
                 f"OpenCode edits {path} from {worktree} without asking")
+# Accepted limit (docs/access.md): from a repository inside persistent scratch, edits elsewhere in scratch ask.
+require(oc_file("edit", expand("~/Projects/eyrie/scrape/plans/p.md"), worktree=HOME + "/Projects/eyrie/scrape/fixture/repo") == "ask",
+        "OpenCode's scratch-inside-scratch behavior changed; update docs/access.md")
 for worktree in (WORKTREE, HOME + "/Projects/quarry/opencode", HOME + "/Work/tries/a"):
     require(oc_file("edit", "/tmp/opencode/session/x.md", worktree=worktree) == "allow",
             f"OpenCode cannot write its own temp root from {worktree}")

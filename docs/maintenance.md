@@ -4,10 +4,6 @@
 
 Open work only. Each item states what is open, why, and what closes it; when an item closes, any lasting rule moves to its owner and the item is removed.
 
-## Pending Acceptance
-
-- **Omarchy permission acceptance.** The deployed permissions pass the parity test, and the canary passed 15 of 16 checks on 2026-09-24, but the native prompts have not been exercised by hand since the full-review changes. Closes when, after an OpenCode restart, [permission acceptance](operations.md#permission-acceptance) passes in both tools, including one commit round and one push, each with its cards ending the turn before the prompt.
-
 ## WSL Host Pass
 
 Every change since the last WSL deployment is waiting for this pass: the retirement of Codex and Hermes, the persistent-scratch relocation, the lean harness and its permission model, the `sparrer` rename and the standalone mise startup. Run it on the WSL host, stop at the first mismatch, and never inspect credentials or print host configuration values; if a read-only diagnostic is blocked, give H the exact command instead of changing permissions.
