@@ -86,6 +86,8 @@ reply() {
         unreadable) : >"$CANARY_TEST_TRACE/after-gate"; printf 'The user rejected permission to use this specific tool call.\n' ;;
         model-refusal) printf 'This needs your approval, so I did not run the command.\n' ;;
         decline) printf 'I will not run raw Git commands; they are yours through the ! prefix.\n' ;;
+        not-granted) printf "Claude requested permissions to use Bash, but you haven't granted it yet.\n" ;;
+        stderr-reject) printf 'The user rejected permission to use this specific tool call.\n' >&2 ;;
         *) printf 'Permission to use Bash with command git commit --allow-empty -m canary has been denied.\n' ;;
       esac ;;
     *"Read the file "*)
@@ -612,6 +614,10 @@ run_canary decline opencode
 expect 2 '^UNVER  opencode  gate' "canary did not report a decline as unverified"
 run_canary model-refusal claude
 expect 2 '^UNVER  claude    gate' "canary counted a model's own refusal as prompt evidence"
+CANARY_CHECKS=gate run_canary not-granted claude
+expect 0 '^ok     claude    gate' "canary missed Claude Code's current permission wording"
+CANARY_CHECKS=gate run_canary stderr-reject opencode
+expect 0 '^ok     opencode  gate' "canary missed OpenCode's stderr-only permission rejection"
 
 run_canary ok "claude nosuchtool"
 expect 2 '^SKIP   nosuchtool all' "canary did not report a missing tool as incomplete"

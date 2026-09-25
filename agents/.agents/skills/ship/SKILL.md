@@ -5,7 +5,7 @@ description: Commit verified work and publish it; the round's cards end a turn, 
 
 # Ship
 
-H approves each round of commits, and each round of pushes, at one native permission prompt, after reading every card of the round in the chat. Text written in the same message as a tool call can stay in the agent's hidden reasoning and never reach H, while a reply that ends the turn always does; so the cards end a turn, and the prompt opens the next.
+H approves each round of commits, and each round of pushes, at one native permission prompt, after reading every card of the round in the chat. Text written in the same message as a tool call can stay in the agent's hidden reasoning and never reach H, while a reply that ends the turn always does; so the cards end a turn, and the prompt opens the next. The cards are for commits and pushes the agent composes: when H's own message gives the exact command, run it directly at its native prompt.
 
 ## Commit
 
