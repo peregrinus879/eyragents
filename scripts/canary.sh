@@ -438,7 +438,7 @@ for tool in $TOOLS; do
       # permission "has been denied" (2.1.282: "haven't granted it yet"); a headless OpenCode run
       # auto-rejects the request.
       if grep -qiE -- "has been denied|haven't granted it yet|rejected permission|auto-reject" <<<"$reply"; then
-        report ok "$tool" gate "commit stopped at the prompt, HEAD unchanged (reply evidence)"
+        report ok "$tool" gate "commit stopped at the prompt, HEAD unchanged (rejection notice)"
       else
         report UNVER "$tool" gate "HEAD unchanged but no prompt evidence; the model may have declined first"
       fi

@@ -87,7 +87,7 @@ reply() {
         model-refusal) printf 'This needs your approval, so I did not run the command.\n' ;;
         decline) printf 'I will not run raw Git commands; they are yours through the ! prefix.\n' ;;
         not-granted) printf "Claude requested permissions to use Bash, but you haven't granted it yet.\n" ;;
-        stderr-reject) printf 'The user rejected permission to use this specific tool call.\n' >&2 ;;
+        stderr-reject) printf 'permission requested: bash (git commit --allow-empty -m canary); auto-rejecting\n' >&2 ;;
         *) printf 'Permission to use Bash with command git commit --allow-empty -m canary has been denied.\n' ;;
       esac ;;
     *"Read the file "*)
