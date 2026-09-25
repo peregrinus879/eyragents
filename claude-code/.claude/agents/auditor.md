@@ -1,6 +1,6 @@
 ---
 name: auditor
-description: Independent read-only review of a plan, diff or decision from a fresh context, from concepts to details. Use at your discretion when a second opinion could change a consequential decision.
+description: The read-only reviewer the spar skill runs, in this tool or through the other tool's bridge, reviewing from concepts to details. Use spar rather than calling it directly, so a review keeps its rounds.
 tools: Read, Bash, WebFetch, WebSearch
 model: fable
 effort: xhigh

@@ -58,6 +58,6 @@ OpenCode 1.18.32 Apply Patch omits Move-to destinations from its Edit request, s
 ## Skills
 
 - `ship`: commit verified work and publish it; the round's cards end a turn, then one native prompt makes the round.
-- `spar`: independent review from concepts to details, by the in-tool auditor or the other tool's model.
+- `spar`: independent review from concepts to details, in rounds, by the in-tool auditor or the other tool's model; the auditor is reached only through it.
 - `eyrsync`: this repository's own skill, under `.agents/skills` with a `.claude/skills` directory link, since Claude Code reads only `.claude/skills` and OpenCode discovers `.agents/skills` natively. Check reference/evidence coverage for every tool, then reconcile official docs/releases, role-appropriate source/public material, runtime evidence and the Agent Skills specification; maintain this repository's reference lifecycle and the workspace guide's AI-client reference.
 - `omarchy`: required for end-user Linux desktop, Hyprland, Omarchy, terminal, theme, and display configuration. Omarchy installs it and `diagnose-crash` as links under `~/.claude/skills` and `~/.agents/skills`; they resolve outside the packages, and `make clean` never touches them.

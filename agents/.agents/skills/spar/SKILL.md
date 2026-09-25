@@ -9,11 +9,11 @@ The session's model drafts; an independent reviewer challenges the work from a f
 
 ## When
 
-At your discretion, when a second opinion could change a consequential decision; it is never mandatory. One review with at most one follow-up round is the default.
+At your discretion, when a second opinion could change a consequential decision; it is never mandatory. A review is a first pass and one follow-up round; a second follow-up is for a blocking finding still in dispute, and whatever remains open then goes to H.
 
 ## Reviewer
 
-- **In-tool** (default): the `auditor` agent.
+- **In-tool** (default): the `auditor` agent, the same model family as the drafter. Call it only through this skill. In Claude Code, continue it for a follow-up round by messaging the same agent; in OpenCode, pass its `task_id` to the task tool.
 - **Cross-vendor**, when a view from another model family is worth its extra time, such as for a consequential or security-relevant decision: from Claude Code, `~/.agents/skills/spar/scripts/spar-opencode`; from OpenCode, `~/.agents/skills/spar/scripts/spar-claude`. Each bridge runs the other tool's `auditor` agent.
 
 H's named reviewer overrides this choice. Report which reviewer ran; an in-tool audit is never cross-vendor review.
