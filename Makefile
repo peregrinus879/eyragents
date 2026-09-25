@@ -28,7 +28,7 @@ help:
 	@echo "  restow         Guard, preflight skills, clean, refresh links"
 	@echo "  check-skills   Read-only preflight of every managed skill directory"
 	@echo "  lint           ShellCheck and Python syntax checks over managed scripts"
-	@echo "  test           Fast tests: configuration boundaries, bridges, statusline, preparation, canary fixtures"
+	@echo "  test           Fast tests: configuration boundaries, documentation links, bridges, statusline, preparation, canary fixtures"
 	@echo "  check          Repository checks: links, JSON/TOML and fixture tests (runs in CI)"
 	@echo "  verify-deploy  Check every package file resolves to its deployed target"
 	@echo "  verify         lint, check, and verify-deploy"
@@ -67,12 +67,13 @@ check-skills: require-clone
 lint:
 	shellcheck -s bash $(SHELLCHECK_FILES)
 	python3 -I -c 'import sys; [compile(open(p, "rb").read(), p, "exec") for p in sys.argv[1:]]' \
-	  scripts/update-references.py tests/reference-migration.py tests/config-contracts.py docs/workspace-guide-src/build.py \
+	  scripts/update-references.py tests/reference-migration.py tests/config-contracts.py tests/doc-links.py docs/workspace-guide-src/build.py \
 	  agents/.agents/skills/spar/scripts/spar-supervise.py
 	@echo "ok:   lint"
 
 test:
 	python3 tests/config-contracts.py
+	python3 tests/doc-links.py
 	bash tests/mise-env.sh
 	bash tests/update-references.sh
 	python3 tests/reference-migration.py

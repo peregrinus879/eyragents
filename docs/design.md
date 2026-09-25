@@ -1,90 +1,58 @@
 # Design
 
-`AGENTS.md` states the invariants. This note gives the reasons, so a reader can judge whether the same shape fits their own setup.
+[AGENTS.md](../AGENTS.md) states the rules; this document gives the reasons, so you can judge whether the same shape fits your own setup.
 
-## Intent-led collaboration
+## Full Capability, Named Exposures
 
-H supplies direction, not an exhaustive specification. Global guidance's [Approach](../agents/.agents/global-agents.md#approach) makes broader reasoning an explicit step before choosing a solution: frame the goal and surrounding system, check missing counterparts and assumptions, and consider alternatives and downstream effects. Interpolation fills reasonable gaps; extrapolation tests related cases. The first example or existing configuration is evidence, not the boundary of the problem. This applies across all work, not only access planning or source references.
+Agents are most useful when they rarely stop to ask. Each restriction here exists to prevent a named exposure: secrets and personal folders are denied; remote, third-party, destructive and hard-to-reverse actions ask at the tool's native prompt. Everything else runs, including reads anywhere else on the machine, because ordinary configuration, package metadata and diagnostics are what an agent needs to do good work. A rule, hook or procedural step that prevents no exposure is removed.
 
-Broad reasoning does not authorize broad action. Surface useful omissions and material tradeoffs for H, while well-supported low-risk work proceeds within scope. Likewise, a command that relieves one symptom is not a durable fix when the workflow will require it repeatedly; explain that distinction and the underlying remedy. Keep the analysis proportionate rather than adding a mandatory essay or another approval ritual to trivial work.
+## Enforce, Then Instruct
 
-## Native approvals
+Rules live at the lowest layer that can hold them. A native permission rule holds regardless of what the model decides; a script makes a procedure repeatable and testable; prose covers what neither can express. Approval sits in each tool's native prompt, which the model cannot answer for you.
 
-H approves each round of commits, and each round of pushes, at the tool's native permission prompt. Text written in the same message as a tool call can stay in the agent's hidden reasoning, while a reply that ends the turn always reaches H, so the ship skill ends a turn with every card of the round and opens the next with one command for the round; publication additionally waits for H's go. Git history is the record; no receipt, binding or shell gate stands between the card and the prompt. Destructive or hard-to-reverse commands keep their own prompts.
+Native rules match command text and file paths, so they are not containment: an absolute binary path, a wrapper or a script can reach what a pattern names. Global guidance forbids such evasion, and Claude Code's auto-mode classifier reviews what rules miss. The [access policy](access.md#enforcement-limits) lists these limits per tool.
 
-Authentication is host-owned: GitHub uses HTTPS and the standard `gh` helper, and H controls login, storage and recovery. Credential access supplies capability, not approval. No broker, nested-client workaround or permission override is provided.
+## One Policy, Two Tools
 
-## Enforce, then instruct
+Both tools carry the same policy, but enforce it to different depths. Claude Code combines rules with a classifier that reviews unlisted actions; OpenCode has only static rules, so it asks in a few places where Claude Code's classifier reviews instead, such as a recursive `rm`. Parity means the same authorized work and the same safety outcome wherever each tool can express it, not identical tables; a stricter boundary is never weakened just to match. A test models both tools' matchers and requires the same decision for every listed command and path, so a rule changed in one tool alone fails the checks.
 
-Rules live at the lowest layer that can hold them. A sandbox constrains the surfaces it actually covers; a permission rule reaches only the subjects its tool checks; hooks see only dispatched calls. Scripts make a procedure repeatable across models and testable in CI; prose states intent and covers what lower layers cannot express. Native prompts hold approval; the skill owns the card that informs it.
+## Approvals That Reach You
 
-## One trust model, two enforcement points
+A commit or push needs your explicit choice, made after the agent has shown what it does. Text an agent writes in the same message as a tool call can remain in its hidden reasoning and never reach you, while a reply that ends the turn always does. So `ship` ends a turn with every card of a round, and your reply brings one native prompt that makes the round. Git history is the record; no receipt, token or shell gate stands between the card and the prompt.
 
-The [access policy](access.md) makes that distinction inspectable across tools: one outcome table for both, enforcement limits, implementation references and official semantics. It is the comparison owner, not another source of permission grants. `/eyrsync` reconciles intent, the access policy, implementation, upstream behavior and evidence together. Parity means equivalent authorized work and safety intent where enforceable, not weakening a stricter tool until the tables look identical.
+Authentication belongs to the host: GitHub over HTTPS with the standard `gh` credential helper, managed by you. Holding credentials gives the agent capability, never approval.
 
-The tools enforce the same intent to different depths. Claude Code combines deterministic rules with an auto-mode classifier; OpenCode has only static rules, so it asks where Claude Code's classifier would review. Both allow what does not expose H and gate the rest: secrets and personal folders are denied, and remote, destructive or configuration-changing commands ask. Neither is shell containment. The [access policy](access.md) owns the rules and their limits.
+## Independent Review
 
-Reads are broad and secrets are denied by one finite inventory in both tools, so ordinary configuration, package metadata and diagnostics stay readable. A finite inventory cannot recognize a renamed secret; global guidance still binds there.
+A second opinion is worth most from a fresh context, and more from a different model family. `spar` is the single entry point for review. Its reviewer, the `sparrer`, is read-only, follows one [charter](../agents/.agents/agents/sparrer.md) in both tools, and has shell and web access under the primary's rules, so it checks claims itself rather than trusting a curated brief. The drafter passes what it ran and checked but withholds its conclusions until the first pass, so the reviewer uses the evidence without inheriting the judgment. Findings that block carry how they fail; the rest are optional suggestions.
 
-Persistent scratch (`~/Projects/eyrie/scrape`) is writable in both tools; OpenCode also writes its session scratch under `/tmp/opencode`. Persistent work there is preserved project work, not disposable by location.
+The in-tool sparrer is the default. A bridge runs the other tool's sparrer when another model family's view is worth the time; the bridge supervises the reviewer's processes and fails unless the reply ends with the charter's verdict line. Review is never mandatory.
 
-## Independent review
+## One Neutral Source
 
-A second opinion is worth most from a fresh context, and more from a different model family. Spar is the single entry point: every reviewer, in-tool or cross-vendor, works in the same rounds and follows one [charter](../agents/.agents/agents/sparrer.md): full context, a top-down review from goal and approach to presentation against global guidance, and read-only conduct. Reviewers have read, shell and web tools, searching through the shell, without edit tools, under the primary's rules, so they verify claims instead of trusting a curated brief. The drafter passes what it ran and checked but withholds its conclusions until the reviewer's first pass, so the reviewer reuses the evidence without inheriting the judgment. Blocking findings carry how they fail; non-blocking findings are optional suggestions closed as one list. The in-tool sparrer is the default reviewer; a bridge adds another model family's view when that is worth its time, running the other tool's `sparrer` agent under H's normal settings with a hard timeout; a reply without the charter's verdict line fails. Review is recommended where it earns its cost, never mandatory.
+Guidance and skills exist once, under `~/.agents`, the home of the Agent Skills format. Each tool reaches them through its native loading: symlinks for global instructions, whole-directory links for skills, and native project `AGENTS.md` reading. Nothing is duplicated per tool, so a change to guidance or a skill reaches both at once, with one exception: Claude Code's agent file needs frontmatter, so it carries a copy of the sparrer charter's body, which the parity test holds equal to the source.
 
-Findings and their dispositions go in the plan file; the primary writes it, never a reviewer.
-
-## One neutral source
-
-Guidance and skills live once, under `~/.agents`, the home of the Agent Skills format. Both tools use native global-instruction symlinks to neutral `global-agents.md`: Claude Code's `CLAUDE.md` and OpenCode's `~/.config/opencode/AGENTS.md`. OpenCode does not append the same guidance through explicit `instructions`, so it loads once. Both tools read a project's `AGENTS.md` natively, so repositories carry no `CLAUDE.md` import. The guidance file avoids the name `AGENTS.md` because both tools also auto-load `AGENTS.md` files from subdirectories they read. Skill executables stay in each skill's standard `scripts/` directory; tool-specific discovery adapters do not transfer ownership out of EyrAgents.
-
-## Configuration Ownership
-
-The package directories mirror deployed paths, but not every managed endpoint is a leaf symlink:
-
-| Component | Ownership and deployment |
+| Component | Source and deployment |
 | --- | --- |
-| Global guidance and skills | `agents/.agents/` is canonical. Each skill directory is linked whole, so new skill files deploy without a restow; each client uses its native adapter. |
-| Claude Code | `claude-code/.claude/` supplies linked instructions, settings, sparrer, and status line; `make stow` links each skill directory into `~/.claude/skills`, the only skill location Claude Code reads. |
-| OpenCode | `opencode/.config/opencode/` supplies linked instructions and configuration; its mise fragment supplies startup defaults. |
-| Project instructions | Root `AGENTS.md` and `.agents/skills/eyrsync/`, linked for Claude Code as `.claude/skills/eyrsync`, apply to this repository; they are not global Stow payloads. |
+| Global guidance and skills | `agents/.agents/`; skill directories linked whole into `~/.agents/skills` and `~/.claude/skills` |
+| Claude Code | `claude-code/.claude/`: instruction link, settings, sparrer, status line |
+| OpenCode | `opencode/.config/opencode/`: instruction link, configuration, sparrer; a mise fragment for startup defaults |
+| This repository's instructions | Root `AGENTS.md` and the `eyrsync` skill, which apply here only |
 
-Client-owned identity, learning, and session state remain outside the source packages. Credentials and schedules retain their separate authorization boundaries; a package does not install accounts or recurring jobs.
+Client-owned state (sessions, memory, credentials) stays outside the packages.
 
-## Documentation Ownership
+## Live Deployment
 
-The README is the overview and navigation entry point. [Setup](setup.md) owns installation, deployment, migration, and adaptation; [operations](operations.md) owns daily use and verification. This guide explains architecture and rationale; [access](access.md) owns the security comparison and restricted launches. Skills own executable workflow procedures, `AGENTS.md` owns agent invariants, and the [maintenance ledger](maintenance.md) holds only unresolved work and live revalidation evidence. Link to those owners instead of copying their detailed procedures into the README.
+Stow links the packages into place without folding directories, so the tools can still write their own files beside the links. The deployed clone is therefore live: an edit takes effect before it is committed, which is fast to iterate on and the reason work on this repository happens in a watched session. Guards stop a deployment from taking over another clone's links or foreign files, and a change to deployed state records the other host's steps in the ledger until it is done there.
 
-The [workspace guide](workspace-guide.html) has one authoring/build owner here because the development workflow spans host applications and AI clients. Its [maintenance contract](workspace-guide-src/README.md) keeps host facts with EyrArcHy/EyrWSL configuration work and `/omasync`, and client facts with EyrAgents and `/eyrsync`. Both host profiles and all client controls are embedded in one offline file. EyrArcHy and EyrWSL retain their implementation-twin contract; EyrAgents remains independent. Cross-repository fact review creates a documentation companion when relevant, while building or deploying any repository uses its own sources.
+## Evidence
 
-## Reference coverage
+Two upstream references anchor reconciliation: OpenCode's client source, and Claude Code's public release and support repository, which is not its CLI source. Official documentation states the supported interface, release notes show changes, source explains available implementation, and runtime checks show only what was observed; none substitutes for the others, and disagreements stay explicit. Reference clones are pinned to GitHub node IDs, because a redirect or shared history alone does not prove a project's identity. The [eyrsync skill](../.agents/skills/eyrsync/SKILL.md#sources) owns this.
 
-The same maintenance questions apply to every tool, but their evidence is not interchangeable. OpenCode publishes client source; Claude Code's official public repository supplies versioned release/plugin/support material, not its proprietary CLI engine. Keeping both declared references makes omissions and release changes visible without pretending equal implementation visibility. Version-matched source, official interface documentation, changelogs and controlled runtime observations answer different questions; disagreements remain explicit rather than being resolved by assumption. Hosted behavior and model internals are not proved by a client clone.
+## Records
 
-The [eyrsync source table and lifecycle](../.agents/skills/eyrsync/SKILL.md#sources) own coverage and freshness. New references need a concrete dependency and approved destination. The standalone Bash entrypoint delegates structured identity/manifest handling to a Python standard-library helper. GitHub node IDs pin the intended projects across canonical URL moves; `gh` resolves declared and actual origin endpoints to that identity before fetching. Non-forced atomic fetches, guarded fast-forwards and rechecks precede fetch-URL/manifest reconciliation. Explicit push URLs and unrelated configuration survive. Source comments/mode survive atomic manifest replacement, but the clone/manifest pair is not a transaction; failure can leave safe partial progress. Unknown identities, local conflicts or drifting inputs refuse without rollback. Reference maintenance has no neighboring-repository dependency.
+Durable decisions live in the repository, open work in the [maintenance ledger](maintenance.md), and provenance in Git history. Work that spans sessions keeps one live plan file outside the repositories, deleted when the work is done; steps pending on another host live in the ledger's host pass, or in a handoff file where a repository keeps one, as EyrWSL does. Native memory is a revisable local cache, never authority.
 
-GitHub documents [rename redirects](https://docs.github.com/en/repositories/creating-and-managing-repositories/renaming-a-repository), including their loss when an old name is reused, and recommends persisting [global node IDs](https://docs.github.com/en/graphql/guides/using-global-node-ids) for object references. A redirect or shared Git ancestry alone is therefore insufficient identity evidence. The updater never replaces its reviewed ID pins automatically. Pins establish object continuity, not trust in arbitrary new sources or approval to publish.
+## Models and Effort
 
-## Gates
-
-`lint` and `check` are repository checks, `restow` and `verify` host verification. A repository declares its gates through these targets; host-bound targets refuse on the wrong host or clone. The ship skill runs them on the staged state before each commit.
-
-## Standalone deployment
-
-The harness deploys with GNU Stow without directory folding, so managed parents stay real directories and only leaves are links; each skill directory is linked whole into both skill roots so new skill files deploy without a restow. Clone guards and complete selected-skill preflight prevent cleanup or migration from silently taking over another clone or foreign entry. One Make invocation is serialized, not made transactional against disk failure or independent host edits.
-
-EyrAgents owns its configuration, startup requirements, setup and workspace-guide build independently of host dotfiles. Ordinary installed tools and mise are explicit prerequisites. OpenCode's mise fragment provides defaults while preserving caller overrides; no shell-export import or host launcher source is required. Live Stow configuration remains the deployment model. Deployment-affecting changes retain exact other-machine acceptance steps in the ledger until completed there.
-
-Fixtures exercise interfaces under mocks. `make canary` adds up to six live calls per tool, requiring successful nonempty replies and preserving its fixture HEAD. Canary replies are behavior, not independent dispatch proof. Node.js and mise belong to this repository's verification prerequisites.
-
-## The repository is the record
-
-Durable decisions live in `AGENTS.md`, unresolved ones in the maintenance ledger, and provenance in Git history. Native memory can retain useful non-secret preferences, context and learned procedures, but remains a revisable local cache. Consequential facts are checked against their sources; learning becomes shared policy or a maintained workflow only through the appropriate repository. Tool-owned memory and learned skills may evolve automatically, while credentials, managed guidance, access controls and repository-owned skills retain their existing boundaries. Local memory neither travels through Git nor establishes another host's state.
-
-Work that spans several steps or sessions keeps one live plan file in `~/Projects/eyrie/scrape/plans/`, as global guidance's Continuity rule describes: the goal, H's decisions, what remains and the next step, current rather than historical, and deleted once the work ships. Simple tasks need none. It lives outside the repositories, so no ignore entry is needed and cross-repository work has one home.
-
-Plan files survive application restarts but not a change of host. A conditional tracked `docs/handoff.md` supplies the next host's pending actions and acceptance checks, linking canonical procedures. The receiver revalidates its host and repository and deletes or updates the handoff through the normal commit workflow. Neither record transfers approval or host attestation; no empty handoff file or second synchronized state store is needed.
-
-## Effort and models
-
-Each tool's configuration and the reviewer scripts own model choices; the contracts check only the configured `xhigh` effort, and global guidance carries no duplicate flag or override recipe. One owner per choice means a `/model` switch or catalog bump changes one file, not a test and three documents. The policy favors the most capable primary models, with small models for tool-managed lightweight tasks. Moving aliases or catalog defaults follow their provider's selection, whose strongest-model status needs revalidation; concrete IDs carry an update trigger in the ledger. Configured preferences and observed runtime provenance remain distinct.
+Each tool's configuration owns its model choices, so a model change edits one file: Claude Code's settings name the primary model and the sparrer's frontmatter its reviewer model, both as moving aliases; OpenCode's configuration names its primary and small models by concrete ID, bumped by hand when a newer generation appears. Claude Code defines no `fallbackModel`: a silent downgrade would override the chosen primary. Effort is set once per tool and can be changed per session.

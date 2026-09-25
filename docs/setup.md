@@ -1,87 +1,74 @@
 # Setup
 
-[Overview](../README.md) · [Operations](operations.md)
+[Overview](../README.md) · [Operations](operations.md) · [Access policy](access.md)
 
 ## Prerequisites
 
-- Git, GNU Make, and GNU Stow
-- jq, Python, Node.js, mise, and ripgrep (`rg`)
-- ShellCheck 0.11.0 or newer
-- GNU coreutils and util-linux (`flock`, `setsid`)
-- Claude Code and OpenCode installed through [mise](https://mise.jdx.dev); provider sign-in remains interactive.
+- Git, GNU Make, GNU Stow, jq, Python 3, mise, and GNU coreutils and util-linux (`setsid`).
+- ShellCheck 0.11.0 or newer, for `make lint`.
+- Claude Code 2.1.277 or newer and OpenCode, installed through [mise](https://mise.jdx.dev).
 
 On Arch Linux:
 
 ```bash
-sudo pacman -Syu --needed git make stow jq python nodejs shellcheck util-linux mise ripgrep
-```
-
-## Client Installation And Sign-In
-
-Install the clients before harness deployment. Existing mise installations can be used directly; no other dotfiles checkout or wrapper is required.
-
-```bash
+sudo pacman -Syu --needed git make stow jq python shellcheck util-linux mise
 mise use --global claude@latest opencode@latest gh@latest
 ```
 
-Keep existing mise trust and release-cooldown preferences; this setup does not lower them.
+Activate mise for your shell ([mise activation](https://mise.jdx.dev/getting-started.html#activate-mise)) or use its shims. Launchers that run outside an activated shell use `mise exec -- claude` or `mise exec -- opencode`. The OpenCode package deploys `~/.config/mise/conf.d/eyragents-opencode.toml`, which supplies OpenCode's startup defaults through mise and keeps any value the caller sets explicitly; a binary started outside mise does not receive them.
 
-Follow [mise activation](https://mise.jdx.dev/getting-started.html#activate-mise) for your shell, or use mise shims. Non-interactive launchers can run `mise exec -- claude` or `mise exec -- opencode` with normal client arguments. Only trust project mise configuration you have reviewed.
-
-The OpenCode package stows `~/.config/mise/conf.d/eyragents-opencode.toml`. Mise supplies its skill-discovery and web-search startup defaults without host shell exports, preserving explicit caller values. A direct binary launched outside mise activation/shims does not receive that fragment; use `mise exec` for that launch.
-
-Claude Code and OpenCode use their native interactive sign-in flows. Client support for a model ID does not establish account entitlement. Keep provider credentials outside the repository and complete a successful live reply separately from installation checks.
-
-## Clone
-
-```bash
-mkdir -p ~/Projects/eyrie
-git clone https://github.com/peregrinus879/eyragents.git ~/Projects/eyrie/eyragents
-cd ~/Projects/eyrie/eyragents
-```
+Sign in to each client through its own interactive flow. Credentials stay with the clients, outside the repository.
 
 ## Deploy
 
-After installing the clients and reviewing the personal guidance, run from the repository root. Preview first and resolve each reported conflict before deployment:
-
 ```bash
-make dry-run   # preview Stow actions before resolving conflicts
-make stow      # guarded cleanup, links, and skill directory links
+git clone https://github.com/peregrinus879/eyragents.git ~/Projects/eyrie/eyragents
+cd ~/Projects/eyrie/eyragents
+make dry-run   # preview Stow's links
+make stow      # clean up, link the packages and the skill directories
 make verify    # repository and deployment checks
 ```
 
-Stow runs without directory folding, so `~/.claude`, `~/.config/opencode`, and the other managed parents stay real directories that tools may write into. The one exception is each skill directory, `~/.agents/skills/<name>` and `~/.claude/skills/<name>`, linked whole by `make stow` so files added to a skill deploy without a restow. Stow reports any conflicting regular file without changing it; reconcile it explicitly.
+Resolve each conflict `make dry-run` reports before deploying; Stow never overwrites an existing file. Restart the clients afterwards, OpenCode in particular, since it loads configuration at startup.
 
-Every host-writing Make target checks deployed-clone ownership, including cleanup. `make check-skills` preflights every selected skill before cleanup or link conversion; foreign files or links cause unchanged refusal rather than partial conversion. Deployment goals are serialized within one Make invocation, including `make -j`; this is not a transaction against I/O failure or independent concurrent deployments. `make dry-run` previews Stow, not cleanup or skill linking.
+How deployment behaves:
 
+- **Real parent directories.** Stow runs with `--no-folding`, so `~/.claude`, `~/.config/opencode` and the other managed parents stay real directories the tools can write into; only files are links. Each skill directory is the exception: `~/.agents/skills/<name>` and `~/.claude/skills/<name>` are single links to the whole directory, so a file added to a skill deploys without a restow.
+- **Clone guard.** Every target that writes to the host checks that the deployed links belong to this clone, and `make check-skills` checks every skill before any cleanup. A foreign file or link at a path this repository manages is refused unchanged rather than taken over; unrelated entries, such as the skills Omarchy installs beside these, are left alone.
+- **Cleanup.** Preparation removes only dangling links it recognizes as this repository's, including those of retired files, and prunes managed directories they leave empty.
+- **One invocation at a time.** Deployment goals in one Make invocation run serially, even under `make -j`. This is not a transaction against disk failure or a second concurrent deployment.
 
-For later updates, use `make restow verify`. `make unstow` removes package links. When moving clones, unstow from the old clone before stowing the new one. If the old clone is unavailable, guarded preparation removes only recognized dangling links, including those of retired packages. Restart the affected clients after deployment, especially OpenCode.
+## Update, Move and Remove
 
-`make verify` checks the deployed paths and the spar bridges' executables. Restart clients to load changed skills; source edits do not replace a running session's loaded instructions. Deployment does not establish authenticated publication.
+- **Update:** pull, then `make restow verify`, then restart the clients.
+- **Move the clone:** run `make unstow` in the old clone, then `make stow` in the new one. If the old clone is gone, preparation in the new one removes its dangling links.
+- **Remove:** `make unstow`.
 
-### GitHub Access
+## GitHub Access
 
-H handles login, storage selection and recovery locally. For GitHub, use HTTPS and the host-local gh credential helper; existing working authentication needs no replacement.
+Publication uses HTTPS with the GitHub CLI's credential helper. Sign in and connect Git once, interactively:
 
 ```bash
 gh auth login --hostname github.com --git-protocol https
 gh auth setup-git
 ```
 
-These are interactive onboarding steps, separate from Stow and agent publication approval. Configure a GitHub no-reply commit identity through your ordinary Git setup. Existing remotes are not changed automatically. Follow the [GitHub CLI documentation](https://cli.github.com/manual/gh_auth_login) for storage and recovery; never print or copy credentials into this repository. The [ship skill](../agents/.agents/skills/ship/SKILL.md) owns publication.
+Set your commit identity to your GitHub no-reply address in your ordinary Git configuration; the [ship skill](../agents/.agents/skills/ship/SKILL.md) stops if either identity resolves elsewhere. Existing remotes are left as they are. The [GitHub CLI manual](https://cli.github.com/manual/gh_auth_login) covers storage and recovery.
 
-### Reference Clones
+## Reference Clones
 
-`references.txt` declares this repository's references. GitHub rows contain `<directory> <URL> github:<reviewed-node-id>`; other endpoints use the first two fields. Bootstrap missing clones only after approving each URL/destination under `~/Projects/quarry` and recording identity from official GitHub metadata. Existing GitHub refreshes require `gh` metadata access. Preview with `bash scripts/update-references.sh --dry-run`; run `make refs`, or pass the same declared names. The updater preserves local work and tags and reconciles verified same-project canonical URL moves in origin and this manifest. It retains explicit push destinations and stops on unknown identity or unsafe inputs. New/different projects and destructive resolution remain separate decisions; [eyrsync](../.agents/skills/eyrsync/SKILL.md#reference-lifecycle) owns the complete procedure.
+[`references.txt`](../references.txt) declares the upstream repositories the harness is checked against: Claude Code's public release and support repository, and OpenCode's source. Clones live under `~/Projects/quarry`. `bash scripts/update-references.sh --dry-run` previews a refresh and `make refs` performs it; the updater refreshes existing clones only, preserves local work, and verifies each project's identity against its pinned GitHub node ID. Creating a clone is a separate, approved step. The [eyrsync skill](../.agents/skills/eyrsync/SKILL.md#reference-lifecycle) owns the full procedure.
 
 ## Adapt For Another User
 
-The harness is personal, and forking it means replacing a few facts rather than the structure:
+The structure transfers as it is; a few facts are personal:
 
-- The addressee. The guidance and skills speak to `H`; the ship skill's identity check expects a GitHub no-reply address.
-- The platforms. Omarchy and Arch WSL are the checked environments. Review filesystem, runtime and native-permission assumptions before adding another platform; the deployed-clone guard is independent of checkout location.
-- The models. Each tool's configuration owns its model choices: Claude Code settings and the sparrer frontmatter, OpenCode's primary and small models.
-- The packages. `PACKAGES` in the Makefile names what Stow deploys. A new client may need links or a native plugin; use its supported loading mechanism rather than assuming every adapter is a symlink tree.
-- The credential list. It lives in the two native configurations. The configuration tests check the relevant path boundaries.
+- **The addressee and profile.** Global guidance speaks to `H` and describes H's background. Replace the opening profile, and the name throughout global guidance, the skills and the sparrer charter.
+- **Paths.** Persistent scratch is `~/Projects/eyrie/scrape`, with plan files in its `plans/` directory, and references live under `~/Projects/quarry`. They appear in guidance, both configurations, scripts, tests and docs; find every use with `git grep -n 'eyrie/scrape\|Projects/quarry'` and change them as one set.
+- **Personal folders.** The denied folders are listed in global guidance, both configurations and the test.
+- **Identity.** The ship skill expects a GitHub no-reply commit identity.
+- **Models.** Claude Code's settings and the sparrer's frontmatter name Claude models; OpenCode's configuration names its primary and small models, with concrete IDs.
+- **Platforms.** Omarchy and Arch WSL are the checked environments. Review filesystem, runtime and permission assumptions before adding another.
+- **Packages.** `PACKAGES` in the [Makefile](../Makefile) lists what Stow deploys. A new client may need a native plugin or loader rather than a link tree.
 
-The [design guide](design.md) explains the shared workflow and deployment choices. Review those choices before adopting the harness for a different environment.
+After a change, run `make lint check`: the parity test catches a permission edit made in only one tool.

@@ -1,65 +1,48 @@
 # EyrAgents
 
-Global guidance, skills, and Git workflows for **Claude Code and OpenCode** on Omarchy and Arch WSL. [GNU Stow](https://www.gnu.org/software/stow/) deploys the tool adapters.
+One harness for **Claude Code** and **OpenCode**: shared global guidance, reusable [Agent Skills](https://agentskills.io), and a permission policy that gives both tools the same outcome. [GNU Stow](https://www.gnu.org/software/stow/) deploys it into your home directory; other projects inherit it without any local setup.
 
-This is a standalone personal harness. It owns AI-client configuration, startup defaults and shared workflows, and uses ordinary installed tools without depending on a host-dotfiles repository.
+The governing idea: an agent works at full capability and prompts only where a real exposure exists. Secrets and personal folders are denied, remote, destructive and hard-to-reverse actions ask at the tool's native prompt, and everything else runs.
 
-## What Is Included
+## What You Get
 
-- One source for global guidance and reusable [Agent Skills](https://agentskills.io).
-- Tool-specific access controls, with their differences documented in the [access policy](docs/access.md).
-- Commits and pushes approved by H at each tool's native prompt, and optional independent review.
-- Repeatable deployment checks and opt-in live smoke tests.
-- One offline development-workspace guide covering the host environment and both AI clients.
-
-## Tools And Layout
-
-| Source | Deployed role |
+| Part | What it does |
 | --- | --- |
-| `agents/.agents/` | Global guidance, skills, reviewer bridges, and sparrer charter. |
-| `claude-code/.claude/` | Claude Code instructions link, settings, sparrer, and status line. |
-| `opencode/.config/opencode/` | OpenCode instructions link, models, permissions, sparrer, and TUI settings. |
-| `scripts/`, `tests/`, `docs/` | Deployment helpers, verification, and documentation. |
+| [Global guidance](agents/.agents/global-agents.md) | One instruction file both tools load: approach, style, safety and workflow rules. |
+| [`ship`](agents/.agents/skills/ship/SKILL.md) | Commits and publishes verified work. The agent ends a turn with a card for each commit; your reply brings one native approval prompt for the round. |
+| [`spar`](agents/.agents/skills/spar/SKILL.md) | Independent review in rounds by a read-only reviewer, the `sparrer`, from the same model family or, through a bridge, from the other tool's. |
+| [Access policy](docs/access.md) | The permission model, what each tool enforces, and where the tools differ. |
+| Tests | A parity test that holds both tools' permissions to the same decisions, bridge and deployment tests, and an opt-in live canary. |
+| [Workspace guide](docs/workspace-guide.html) | One offline page of terminal, editor and AI-client controls for Omarchy and Arch WSL; on GitHub, download the raw file and open it in a browser. |
 
-The [architecture guide](docs/design.md#configuration-ownership) explains linked packages and whole skill-directory links. The [Makefile](Makefile) owns deployment targets and the package list.
+## Requirements
 
-## Independence
+Linux with Git, GNU Make, GNU Stow, jq, Python 3, ShellCheck and mise; Claude Code and OpenCode installed through mise. The checked hosts are [Omarchy](https://omarchy.org) and Arch Linux on WSL 2. [Setup](docs/setup.md) lists exact packages.
 
-Clone this repository wherever you keep projects. Setup, checks, reference maintenance and the [offline workspace guide](docs/workspace-guide.html) are owned here. Other projects inherit the stowed global harness through their AI client; they need no local import or EyrAgents-specific configuration.
+## Quick Start
 
-## Setup
+```bash
+git clone https://github.com/peregrinus879/eyragents.git ~/Projects/eyrie/eyragents
+cd ~/Projects/eyrie/eyragents
+make dry-run   # preview the links; resolve any reported conflict first
+make stow      # deploy
+make verify    # repository and deployment checks
+```
 
-Start with the [setup guide](docs/setup.md): prerequisites, client installation and sign-in, conflict handling, deployment, and adaptation for another user.
-
-**The deployed clone is live configuration.** Review personal guidance and permissions before adopting it; edits to linked files can take effect before a commit. Credentials and application history stay outside Git.
-
-## Usage
-
-Start an installed client in the project you want to work on. The [operations guide](docs/operations.md) covers continuation, model effort, shared workflows, and verification. The [offline workspace guide](docs/workspace-guide.html) combines `hdw`, Herdr, editor/shell controls and AI-client workflows, with an Omarchy/Arch WSL selector and saved favorites. Open it locally in a browser; on GitHub, download the raw HTML first. [Guide maintenance](docs/workspace-guide-src/README.md) explains ownership and rebuilding.
-
-| Workflow | Canonical procedure |
-| --- | --- |
-| Commit and publish verified work | [ship](agents/.agents/skills/ship/SKILL.md) |
-| Obtain a second opinion | [spar](agents/.agents/skills/spar/SKILL.md) |
-| Reconcile the harness with upstream tools | [eyrsync](.agents/skills/eyrsync/SKILL.md) |
-
-Long work keeps a live plan file, as global guidance's Continuity rule describes. `ship` ends a turn with every card of a round; H's reply brings one native prompt that commits the round. Publication works the same way: the cards, H's go, then one push prompt. Host-local authentication supplies capability, not approval; [setup](docs/setup.md#github-access) owns standalone onboarding.
-
-## Verify
-
-From the repository root, `make lint check` runs repository checks; `make restow verify` deploys and checks the current host. `make canary` is a separate live smoke test. See [verification and its limits](docs/operations.md#verify).
+Read [global guidance](agents/.agents/global-agents.md) and the [access policy](docs/access.md) before deploying: the guidance addresses its owner as **H**, and the deployed clone is live configuration, so an edit takes effect before it is committed. [Adapt for another user](docs/setup.md#adapt-for-another-user) lists what to change.
 
 ## Documentation
 
 | Need | Read |
 | --- | --- |
-| Install, move, or adapt the harness | [Setup](docs/setup.md) |
-| Use the tools and run checks | [Operations](docs/operations.md) |
-| Find workspace and AI-client controls offline | [Workspace guide](docs/workspace-guide.html) |
-| Understand configuration ownership and design | [Design](docs/design.md) |
-| Compare permissions or inspect an untrusted checkout | [Access policy](docs/access.md) |
-| Find unresolved issues or pending host work | [Maintenance ledger](docs/maintenance.md) |
-| Change the repository with an agent | [AGENTS.md](AGENTS.md) |
+| Install, update, move or adapt | [Setup](docs/setup.md) |
+| Daily use, workflows and checks | [Operations](docs/operations.md) |
+| Permissions and their limits | [Access policy](docs/access.md) |
+| Why it is built this way | [Design](docs/design.md) |
+| Open work and pending host checks | [Maintenance ledger](docs/maintenance.md) |
+| Rules for agents changing this repository | [AGENTS.md](AGENTS.md) |
+
+Companion repositories: [EyrArcHy](https://github.com/peregrinus879/eyrarchy) (Omarchy dotfiles) and [EyrWSL](https://github.com/peregrinus879/eyrwsl) (an Omarchy-like Arch WSL environment).
 
 ## License
 

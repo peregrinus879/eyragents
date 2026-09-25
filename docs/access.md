@@ -1,105 +1,118 @@
 # Access Policy
 
-The comparison point for Claude Code and OpenCode: what each agent may do, how each tool enforces it, and where the tools differ. [Global guidance](../agents/.agents/global-agents.md#safety) owns authorization, [`AGENTS.md`](../AGENTS.md) owns invariants, the linked configurations implement both, and [`maintenance.md`](maintenance.md) holds open gaps. [`/eyrsync`](../.agents/skills/eyrsync/SKILL.md#access-reconciliation) keeps these views aligned.
+[Overview](../README.md) · [Design](design.md)
+
+What each agent may do, how Claude Code and OpenCode enforce it, and where they differ. [Global guidance](../agents/.agents/global-agents.md#safety) states the rules the agents follow; the two configurations implement them; [`tests/config-contracts.py`](../tests/config-contracts.py) holds both configurations to the same decisions; the [maintenance ledger](maintenance.md) holds open gaps.
 
 ## Model
 
-The governing rule is the most freedom possible without exposing H, with the same outcome in both tools wherever each can express it. Exposure means secrets and personal folders, remote or third-party effects, and destructive or hard-to-reverse changes. Everything else in the authorized scope runs without a prompt.
+The most freedom possible without exposing the owner, with the same outcome in both tools wherever each can express it. An exposure is a secret or personal folder, a remote or third-party effect, or a destructive or hard-to-reverse change. Everything else in the authorized scope runs without a prompt.
 
 | Outcome | Scope |
 | --- | --- |
-| Allow | Reads anywhere except secrets and personal folders, and read forms of commands whose writes differ by a subcommand word; edits in the worktree and persistent scratch (`~/Projects/eyrie/scrape`); ordinary commands; web fetch and search. |
-| Ask | Remote-changing `gh` subcommands, every `gh api` call and `gh alias` changes; `git clean`, `reset`, `restore`, `checkout --`, `stash drop`/`clear`, branch deletion; Git configuration writes (a dotted key with a value, `-e`/`edit`, `set`, `unset`, `--unset`, `--add`, `--replace-all`, section renames and removals) and remote changes, also behind `git -C`, `-c` and long global options; `ssh`, `scp`, `sftp`; every commit-producing Git command (`commit`, `merge`, `pull`, `rebase`, `cherry-pick`, `revert`, `am`, and the ref and history rewriters) and `git push`; history-destroying Git (`reflog expire`/`delete`, `gc --prune`, `worktree remove`); package and image publication (`npm`, `pnpm` and `yarn publish`, `cargo publish`, `docker push`, `twine upload`). OpenCode also asks before edits outside the worktree and scratch, and for recursive or forced `rm`; Claude Code's auto-mode classifier reviews those instead. |
-| Deny | Secrets and personal folders (read and edit); edits to `.git/**`, `~/.config/git` and `~/.config/gh`; `sudo`, `su`, `doas`, `pkexec`; all of `gh auth`, and secret and key writes; Remote Control (`claude remote-control`, `--remote-control`, `--rc`); every form of another agent client (the other tool, Copilot, Gemini, Cursor Agent, Crush), except OpenCode's exact version checks. |
+| Allow | Reads anywhere except secrets and personal folders; edits in the project and persistent scratch (`~/Projects/eyrie/scrape`); ordinary commands; web fetch and search. |
+| Ask | Remote-changing `gh` subcommands, every `gh api` call and `gh alias` change. Git: every commit-producing command (`commit`, `merge`, `pull`, `rebase`, `cherry-pick`, `revert`, `am`, and the ref and history rewriters), `push`, `clean`, `reset`, `restore`, `checkout --`, `stash drop`/`clear`, branch deletion, configuration writes and remote changes, and history destroyers (`reflog expire`/`delete`, `gc --prune`, `worktree remove`), also behind `git -C`, `-c` and long global options. Package and image publication (`npm`, `pnpm` and `yarn publish`, `cargo publish`, `docker push`, `twine upload`). `ssh`, `scp`, `sftp`. OpenCode also asks for edits outside the project and scratch and for recursive or forced `rm`, which Claude Code's classifier reviews instead. |
+| Deny | Secrets and personal folders, for read and edit; edits to `.git/**`, `~/.config/git` and `~/.config/gh`; `sudo`, `su`, `doas`, `pkexec`; all of `gh auth`, and secret and key writes; Remote Control (`claude remote-control`, `--remote-control`, `--rc`); every other agent client (the other tool, Copilot, Gemini, Cursor Agent, Crush), except OpenCode's exact version checks. |
 
-An Ask is a native prompt: the agent states what the command does and H selects. The [ship skill](../agents/.agents/skills/ship/SKILL.md) ends a turn with every card of a round; H's reply brings one command that commits or pushes the round at a single prompt.
+An Ask is the tool's native prompt; the [ship skill](../agents/.agents/skills/ship/SKILL.md) shows the cards before it.
 
-Both tools use one `gh` verb table covering every top-level group in `gh` 2.101; groups that only read or change local `gh` settings stay allowed. Claude Code lists each remote-changing verb as Ask. OpenCode asks for every subcommand of a gated group, then allows its read-only verbs, so a verb added in a later `gh` release asks in OpenCode and reaches Claude Code's classifier. Every `gh` rule also covers options before the group (`gh --repo o/r pr merge`), and nested groups gate only their writing verbs (`gh repo autolink create`, `gh repo deploy-key add`). `tests/config-contracts.py` holds both to the same decisions, including flag combinations and global-option prefixes, and keeps a list of reads that must never prompt.
+**`gh`.** One verb table covers every top-level group in `gh` 2.101, including options placed before the group (`gh --repo o/r pr merge`); groups that only read or change local `gh` settings stay allowed, and nested groups gate only their writing verbs (`gh repo autolink create`, `gh repo deploy-key add`). Claude Code lists each writing verb as Ask. OpenCode asks for every subcommand of a gated group and then allows its reading verbs, so a verb added in a later `gh` release asks in OpenCode and reaches Claude Code's classifier.
 
-Native rules see command text only. Where a family's read and write forms differ by flags that combine or reorder freely, it is gated whole, and its reads prompt or are refused: `gh api` (read through `gh` subcommands), `git clean` (preview with `git status --ignored`), `gh auth`, and other agent clients (check versions with `mise ls`). Git configuration reads shaped like writes, a dotted token followed by another argument, also prompt; read the configuration files directly instead. A read that passes a gated subcommand word as its own argument after a global option, such as `git --no-pager log --grep push`, is treated as that subcommand. `--help` on the gated Git commands and `ssh -V`/`-G` prompt too.
+**Families gated whole.** Rules see command text only. Where a family's read and write forms differ only by flags that combine or reorder freely, the whole family is gated, and its reads prompt or are refused. Each has a prompt-free alternative:
+
+| Family | Read instead with |
+| --- | --- |
+| `gh api` | `gh` subcommands, such as `gh search issues` |
+| `git clean -n` | `git status --ignored` |
+| `gh auth status` | nothing needed: sign-in is the owner's |
+| another agent client's `--version` | `mise ls` |
+| a Git configuration read shaped like a write (a dotted key followed by another argument) | the configuration file itself |
+
+`--help` on gated Git commands and `ssh -V`/`-G` prompt too, and a read that passes a gated subcommand word after a global option, such as `git --no-pager log --grep push`, is treated as that subcommand.
 
 ### Protected Paths
 
-One inventory serves both primaries:
+One inventory, in both configurations:
 
-- **Home stores:** `.ssh`, `.aws`, `.gnupg`, `.kube`, `.password-store`, keyrings, browser and password-manager profiles (Firefox, Chrome, Chromium, Brave, 1Password, Bitwarden), `gh` hosts, Docker config, `.netrc`, `.npmrc`, `.pypirc`.
-- **Client state:** Claude Code's credentials (`.credentials.json` and copies), sign-in session (`~/.claude.json` and its `backups/`), prompt history and session state; OpenCode's auth and logs; the Codex desktop app's auth, config and history. Conversation transcripts (Claude Code's `projects/**/*.jsonl`, OpenCode's storage and database, Codex sessions) are readable and never editable; a credential found in one is still a secret.
+- **Home stores:** `.ssh`, `.aws`, `.gnupg`, `.kube`, `.password-store`, keyrings, browser and password-manager profiles (Firefox, Chrome, Chromium, Brave, 1Password, Bitwarden), `gh` hosts, Docker configuration, `.netrc`, `.npmrc`, `.pypirc`.
+- **Client state:** Claude Code's credentials (`.credentials.json` and copies), sign-in session (`~/.claude.json` and its `backups/`), prompt history and session state; OpenCode's auth and logs; the Codex desktop app's auth, configuration and history.
 - **Histories and runtime:** Bash, Zsh, fish, Python, Node, psql and MySQL histories; `/proc/*/environ`; `/var/lib/systemd/coredump`; `/var/crash`.
-- **Shapes anywhere:** `.env`, `.env.*`, `secrets/`, `credentials`, `credentials.*`, `auth.json`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `*.keytab`, private OpenSSH keys (`id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`) and private `ssh_host_*_key` files, including copies under any directory.
+- **Shapes anywhere:** `.env`, `.env.*`, `secrets/`, `credentials`, `credentials.*`, `auth.json`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `*.keytab`, private OpenSSH keys (`id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`) and private `ssh_host_*_key` files, including copies in any directory; recognizable copies of root-only system secrets (`shadow`, `gshadow`, NetworkManager connections, `kcore`), whose originals the OS already protects.
 - **Windows through WSL mounts:** browser profiles, 1Password, Bitwarden, Credential Manager, DPAPI keys and GitHub CLI under `AppData`.
 
-Root-only system secrets rely on OS permissions, since the agents run unprivileged; their recognizable copies (`shadow`, `gshadow`, NetworkManager connections, `kcore`) are denied by name anywhere. `example.env`, `credentials-policy.md`, public host keys and ordinary configuration stay readable. A finite inventory cannot recognize a renamed secret; global guidance still governs it.
+Conversation transcripts (Claude Code's `projects/**/*.jsonl`, OpenCode's storage and database, Codex sessions) are readable and never editable; a credential found in one is still a secret. `example.env`, `credentials-policy.md`, public host keys and ordinary configuration stay readable. A finite inventory cannot recognize a renamed secret; global guidance still governs it.
 
 ### Personal Folders
 
-`~/Desktop`, `~/Documents`, `~/Downloads`, `~/Music`, `~/Pictures`, `~/Sync` and `~/Videos`, plus the WSL `/mnt/*/Users/*` counterparts and OneDrive, are denied for read and edit. OpenCode carries them in its read and edit rules as well, because a session launched from a directory above them skips its external-directory check. Rules for folders absent on a host have no effect. Claude Code's classifier also prohibits reaching them through the shell.
+`~/Desktop`, `~/Documents`, `~/Downloads`, `~/Music`, `~/Pictures`, `~/Sync` and `~/Videos`, their `/mnt/*/Users/*` counterparts under WSL, and OneDrive are denied for read and edit. OpenCode carries them in its read and edit rules as well as its external-directory rules, because a session launched from a directory above them skips the external-directory check. Claude Code's classifier also prohibits reaching them through the shell. Rules for folders a host lacks have no effect.
 
 ### Temporary Directories
 
-Each tool keeps out of the other's session root: Claude Code denies `/tmp/opencode`, OpenCode denies `/tmp/claude-*`. The rest of `/tmp` is ordinary. OpenCode's own session scratch is a child of `/tmp/opencode`.
+Each tool keeps out of the other's session directory: Claude Code denies `/tmp/opencode` and OpenCode denies `/tmp/claude-*`. The rest of `/tmp` is ordinary, and OpenCode writes its own session scratch under `/tmp/opencode`.
 
 ## Enforcement Limits
 
-Rules are named forms, not containment. Path rules govern each tool's native file tools; an allowed command can still read or write any path the OS permits. Claude Code also applies Read and Edit denies to recognized file commands (`cat`, `head`, `tail`, `sed`, `tee`) and redirection targets, and its classifier reviews the rest; OpenCode checks directories for recognized file commands only. Command rules gate the spellings agents normally produce, including options before a `gh` verb, `git -C`, `-c` and long global options, and abbreviated Git long options. They are not a boundary against deliberate evasion: an absolute path (`/usr/bin/git push`), a wrapper, an environment prefix or a script escapes any text pattern, as does `git checkout <path>` without `--`, which reads like a branch switch. Global guidance forbids evasion, and Claude Code's classifier reviews what rules miss.
+Rules are named forms, not containment. Path rules govern each tool's file tools; an allowed command can still read or write anything the OS permits. Claude Code also applies Read and Edit denies to recognized file commands (`cat`, `head`, `tail`, `sed`, `tee`) and redirection targets, and its classifier reviews the rest; OpenCode checks directories for recognized file commands only. Command rules cover the spellings agents normally produce, including options before a verb, `git -C`, `-c`, long global options and abbreviated Git long options, but an absolute path (`/usr/bin/git push`), a wrapper, an environment prefix or a script escapes any text pattern, as does `git checkout <path>` without `--`. Global guidance forbids such evasion.
 
 | Surface | Claude Code | OpenCode |
 | --- | --- | --- |
-| Search | On Linux and WSL, `find` and `grep` run embedded in Bash and reach permission rules as Bash calls; Grep and Glob exist only without Bash | Grep returns matching lines without per-file Read checks; Glob lists names |
+| Search | On Linux and WSL, `find` and `grep` run inside Bash and meet the rules as Bash calls; the Grep and Glob tools exist only without Bash | Grep returns matching lines without per-file Read checks; Glob lists names |
 | Symlinks | Read and Edit rules check the link and its target | Read and Edit check the path as given, not a symlink's target (1.18.32) |
-| Deletion | Classifier review | Recursive or forced `rm` asks; other deletion forms (`find -delete`, scripts) run |
-| Auto-approve | `bypassPermissions` disabled | `--auto` or its palette toggle approves every Ask; keep it off |
-| Edits outside scope | Classifier review | `../* = ask`; a non-Git worktree is `/`, where `../*` never matches |
-| Move destinations | Not applicable | See [Move Destinations](#move-destinations) |
-| Nested clients | Every form of `opencode` and other agent clients denied; `claude` runs under the same user rules | Every form of `claude`, `opencode` and other agent clients denied, except the two exact version checks |
-| Web | Available; no tracked domain rules | `webfetch` and `websearch` allowed |
-| Sharing | `/feedback`, `/bug`, `/share`, Claude-drafted feedback, the session survey and error reports off in `env`; Remote Control denied | `share = "disabled"` |
+| Deletion | Classifier review | Recursive or forced `rm` asks; other forms (`find -delete`, scripts) run |
+| Auto-approval | `bypassPermissions` disabled | `--auto`, or its palette toggle, approves every Ask; keep it off |
+| Edits outside the project | Classifier review | `../* = ask`; in a non-Git directory the worktree is `/`, where `../*` never matches |
+| Move destinations | Not applicable | Checked only against external-directory rules; see [below](#move-destinations) |
+| Nested clients | Other agent clients denied; `claude` runs under the same user rules | `claude`, `opencode` and other agent clients denied, except the two exact version checks |
+| Web | Fetch and search available, no domain rules | `webfetch` and `websearch` allowed |
+| Sharing | `/feedback`, `/bug`, `/share`, Claude-drafted feedback, the session survey and error reports off; Remote Control denied | `share = "disabled"` |
 | Updates | `DISABLE_AUTOUPDATER`; mise owns versions | `autoupdate = false` |
 
-Claude Code's usage metrics stay on: they carry no code, prompts or paths, and `DISABLE_TELEMETRY` also stops the feature flags behind pasted-text marking, the Monitor and PushNotification tools and artifact comments. Auto mode is unaffected, since `defaultMode` sets it.
+Web access is a deliberate choice: it lets agents check current sources, and it is also an egress path for a prompt-injected session. OpenCode's `webfetch` has no boundary against requests to local or private addresses (source-checked on 1.18.18); secrets and shell network access stay separately restricted. A web read sends queries and URLs to a service; it is not permission to upload or change anything remote. Claude Code's usage metrics stay on: they carry no code, prompts or paths, and turning them off (`DISABLE_TELEMETRY`) also stops the feature flags behind pasted-text marking, the Monitor and PushNotification tools and artifact comments. Auto mode is unaffected, since `defaultMode` sets it.
 
-Web reads send queries and URLs to a service; that is not permission to upload or change anything remote.
+### The Sparrer
 
-### Sparrers
-
-Both tools carry an `sparrer` with the sparrer charter [`sparrer.md`](../agents/.agents/agents/sparrer.md). It has read, search, shell and web tools and no edit tools; the charter keeps it read-only, and its commands pass the primary's rules, so it never exceeds the primary. The [spar skill](../agents/.agents/skills/spar/SKILL.md)'s bridges run the other tool's reviewer: each runs the other tool's `sparrer` agent, and `spar-claude` also drops MCP tools and refuses a project that defines its own `sparrer`. Bridges are the sanctioned route; direct nested client launches stay denied.
+Both tools define a `sparrer` agent from one charter, [`sparrer.md`](../agents/.agents/agents/sparrer.md). It has read, shell and web tools and no edit tools, and its commands pass the primary's rules, so it never exceeds the primary. It cannot launch subagents: it denies `task`, and OpenCode's `subagent_depth` of 1 stops a subagent from delegating further. It is reached through the [spar skill](../agents/.agents/skills/spar/SKILL.md), whose bridges run the other tool's sparrer; `spar-claude` also drops MCP tools and refuses a project that defines its own `sparrer`. The bridges are the only sanctioned launch of another client.
 
 ## Untrusted Checkouts
 
-Normal interactive use assumes a trusted repository. For an untrusted checkout, suppress project-provided instructions and configuration using the supported client launch:
+Normal use assumes a trusted repository. For an untrusted checkout, launch without project instructions and configuration:
 
 ```bash
 claude --safe-mode --setting-sources user
 OPENCODE_DISABLE_PROJECT_CONFIG=1 OPENCODE_DISABLE_EXTERNAL_SKILLS=1 opencode
 ```
 
-Claude's safe mode ignores project instructions, hooks, and settings. OpenCode disables project configuration and external skills, but has no equivalent untrusted mode or shell sandbox. The spar bridges launch the other client with normal settings, so a restricted parent does not restrict the reviewer; use the in-tool sparrer there. These launches do not make instructions encountered in file contents trustworthy, nor do they remove every client/app surface.
+Claude Code's safe mode ignores project instructions, hooks and settings. OpenCode disables project configuration and external skills but has no equivalent untrusted mode or shell sandbox. The bridges start the other client with normal settings, so use the in-tool sparrer in a restricted session. Neither launch makes instructions found in file contents trustworthy.
 
-## Implementation And Semantics
+## Implementation
 
 ### Claude Code
 
-Implementation: [`settings.json`](../claude-code/.claude/settings.json) `permissions` and `autoMode`; [`sparrer.md`](../claude-code/.claude/agents/sparrer.md). The tool runs in auto mode with bypass disabled and no tracked sandbox.
+[`settings.json`](../claude-code/.claude/settings.json) `permissions` and `autoMode`, and [`sparrer.md`](../claude-code/.claude/agents/sparrer.md). Auto mode is the default, with bypass disabled and no tracked sandbox.
 
-Precedence is deny, then ask, then allow; an Ask rule prompts even in auto mode. A trailing ` *` matches the bare command only when it is the rule's sole wildcard, so `git -C` forms carry both shapes. Ask and deny rules apply to each subcommand of a compound command. `Read(//...)` is absolute, `Read(~/...)` home-relative, with gitignore-style globs; `Edit(path)` governs Edit, Write and NotebookEdit.
+- Precedence is deny, then ask, then allow; an Ask rule prompts even in auto mode, and Ask and deny rules apply to each part of a compound command.
+- A trailing ` *` matches the bare command only when it is the rule's only wildcard, so prefixed forms such as `git -C` carry both shapes.
+- `Read(//...)` is absolute and `Read(~/...)` home-relative, with gitignore-style globs; `Edit(...)` governs Edit, Write and NotebookEdit.
+- `autoMode` keeps the built-in rules and adds prose rules. **Allow:** work in persistent scratch follows repository rules. **Soft deny, needing the owner's instruction naming the file:** deleting files the task did not create; editing shell startup, systemd, autostart or mise configuration; changing the agents' own permissions, hooks, plugins or skills. **Hard deny:** reading or copying secrets even when named, reaching personal folders through the shell, and transmitting credentials. Its `environment` entries describe the owner's source control, public repositories, workstation and sensitive locations.
 
-`autoMode` keeps the built-in defaults and adds: scratch implementation follows repository rules (allow); deleting files the task did not create, editing startup, systemd or mise configuration, and changing the agents' own permissions, hooks, plugins or skills need H's instruction naming the file (soft deny); reading or copying secrets even when named, reaching personal folders through the shell, and transmitting credentials are prohibited (hard deny). Classifier rules are prose, not native denies.
-
-Official sources: [permissions](https://code.claude.com/docs/en/permissions), [permission modes](https://code.claude.com/docs/en/permission-modes), [auto-mode configuration](https://code.claude.com/docs/en/auto-mode-config), [hooks](https://code.claude.com/docs/en/hooks).
+Official sources: [permissions](https://code.claude.com/docs/en/permissions), [permission modes](https://code.claude.com/docs/en/permission-modes), [auto-mode configuration](https://code.claude.com/docs/en/auto-mode-config), [settings](https://code.claude.com/docs/en/settings).
 
 ### OpenCode
 
-Implementation: [`opencode.json`](../opencode/.config/opencode/opencode.json) `permission` and `agent.sparrer`; startup flags in [the mise fragment](../opencode/.config/mise/conf.d/eyragents-opencode.toml). OpenCode discovers `~/.agents/skills` natively; `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS` drops only the `.claude` copies, and `skills.paths` names the shared skills so the [untrusted-checkout launch](#untrusted-checkouts), which disables external discovery, keeps them.
+[`opencode.json`](../opencode/.config/opencode/opencode.json) `permission` and `agent.sparrer`, and startup flags in [the mise fragment](../opencode/.config/mise/conf.d/eyragents-opencode.toml). OpenCode discovers `~/.agents/skills` natively; `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS` drops only the duplicate `.claude` copies, and `skills.paths` names the shared skills so the [untrusted-checkout launch](#untrusted-checkouts), which disables external discovery, keeps them.
 
-The last matching rule wins, in config order, starting from OpenCode's own `* = allow`. A `*` matches any characters, including `/`, and a trailing ` *` also matches the bare command. `~/` expands in every pattern. Read and edit subjects are paths relative to the worktree; `external_directory` subjects are the absolute parent directory plus `/*`, checked first for anything outside the worktree. Because edit subjects are relative, the scratch grants use location-independent patterns: `../scrape/**` for worktrees in `~/Projects/eyrie`, `**/eyrie/scrape/**` elsewhere, and `**/tmp/opencode/**`. From a worktree under `/tmp`, `/tmp/opencode` edits ask.
+- The last matching rule wins, in configuration order, after OpenCode's own `* = allow`. `*` matches any characters, including `/`; a trailing ` *` also matches the bare command; `~/` expands in every pattern.
+- Read and edit subjects are paths relative to the worktree; `external_directory` subjects are the absolute parent directory plus `/*`, checked first for anything outside the worktree and skipped for paths under the launch directory.
+- Because edit subjects are relative, the scratch grants use location-independent patterns: `../scrape/**` for projects in `~/Projects/eyrie`, `**/eyrie/scrape/**` elsewhere, and `**/tmp/opencode/**`. The deployed Git and `gh` configuration is denied through forms anchored to the home directory (`.config/git/**` from a home worktree, `../**/.config/git/**` from below it, `home/*/.config/git/**` from a root worktree), so a Stow package's tracked copy, such as `git/.config/git/config`, stays editable. From a worktree under `/tmp`, `/tmp/opencode` edits ask, because `**/tmp/opencode/**` cannot match a relative `../opencode/` path.
 
-Checked 1.18.32 sources: [permission evaluation](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/permission/index.ts), [Edit](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/tool/edit.ts), [Grep](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/tool/grep.ts), [external directories](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/tool/external-directory.ts), [skill discovery](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/skill/index.ts). Official interfaces: [permissions](https://opencode.ai/docs/permissions/), [agents](https://opencode.ai/docs/agents/), [config precedence](https://opencode.ai/docs/config/#precedence-order).
+Checked 1.18.32 source: [permission evaluation](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/permission/index.ts), [Edit](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/tool/edit.ts), [Read](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/tool/read.ts), [external directories](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/tool/external-directory.ts), [launch-directory containment](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/project/instance-context.ts), [skill discovery](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/skill/index.ts). Official interfaces: [permissions](https://opencode.ai/docs/permissions/), [agents](https://opencode.ai/docs/agents/), [configuration precedence](https://opencode.ai/docs/config/#precedence-order).
 
 ### Move Destinations
 
-[Apply Patch 1.18.32](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/tool/apply_patch.ts) submits only source paths to the `edit` check; a `Move to` destination is checked against `external_directory` alone. An Edit deny such as `.git/**` therefore does not bind a move destination. The shell already reaches the same paths, so this adds no reach, but never use a move to evade a rule.
+[Apply Patch in 1.18.32](https://github.com/anomalyco/opencode/blob/v1.18.32/packages/opencode/src/tool/apply_patch.ts) submits only source paths to the `edit` check; a `Move to` destination is checked against `external_directory` alone, so an edit deny such as `.git/**` does not bind it. The shell already reaches the same paths, so this adds no reach; a move must never be used to evade a rule.
 
-## Evidence And Refresh
+## Evidence and Refresh
 
-[`tests/config-contracts.py`](../tests/config-contracts.py) models both matchers and requires the same decision in both tools for every listed command and path, the scratch grants from several worktree locations, and both sparrers' tools (no edit tools). It checks configuration, not live dispatch. [The canary](../scripts/canary.sh) is behavioral smoke through the real clients; a model-reported refusal is not proof of a native denial. The [eyrsync source table](../.agents/skills/eyrsync/SKILL.md#sources) owns the reference strategy.
+[`tests/config-contracts.py`](../tests/config-contracts.py) models both matchers and requires the same decision in both tools for every listed command and path, including the scratch grants from several project locations and a session launched from a home directory. It checks configuration, not live dispatch. The [canary](operations.md#canary) exercises the real clients; a refusal the model reports is not proof of a native denial.
 
-Source and configuration reconciled **2026-09-24** against Claude Code 2.1.281 official documentation and OpenCode 1.18.32 source. Every `/eyrsync` pass reconciles decision, implementation, current official semantics and evidence for both tools, and records unresolved drift in the ledger. Do not change policy just to make a check pass.
+Reconciled on **2026-09-24** against Claude Code 2.1.281 documentation and OpenCode 1.18.32 source; the full-review changes of 2026-09-25 were checked against the then-current Claude Code documentation pages they cite and OpenCode's `instance-context.ts`. Each [`/eyrsync`](../.agents/skills/eyrsync/SKILL.md#access-reconciliation) pass reconciles the policy, both implementations, current official semantics and evidence, and records unresolved drift in the ledger. Never change policy just to make a check pass.

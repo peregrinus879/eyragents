@@ -39,7 +39,7 @@ The generator rejects duplicate IDs/apps/sources, invalid host/source references
 
 ## Change-coupled maintenance
 
-The author changing a control or adopting an update owns its guide reconciliation in the same workstream. This includes additions, changes, removals and inherited defaults changed by an application/plugin update even when personal configuration did not change.
+The author changing a control or adopting an update owns its guide reconciliation in the same change. This includes additions, changes, removals and inherited defaults changed by an application/plugin update even when personal configuration did not change.
 
 1. Review the affected entries against the owning configuration, version-matched source and current help. Include arguments, modes, prefixes, clipboard behavior, key interception and enabled plugins. Actual host key delivery requires actual-host evidence.
 2. Edit the affected reference file in EyrAgents. Update related recipes, workflows, routing notes and sources together. Keep IDs stable for the same action; remove obsolete actions, retaining retired IDs only when useful for saved-key compatibility.
@@ -57,4 +57,4 @@ Action IDs and the `eyragents-guide-v1` browser-storage namespace are stable com
 
 The guide accepts both `hdw-guide-saved-v1` and `eyragents-guide-saved-v1` exports and exports the latter. Before discarding an old local guide copy, export its saved keys, then import that file here. File-URL storage can differ after a move or rename; existing browser profiles are never inspected or migrated automatically. With storage restricted, the interface and in-tab favorites still work.
 
-The interface adapts H's Keymap dashboard and the starting reference comes from H's Keybind Atlas. The maintained guide is self-contained.
+In automated tests (Chromium 152.0.7977.82 with Playwright 1.63.0, 2026-09-15), exports and restored favorites work after a full browser restart, but a download after a relaunch intermittently ends Chromium; a minimal page that downloads a Blob reproduces it, so no guide-specific cause is established. Interactive browsers are unverified.

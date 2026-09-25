@@ -2,71 +2,60 @@
 
 [Overview](../README.md) · [Setup](setup.md) · [Access policy](access.md)
 
-Run repository commands from the EyrAgents root. The client commands below run from the project you want to work on.
+Client commands run from the project you are working on; `make` targets run from the EyrAgents root.
 
-## Start And Continue
+## Start and Continue
 
-| Client | Start | Continue |
+| Client | Start | Continue the last session |
 | --- | --- | --- |
 | Claude Code | `claude` | `claude -c` |
 | OpenCode | `opencode` | `opencode -c` |
 
-Continuation follows each client's native session and working-directory rules. The [offline workspace guide](workspace-guide.html) combines client controls and workflow links with `hdw`, Herdr, editor, shell and host references. Select Omarchy or Arch WSL in the browser. Its [source and maintenance contract](workspace-guide-src/README.md) live here; `make workspace-guide` rebuilds both profiles into one file, and `make check` rejects stale output. Use mise activation or shims for ordinary launches, and `mise exec -- <client>` for non-interactive launchers that need the configured environment. Restart a client after deploying its configuration.
+[Setup](setup.md#prerequisites) covers launching through mise. For an untrusted checkout, use the [restricted launches](access.md#untrusted-checkouts). The [offline workspace guide](workspace-guide.html) collects these controls with the terminal, editor and host references for Omarchy and Arch WSL.
 
-For untrusted projects, use the [documented restricted launches](access.md#untrusted-checkouts).
+## Workflows
+
+Every project inherits the global skills; OpenCode also offers each as a slash command, such as `/ship`.
+
+- **Commit and publish:** [ship](../agents/.agents/skills/ship/SKILL.md). The agent builds and gates a round of commits, then ends its turn with a card for each; your reply brings one native prompt that makes the round. Publication works the same way: cards, your go, one push prompt. A failed CI run gets one retry after its logs show a retryable cause.
+- **Independent review:** [spar](../agents/.agents/skills/spar/SKILL.md). The read-only `sparrer` reviews in rounds, from the same model family by default or from the other tool's through a bridge. The agent uses it when a second opinion could change a consequential decision, without being asked.
+- **Harness reconciliation:** [eyrsync](../.agents/skills/eyrsync/SKILL.md) compares this harness with each tool's current documentation, releases and source.
+- **Long work:** a live plan file in `~/Projects/eyrie/scrape/plans/` carries the goal, H's decisions, what remains and the next step, as global guidance's Continuity rule describes; it is deleted when the work is done.
 
 ## Model Effort
 
-The configured primary OpenCode model defaults to `xhigh`. In `/variants`, `Default` means use configured request defaults, not medium effort. An explicit named variant overrides that setting. OpenCode remembers choices separately for the base model and its Fast variant and can skip the follow-up effort dialog when a choice already exists; use `/variants` to inspect it. A missing effort badge is not evidence of a lower request effort. Keep deliberate overrides rather than rewriting saved state or adding duplicate model pins solely for the display.
-
-## Shared Workflows
-
-[ship](../agents/.agents/skills/ship/SKILL.md) commits and publishes: the round's cards end a turn, then H's reply brings one native prompt that commits the round; publication waits for H's go, then one push command prompts too. [spar](../agents/.agents/skills/spar/SKILL.md) owns independent review and [eyrsync](../.agents/skills/eyrsync/SKILL.md) harness reconciliation. Work that spans several steps or sessions keeps one live plan file in `~/Projects/eyrie/scrape/plans/`, as global guidance's Continuity rule describes. All projects inherit the global skills; OpenCode also offers each skill as a slash command, such as `/ship`.
-
-GitHub uses HTTPS with the host-local `gh` credential helper; follow [standalone setup](setup.md#github-access). Authentication supplies capability, not approval.
-
-## CI Reruns
-
-Failed CI after a push follows the [ship skill](../agents/.agents/skills/ship/SKILL.md#publish): read the failed job's logs, establish a retryable cause, and retry the smallest affected job scope. `gh run rerun` asks in both tools; state the run, job and cause, and H approves at the prompt.
-
-For paired repositories, a twin job can fetch the earlier peer between sequential pushes. Confirm that both approved tips are now published before rerunning the failed twin job, then inspect the actual pair in the successful log. This does not call for another push or a new workflow dispatch. Repeated unchanged failures return to diagnosis; source fixes and additional deployment effects require their own approval.
-
-## Permission Acceptance
-
-OpenCode loads permissions at startup; after `make restow verify`, restart it before claiming a change is live. With owned, non-secret fixtures, confirm in each tool that a read outside the workspace (a system file, a dotfile) completes without a prompt, that a synthetic `.env` read is refused, and that a remote-changing command such as `gh issue comment` or a destructive one such as `git reset --hard` raises a native prompt, which you decline. In OpenCode, an edit outside the worktree and scratch also asks. [The access policy](access.md) owns the expected outcome for each case.
-
-### Persistent Scratch
-
-An implementation request includes in-scope work under `~/Projects/eyrie/scrape`; existing work there remains preserved project data. Use a unique owned child for disposable tests.
+- **Claude Code:** the `effortLevel` setting is `xhigh`; `/effort` changes it for a session. The sparrer's frontmatter sets its own `xhigh`.
+- **OpenCode:** the primary model's configured effort is `xhigh`. In `/variants`, `Default` keeps that configured value, and a named variant overrides it. OpenCode remembers a choice per model, separately for a model and its Fast variant, and may skip the dialog when one exists. The effort badge shows the selection, not the request actually sent.
 
 ## Verify
 
-After changing managed payloads:
-
 ```bash
-make lint
-make check
+make lint check      # repository checks
+make restow verify   # deploy, then check the deployment
 ```
 
-After stowing, `make verify` runs both and adds deployment checks. GitHub Actions runs `make lint` and `make check` on every push to `main` and every pull request. Restart OpenCode after changing its config or skills because they load at process startup.
+GitHub Actions runs `make lint check` on every push to `main` and every pull request, in an `archlinux:base` container as an unprivileged user. It does not deploy to or attest a host.
 
-CI uses the official `archlinux:base` container with a full signed-package upgrade, matching the Arch userspace of both supported hosts. `ubuntu-latest` supplies only GitHub's VM. Checks run as an unprivileged `ci` user with explicit Bash, a private temporary directory and container process reaping; checkout credentials are not persisted. CI does not perform or attest deployment to Omarchy or WSL.
+### Canary
 
-`make canary` is separate live behavioral smoke testing, not a repository gate or independent permission-dispatch proof. Within six calls per tool, it checks skills, a commit stopped at the native prompt, README read plus ordinary workspace/persistent-scratch writes, system read, external temporary read and fixture-marker non-disclosure. Scratch uses only an exclusive child of the existing safe root, with identity-checked cleanup; root safety and identity checks include the intermediate `~/Projects/eyrie` directory. Drift is retained and reported. Fixture and client-side Git commands use process-local isolated Git configuration, preserving real HOME/client authentication and native permissions. Performed assertions require successful nonempty replies. Exit 1 means failure; 2 means skipped/unverified, including unavailable scratch or uncertain cleanup; 0 means all selected behavioral checks passed. A moved/unreadable fixture HEAD stops the probe without reset. Mocks and static checks do not establish live behavior.
+`make canary` is a live smoke test through the real clients, not a repository gate. Within six calls per tool it checks that the shared skills are listed, a commit stops at the native prompt, a README read and ordinary workspace and persistent-scratch writes succeed, a system file and a temporary file can be read, and a credential-shaped fixture is not disclosed. It checks the fixture repository's HEAD after every call and stops, without resetting, if it moved.
 
-Use `CANARY_TOOLS=claude CANARY_CHECKS=read make canary` for a focused retry of the combined README/workspace/scratch case. `CANARY_CHECKS` accepts unique names from `skills gate read system temp secret`; unset runs all. The output names a selected scope, and invalid selectors refuse before fixture creation. A focused pass covers only its selected cases. Failed README replies are displayed only up to 8 KB. Each client runs under an owned supervisor; verified termination precedes cleanup, while uncertain child termination preserves both work and scratch fixtures.
+| Exit | Meaning |
+| --- | --- |
+| 0 | Every selected check passed (behavior, not proof of permission dispatch) |
+| 1 | A check failed |
+| 2 | A check was skipped or unverified |
 
-Cross-client canaries use the script's standard `/tmp` fixture layout. When the caller's `TMPDIR` names a tool-specific session root, use `env -u TMPDIR CANARY_TOOLS=claude make canary` for fresh shared-temp fixtures. Claude Code protects `/tmp/opencode` as foreign session material; placing their ordinary workspace/temp probes there tests that exclusion instead of normal access.
+`CANARY_TOOLS` selects clients (default `claude opencode`) and `CANARY_CHECKS` selects checks from `skills gate read system temp secret`; for example, `CANARY_TOOLS=claude CANARY_CHECKS=read make canary`. Each client runs under a supervisor that stops all its processes before fixtures are cleaned up; when that cannot be confirmed, fixtures are kept. If `TMPDIR` points into a client's session directory, run `env -u TMPDIR make canary`.
 
-Consult [`docs/maintenance.md`](maintenance.md) before major tool or plugin changes, permission or bridge changes, cross-host work, `/doctor`, or work on a listed limitation or deferred item.
+### Permission Acceptance
 
-### Claude Compatibility Acceptance
+After a permission change, `make restow verify` and restart OpenCode, then confirm in each tool with owned, non-secret fixtures:
 
-After the 2.1.272 upgrade, use owned non-secret fixtures and the existing controls to check the [changed 2.1.271 interfaces](access.md#claude-code):
+1. a read outside the project (a system file, a dotfile) runs without a prompt;
+2. a synthetic `.env` read is refused;
+3. a remote-changing command (`gh issue comment`) and a destructive one (`git reset --hard`) raise a native prompt, which you decline;
+4. in OpenCode, an edit outside the project and scratch asks, and a recursive `rm` asks;
+5. after a real change, one `ship` round ends its turn with the cards, and your reply brings a single commit prompt; the same holds for one push.
 
-- Confirm global guidance and skill discovery in a fresh session using safe native listings and observed skill reads.
-- Exercise Bash file operands following unrecognized options, wildcard expansion inside pattern/option values, and declaration-flag handling under an approved synthetic path policy, with an ordinary allowed-read control. Record native permission decisions. The optional external-read fence needs its own authorized fixture if tested; it is not enabled in the managed baseline.
-- When reviewer execution is authorized, confirm the read-only sparrer can return through the classifier-reviewed hand-back path under auto mode while retaining its guidance and tool caps.
-- Switch between explicitly owned fixture conversations and check the resumed conversation's read-before-edit behavior. A successful reread alone does not prove stale tracking was rejected; record a native decision witness where the client exposes one.
-
-Keep unavailable native evidence marked unverified and retain pending checks in the ledger. A model's refusal or assurance is not independent dispatch proof; do not force prohibited calls to manufacture evidence. Inline skill-shell permission handling needs a separate check if a managed skill later adopts it. These checks require no feature adoption, new service or wider permissions.
+The [access policy](access.md) owns the expected outcome of each case. Persistent scratch at `~/Projects/eyrie/scrape` is preserved project work; use a uniquely named child for disposable tests.

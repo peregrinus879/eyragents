@@ -5,6 +5,9 @@
 # Design conventions:
 # - Every segment must earn its place: directory, Git branch, model, context,
 #   and the two rate-limit windows. No cost, duration, or host segments.
+#   The weekly Fable window is not in the rate_limits payload (only the usage
+#   API, which needs the credential store, exposes it); add a segment after 7d
+#   when a release adds it.
 # - Consistent "label: pct% (remaining)" pattern: ctx: 42% (116k),
 #   5h: 38% (2h:11m), 7d: 24% (5d:6h:38m). The dim bracket holds what remains:
 #   context tokens, or the countdown to the window reset as colon-joined unit
