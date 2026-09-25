@@ -35,18 +35,19 @@ fi
 [[ $TIMEOUT =~ ^[1-9][0-9]*$ ]] || usage
 repo=$(git rev-parse --show-toplevel 2>/dev/null) || { printf 'SPAR-BRIDGE ERROR: run from inside a Git worktree\n' >&2; exit 64; }
 
-# Every client call runs in its own process group under a hard timeout; the
-# group is killed when the call ends, times out or the bridge is interrupted.
+# Every client call runs under spar-supervise.py: a hard timeout, and every descendant
+# stopped when the call ends, times out or the bridge is interrupted, including
+# processes that started their own session.
+SUPERVISE="$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")/spar-supervise.py"
 work=$(mktemp -d)
 pid=""
 trap 'rm -rf -- "$work"' EXIT
-trap '[[ -z $pid ]] || { kill -TERM -- "-$pid" 2>/dev/null || kill -TERM -- "$pid" 2>/dev/null; sleep 1; kill -KILL -- "-$pid" 2>/dev/null; }; exit 130' INT TERM HUP
+trap '[[ -z $pid ]] || { kill -TERM -- "$pid" 2>/dev/null; wait "$pid" 2>/dev/null || true; }; exit 130' INT TERM HUP
 supervise() { # seconds stdin stdout stderr command... ; sets rc
-  (cd "$repo" && exec timeout --kill-after=10 "$1" "${@:5}") <"$2" >"$3" 2>"$4" &
+  "$SUPERVISE" "$1" "$repo" -- "${@:5}" <"$2" >"$3" 2>"$4" &
   pid=$!
   rc=0
   wait "$pid" || rc=$?
-  kill -KILL -- "-$pid" 2>/dev/null || true
   pid=""
 }
 
@@ -61,7 +62,8 @@ jq -e 'map(select(.permission == "edit")) | last | .pattern == "*" and .action =
 
 supervise "$TIMEOUT" /dev/null "$work/out" "$work/err" opencode run --agent auditor --format json "${resume[@]}" -- "$1"
 
-if ((rc == 124 || rc == 137)); then
+((rc != 125)) || fail "the reviewer's processes could not all be stopped" "$(<"$work/err")"
+if ((rc == 124)); then
   printf 'SPAR-BRIDGE TIMEOUT: no reply within %ss\n' "$TIMEOUT" >&2
   exit 124
 fi
@@ -71,13 +73,14 @@ fi
 # Stdout events can quote any text a reviewed file holds; judge limits and
 # errors only from stderr and error events.
 errors=$(jq -c 'select(.type == "error")' "$work/out" 2>/dev/null || true)
-if { cat -- "$work/err"; printf '%s\n' "$errors"; } | grep -qiE "$LIMIT_RE"; then
+reply=$(jq -rs 'map(select(.type == "text")) | last | .part.text // empty' "$work/out" 2>/dev/null || true)
+if ((rc != 0)) || [[ -n $errors || -z $reply ]] &&
+  { cat -- "$work/err"; printf '%s\n' "$errors"; } | grep -qiE "$LIMIT_RE"; then
   printf 'SPAR-BRIDGE LIMIT: the reviewer hit a usage limit\n' >&2
   exit 3
 fi
 ((rc == 0)) || fail "the reviewer exited $rc" "$(<"$work/err")"
 [[ -z $errors ]] || fail "the reviewer reported an error" "$errors"
-reply=$(jq -rs 'map(select(.type == "text")) | last | .part.text // empty' "$work/out" 2>/dev/null || true)
 [[ -n $reply ]] || fail "the reviewer ended without a reply" "$(<"$work/err")"
 printf 'SPAR-BRIDGE ID: %s\n' "$(jq -rs 'map(.sessionID // empty) | first // "unknown"' "$work/out")" >&2
 grep -v '^[[:space:]]*$' <<<"$reply" | tail -n 1 | grep -qE "$VERDICT_RE" ||

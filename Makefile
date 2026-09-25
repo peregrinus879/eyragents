@@ -67,7 +67,8 @@ check-skills: require-clone
 lint:
 	shellcheck -s bash $(SHELLCHECK_FILES)
 	python3 -I -c 'import sys; [compile(open(p, "rb").read(), p, "exec") for p in sys.argv[1:]]' \
-	  scripts/update-references.py tests/reference-migration.py tests/config-contracts.py docs/workspace-guide-src/build.py
+	  scripts/update-references.py tests/reference-migration.py tests/config-contracts.py docs/workspace-guide-src/build.py \
+	  agents/.agents/skills/spar/scripts/spar-supervise.py
 	@echo "ok:   lint"
 
 test:
@@ -151,7 +152,7 @@ verify-deploy:
 	  if [[ ! -e $$target && ! -L $$target ]]; then :; \
 	  else echo "FAIL: generated OpenCode state reached the package source: $$target"; fail=1; fi; \
 	done; \
-	for b in spar-claude spar-opencode; do \
+	for b in spar-claude spar-opencode spar-supervise.py; do \
 	  if [[ -x "$$HOME/.agents/skills/spar/scripts/$$b" ]]; then echo "ok:   $$b executable"; else echo "FAIL: $$b missing or not executable"; fail=1; fi; \
 	done; \
 	if [[ -e "$$HOME/.config/opencode/opencode.jsonc" ]]; then \

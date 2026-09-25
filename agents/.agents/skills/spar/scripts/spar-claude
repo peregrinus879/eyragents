@@ -33,37 +33,40 @@ fi
 [[ $# == 1 && -n $1 ]] || usage
 [[ $TIMEOUT =~ ^[1-9][0-9]*$ ]] || usage
 repo=$(git rev-parse --show-toplevel 2>/dev/null) || { printf 'SPAR-BRIDGE ERROR: run from inside a Git worktree\n' >&2; exit 64; }
-! grep -rqsE '^name:[[:space:]]*["'\'']?auditor["'\'']?[[:space:]]*$' -- "$repo/.claude/agents" ||
+! grep -rqsE '^name:[[:space:]]*["'\'']?auditor["'\'']?[[:space:]]*(#.*)?$' -- "$repo/.claude/agents" ||
   fail "the project defines its own auditor agent, which would replace the user auditor"
 
-# Every client call runs in its own process group under a hard timeout; the
-# group is killed when the call ends, times out or the bridge is interrupted.
+# Every client call runs under spar-supervise.py: a hard timeout, and every descendant
+# stopped when the call ends, times out or the bridge is interrupted, including
+# processes that started their own session.
+SUPERVISE="$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")/spar-supervise.py"
 work=$(mktemp -d)
 pid=""
 trap 'rm -rf -- "$work"' EXIT
-trap '[[ -z $pid ]] || { kill -TERM -- "-$pid" 2>/dev/null || kill -TERM -- "$pid" 2>/dev/null; sleep 1; kill -KILL -- "-$pid" 2>/dev/null; }; exit 130' INT TERM HUP
+trap '[[ -z $pid ]] || { kill -TERM -- "$pid" 2>/dev/null; wait "$pid" 2>/dev/null || true; }; exit 130' INT TERM HUP
 supervise() { # seconds stdin stdout stderr command... ; sets rc
-  (cd "$repo" && exec timeout --kill-after=10 "$1" "${@:5}") <"$2" >"$3" 2>"$4" &
+  "$SUPERVISE" "$1" "$repo" -- "${@:5}" <"$2" >"$3" 2>"$4" &
   pid=$!
   rc=0
   wait "$pid" || rc=$?
-  kill -KILL -- "-$pid" 2>/dev/null || true
   pid=""
 }
 printf '%s' "$1" >"$work/request"
 supervise "$TIMEOUT" "$work/request" "$work/out" "$work/err" claude -p --permission-mode auto --agent auditor \
   --disallowedTools 'mcp__*' --strict-mcp-config --output-format json "${resume[@]}"
 
-if ((rc == 124 || rc == 137)); then
+((rc != 125)) || fail "the reviewer's processes could not all be stopped" "$(<"$work/err")"
+if ((rc == 124)); then
   printf 'SPAR-BRIDGE TIMEOUT: no reply within %ss\n' "$TIMEOUT" >&2
   exit 124
 fi
 result=$(jq -cR 'fromjson? | select(.type == "result")' "$work/out" | tail -n 1)
-if { cat -- "$work/err"; jq -r 'select(.is_error == true) | .result // empty' <<<"$result" 2>/dev/null; } | grep -qiE "$LIMIT_RE"; then
+reply=$(jq -r 'select(.is_error != true) | .result // empty' <<<"$result" 2>/dev/null || true)
+if ((rc != 0)) || [[ -z $reply ]] &&
+  { cat -- "$work/err"; jq -r 'select(.is_error == true) | .result // empty' <<<"$result" 2>/dev/null; } | grep -qiE "$LIMIT_RE"; then
   printf 'SPAR-BRIDGE LIMIT: the reviewer hit a usage limit\n' >&2
   exit 3
 fi
-reply=$(jq -r 'select(.is_error != true) | .result // empty' <<<"$result" 2>/dev/null || true)
 ((rc == 0)) || fail "the reviewer exited $rc" "$(<"$work/err")"
 [[ -n $reply ]] || fail "the reviewer ended without a reply" "$(<"$work/err")"
 printf 'SPAR-BRIDGE ID: %s\n' "$(jq -r '.session_id // "unknown"' <<<"$result")" >&2

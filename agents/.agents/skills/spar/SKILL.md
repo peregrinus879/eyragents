@@ -24,9 +24,9 @@ Write the request so the reviewer starts where you stopped:
 
 - what to review: paths, a diff range, a plan file or a decision;
 - the goal, the constraints and where the decision record lives;
-- what you already did: commands run with their results, sources checked, alternatives weighed and findings so far.
+- what you already did: commands run with their results and sources checked.
 
-The reviewer tests these as claims and gathers everything else itself. Never narrow the scope to make a round pass.
+Withhold your conclusions, the alternatives you weighed and your findings until the reviewer's first pass, so it judges the work on its own terms; share them in a follow-up round when useful. The reviewer reuses your evidence where it suffices and gathers everything else itself. Never narrow the scope to make a round pass.
 
 ## Run
 
@@ -34,4 +34,4 @@ Bridges run the other client under H's normal settings, which load project confi
 
 ## Findings
 
-Verify each finding's ground. Fix confirmed issues, rebut disputed ones with evidence, and ask for the ground when one is missing. Relay objections in substance; never soften or drop them. Record each finding with its disposition in the plan file: implemented, declined with the rationale shown to H, or open for H's ruling. For each open item, present the decision, both positions with evidence, and your recommendation labeled as judgment. A review authorizes nothing by itself.
+Verify each blocking finding's ground, including how it fails. Fix confirmed issues, rebut disputed ones with evidence, and ask for the ground when one is missing. Relay objections in substance; never soften or drop them. Record each blocking finding with its disposition in the plan file: implemented, declined with the rationale shown to H, or open for H's ruling. Non-blocking findings are optional suggestions: present them as one list, which H closes with one disposition. For each open item, present the decision, both positions with evidence, and your recommendation labeled as judgment. A review authorizes nothing by itself.

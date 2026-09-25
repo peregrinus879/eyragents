@@ -35,8 +35,12 @@ case $FAKE_MODE in
   orphan|hang)
     (trap '' TERM; exec sleep 300) &
     printf '%s\n' "$!" >"$FAKE_TRACE/child" ;;
+  detached|detachedhang)
+    # A descendant in its own session, as OpenCode's shell tool starts commands.
+    setsid sleep 300 </dev/null >/dev/null 2>&1 &
+    printf '%s\n' "$!" >"$FAKE_TRACE/child" ;;
 esac
-[[ $FAKE_MODE != hang ]] || exec sleep 300
+[[ $FAKE_MODE != hang && $FAKE_MODE != detachedhang ]] || exec sleep 300
 FAKE
 cat >"$WORK/bin/claude" <<'FAKE'
 #!/usr/bin/env bash
@@ -46,7 +50,8 @@ cat >"$FAKE_TRACE/stdin"
 source "$(dirname -- "$0")/fake-common"
 ok='{"type":"result","is_error":false,"result":"claude findings\nVERDICT: CONVERGED","session_id":"c-123","modelUsage":{"claude-fable-5-1":{}}}'
 case $FAKE_MODE in
-  ok|orphan) printf '%s\n' "$ok" ;;
+  ok|orphan|detached) printf '%s\n' "$ok" ;;
+  noisy) printf 'API error 529 overloaded; retrying\n' >&2; printf '%s\n' "$ok" ;;
   failverdict) printf '%s\n' "$ok"; exit 1 ;;
   error) printf '%s\n' '{"type":"result","is_error":true,"result":"review failed"}'; exit 1 ;;
   limit) printf "You've hit your session limit\n" >&2; exit 1 ;;
@@ -81,7 +86,8 @@ ok() {
     '{"type":"text","sessionID":"ses_1","part":{"text":"opencode findings\nVERDICT: CONVERGED"}}'
 }
 case $FAKE_MODE in
-  ok|orphan) ok ;;
+  ok|orphan|detached) ok ;;
+  noisy) printf 'API error 429; retrying\n' >&2; ok ;;
   failverdict) ok; exit 1 ;;
   fallback) printf '! agent "auditor" is a subagent, not a primary agent. Falling back to default agent\n' >&2; ok ;;
   error) printf '%s\n' '{"type":"error","sessionID":"ses_1","error":{"name":"APIError"}}'; exit 1 ;;
@@ -153,6 +159,17 @@ for bridge in spar-claude spar-opencode; do
   [[ $RC == 124 ]] || fail "$bridge did not time out"
   gone "$WORK/trace/child" "$bridge left a descendant after a timeout"
   FAKE_MODE=hang interrupt "$bridge review" "$SCRIPTS/$bridge" review 'Review.'
+  # Descendants that start their own session escape a process-group kill; the supervisor adopts them.
+  run detached "$bridge" review 'Review.'
+  [[ $RC == 0 ]] || fail "$bridge detached case exited $RC"
+  gone "$WORK/trace/child" "$bridge left a detached descendant after completing"
+  SPAR_BRIDGE_TIMEOUT=1 run detachedhang "$bridge" review 'Review.'
+  [[ $RC == 124 ]] || fail "$bridge did not time out with a detached descendant"
+  gone "$WORK/trace/child" "$bridge left a detached descendant after a timeout"
+  FAKE_MODE=detachedhang interrupt "$bridge detached review" "$SCRIPTS/$bridge" review 'Review.'
+  # A retried 429 or 529 on stderr before a good reply is not a usage limit.
+  run noisy "$bridge" review 'Review.'
+  [[ $RC == 0 && -s $WORK/out ]] || fail "$bridge reported a limit for a successful review (exit $RC)"
 done
 
 run ok spar-claude review 'Review the diff. Already ran make check.'
@@ -165,9 +182,11 @@ expected=$(printf '%s\n' -p --permission-mode auto --agent auditor --disallowedT
 [[ $(argv) == "$expected" ]] || fail "spar-claude flags drifted: $(argv)"
 # A project agent named auditor would take precedence over the user auditor: refused before any call.
 mkdir -p "$repo/.claude/agents/nested"
-printf -- '---\nname: "auditor"\ntools: Read, Edit\n---\nShadow.\n' >"$repo/.claude/agents/nested/shadow.md"
-run ok spar-claude review 'Review.'
-[[ $RC == 5 && ! -e $WORK/trace/argv ]] || fail 'spar-claude ran with a project-defined auditor'
+for name in '"auditor"' "auditor # project reviewer" "'auditor'"; do
+  printf -- '---\nname: %s\ntools: Read, Edit\n---\nShadow.\n' "$name" >"$repo/.claude/agents/nested/shadow.md"
+  run ok spar-claude review 'Review.'
+  [[ $RC == 5 && ! -e $WORK/trace/argv ]] || fail "spar-claude ran with a project-defined auditor (name: $name)"
+done
 rm -rf -- "$repo/.claude"
 run ok spar-claude review --resume c-123 'Round two.'
 [[ $(argv | tail -n 2) == $'--resume\nc-123' ]] || fail 'spar-claude did not resume the named session'
