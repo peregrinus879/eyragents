@@ -80,7 +80,7 @@ The harness is personal, and forking it means replacing a few facts rather than 
 
 - The addressee. The guidance and skills speak to `H`; the ship skill's identity check expects a GitHub no-reply address.
 - The platforms. Omarchy and Arch WSL are the checked environments. Review filesystem, runtime and native-permission assumptions before adding another platform; the deployed-clone guard is independent of checkout location.
-- The models. Each tool's configuration owns its model choices: Claude Code settings and the auditor frontmatter, OpenCode's primary and small models.
+- The models. Each tool's configuration owns its model choices: Claude Code settings and the sparrer frontmatter, OpenCode's primary and small models.
 - The packages. `PACKAGES` in the Makefile names what Stow deploys. A new client may need links or a native plugin; use its supported loading mechanism rather than assuming every adapter is a symlink tree.
 - The credential list. It lives in the two native configurations. The configuration tests check the relevant path boundaries.
 

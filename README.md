@@ -16,9 +16,9 @@ This is a standalone personal harness. It owns AI-client configuration, startup 
 
 | Source | Deployed role |
 | --- | --- |
-| `agents/.agents/` | Global guidance, skills, reviewer bridges, and auditor charter. |
-| `claude-code/.claude/` | Claude Code instructions link, settings, auditor, and status line. |
-| `opencode/.config/opencode/` | OpenCode instructions link, models, permissions, auditor, and TUI settings. |
+| `agents/.agents/` | Global guidance, skills, reviewer bridges, and sparrer charter. |
+| `claude-code/.claude/` | Claude Code instructions link, settings, sparrer, and status line. |
+| `opencode/.config/opencode/` | OpenCode instructions link, models, permissions, sparrer, and TUI settings. |
 | `scripts/`, `tests/`, `docs/` | Deployment helpers, verification, and documentation. |
 
 The [architecture guide](docs/design.md#configuration-ownership) explains linked packages and whole skill-directory links. The [Makefile](Makefile) owns deployment targets and the package list.

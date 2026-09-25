@@ -59,9 +59,9 @@ Claude Code's usage metrics stay on: they carry no code, prompts or paths, and `
 
 Web reads send queries and URLs to a service; that is not permission to upload or change anything remote.
 
-### Auditors
+### Sparrers
 
-Both tools carry an `auditor` with the auditor charter [`auditor.md`](../agents/.agents/agents/auditor.md). It has read, search, shell and web tools and no edit tools; the charter keeps it read-only, and its commands pass the primary's rules, so it never exceeds the primary. The [spar skill](../agents/.agents/skills/spar/SKILL.md)'s bridges run the other tool's reviewer: each runs the other tool's `auditor` agent, and `spar-claude` also drops MCP tools and refuses a project that defines its own `auditor`. Bridges are the sanctioned route; direct nested client launches stay denied.
+Both tools carry an `sparrer` with the sparrer charter [`sparrer.md`](../agents/.agents/agents/sparrer.md). It has read, search, shell and web tools and no edit tools; the charter keeps it read-only, and its commands pass the primary's rules, so it never exceeds the primary. The [spar skill](../agents/.agents/skills/spar/SKILL.md)'s bridges run the other tool's reviewer: each runs the other tool's `sparrer` agent, and `spar-claude` also drops MCP tools and refuses a project that defines its own `sparrer`. Bridges are the sanctioned route; direct nested client launches stay denied.
 
 ## Untrusted Checkouts
 
@@ -72,13 +72,13 @@ claude --safe-mode --setting-sources user
 OPENCODE_DISABLE_PROJECT_CONFIG=1 OPENCODE_DISABLE_EXTERNAL_SKILLS=1 opencode
 ```
 
-Claude's safe mode ignores project instructions, hooks, and settings. OpenCode disables project configuration and external skills, but has no equivalent untrusted mode or shell sandbox. The spar bridges launch the other client with normal settings, so a restricted parent does not restrict the reviewer; use the in-tool auditor there. These launches do not make instructions encountered in file contents trustworthy, nor do they remove every client/app surface.
+Claude's safe mode ignores project instructions, hooks, and settings. OpenCode disables project configuration and external skills, but has no equivalent untrusted mode or shell sandbox. The spar bridges launch the other client with normal settings, so a restricted parent does not restrict the reviewer; use the in-tool sparrer there. These launches do not make instructions encountered in file contents trustworthy, nor do they remove every client/app surface.
 
 ## Implementation And Semantics
 
 ### Claude Code
 
-Implementation: [`settings.json`](../claude-code/.claude/settings.json) `permissions` and `autoMode`; [`auditor.md`](../claude-code/.claude/agents/auditor.md). The tool runs in auto mode with bypass disabled and no tracked sandbox.
+Implementation: [`settings.json`](../claude-code/.claude/settings.json) `permissions` and `autoMode`; [`sparrer.md`](../claude-code/.claude/agents/sparrer.md). The tool runs in auto mode with bypass disabled and no tracked sandbox.
 
 Precedence is deny, then ask, then allow; an Ask rule prompts even in auto mode. A trailing ` *` matches the bare command only when it is the rule's sole wildcard, so `git -C` forms carry both shapes. Ask and deny rules apply to each subcommand of a compound command. `Read(//...)` is absolute, `Read(~/...)` home-relative, with gitignore-style globs; `Edit(path)` governs Edit, Write and NotebookEdit.
 
@@ -88,7 +88,7 @@ Official sources: [permissions](https://code.claude.com/docs/en/permissions), [p
 
 ### OpenCode
 
-Implementation: [`opencode.json`](../opencode/.config/opencode/opencode.json) `permission` and `agent.auditor`; startup flags in [the mise fragment](../opencode/.config/mise/conf.d/eyragents-opencode.toml). OpenCode discovers `~/.agents/skills` natively; `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS` drops only the `.claude` copies, and `skills.paths` names the shared skills so the [untrusted-checkout launch](#untrusted-checkouts), which disables external discovery, keeps them.
+Implementation: [`opencode.json`](../opencode/.config/opencode/opencode.json) `permission` and `agent.sparrer`; startup flags in [the mise fragment](../opencode/.config/mise/conf.d/eyragents-opencode.toml). OpenCode discovers `~/.agents/skills` natively; `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS` drops only the `.claude` copies, and `skills.paths` names the shared skills so the [untrusted-checkout launch](#untrusted-checkouts), which disables external discovery, keeps them.
 
 The last matching rule wins, in config order, starting from OpenCode's own `* = allow`. A `*` matches any characters, including `/`, and a trailing ` *` also matches the bare command. `~/` expands in every pattern. Read and edit subjects are paths relative to the worktree; `external_directory` subjects are the absolute parent directory plus `/*`, checked first for anything outside the worktree. Because edit subjects are relative, the scratch grants use location-independent patterns: `../scrape/**` for worktrees in `~/Projects/eyrie`, `**/eyrie/scrape/**` elsewhere, and `**/tmp/opencode/**`. From a worktree under `/tmp`, `/tmp/opencode` edits ask.
 
@@ -100,6 +100,6 @@ Checked 1.18.32 sources: [permission evaluation](https://github.com/anomalyco/op
 
 ## Evidence And Refresh
 
-[`tests/config-contracts.py`](../tests/config-contracts.py) models both matchers and requires the same decision in both tools for every listed command and path, the scratch grants from several worktree locations, and both auditors' tools (no edit tools). It checks configuration, not live dispatch. [The canary](../scripts/canary.sh) is behavioral smoke through the real clients; a model-reported refusal is not proof of a native denial. The [eyrsync source table](../.agents/skills/eyrsync/SKILL.md#sources) owns the reference strategy.
+[`tests/config-contracts.py`](../tests/config-contracts.py) models both matchers and requires the same decision in both tools for every listed command and path, the scratch grants from several worktree locations, and both sparrers' tools (no edit tools). It checks configuration, not live dispatch. [The canary](../scripts/canary.sh) is behavioral smoke through the real clients; a model-reported refusal is not proof of a native denial. The [eyrsync source table](../.agents/skills/eyrsync/SKILL.md#sources) owns the reference strategy.
 
 Source and configuration reconciled **2026-09-24** against Claude Code 2.1.281 official documentation and OpenCode 1.18.32 source. Every `/eyrsync` pass reconciles decision, implementation, current official semantics and evidence for both tools, and records unresolved drift in the ledger. Do not change policy just to make a check pass.

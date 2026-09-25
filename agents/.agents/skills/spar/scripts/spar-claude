@@ -3,11 +3,11 @@
 #
 # Usage: spar-claude review [--resume SESSION] "<request>"
 #
-# Runs Claude Code's `auditor` agent (~/.claude/agents/auditor.md: the auditor
+# Runs Claude Code's `sparrer` agent (~/.claude/agents/sparrer.md: the sparrer
 # charter, read, shell and web tools, the moving `fable` alias) as the whole
 # session, from the repository root under H's normal settings in auto mode, with
 # no MCP tools. An unknown agent name makes Claude Code exit with an error; a
-# project agent named `auditor` would take precedence, so such a project is
+# project agent named `sparrer` would take precedence, so such a project is
 # refused. Normal settings load project configuration, so use it only in
 # trusted checkouts. A review needs a clean client exit and a reply
 # ending with the charter's VERDICT line. The reply goes to stdout; the session
@@ -33,8 +33,8 @@ fi
 [[ $# == 1 && -n $1 ]] || usage
 [[ $TIMEOUT =~ ^[1-9][0-9]*$ ]] || usage
 repo=$(git rev-parse --show-toplevel 2>/dev/null) || { printf 'SPAR-BRIDGE ERROR: run from inside a Git worktree\n' >&2; exit 64; }
-! grep -rqsE '^name:[[:space:]]*["'\'']?auditor["'\'']?[[:space:]]*(#.*)?$' -- "$repo/.claude/agents" ||
-  fail "the project defines its own auditor agent, which would replace the user auditor"
+! grep -rqsE '^name:[[:space:]]*["'\'']?sparrer["'\'']?[[:space:]]*(#.*)?$' -- "$repo/.claude/agents" ||
+  fail "the project defines its own sparrer agent, which would replace the user sparrer"
 
 # Every client call runs under spar-supervise.py: a hard timeout, and every descendant
 # stopped when the call ends, times out or the bridge is interrupted, including
@@ -52,7 +52,7 @@ supervise() { # seconds stdin stdout stderr command... ; sets rc
   pid=""
 }
 printf '%s' "$1" >"$work/request"
-supervise "$TIMEOUT" "$work/request" "$work/out" "$work/err" claude -p --permission-mode auto --agent auditor \
+supervise "$TIMEOUT" "$work/request" "$work/out" "$work/err" claude -p --permission-mode auto --agent sparrer \
   --disallowedTools 'mcp__*' --strict-mcp-config --output-format json "${resume[@]}"
 
 ((rc != 125)) || fail "the reviewer's processes could not all be stopped" "$(<"$work/err")"

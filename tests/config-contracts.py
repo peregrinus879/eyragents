@@ -369,27 +369,27 @@ require(opencode.get("skills") == {"paths": ["~/.agents/skills"]}, "OpenCode sha
 require(not (ROOT / "opencode/.config/opencode/plugins").exists(), "OpenCode plugins are back; commits use native prompts")
 require(not (ROOT / "opencode/.config/opencode/commands").exists(), "OpenCode command wrappers are back; skills are native")
 
-# Auditors: the same charter in both tools; no edit tools, shell and web under the primary rules.
-charter = (ROOT / "agents/.agents/agents/auditor.md").read_text(encoding="utf-8")
-claude_auditor = (ROOT / "claude-code/.claude/agents/auditor.md").read_text(encoding="utf-8")
-front, body = claude_auditor.split("---\n", 2)[1:]
+# Sparrers: the same charter in both tools; no edit tools, shell and web under the primary rules.
+charter = (ROOT / "agents/.agents/agents/sparrer.md").read_text(encoding="utf-8")
+claude_sparrer = (ROOT / "claude-code/.claude/agents/sparrer.md").read_text(encoding="utf-8")
+front, body = claude_sparrer.split("---\n", 2)[1:]
 fields = dict(line.split(":", 1) for line in front.strip().splitlines())
-require(body.strip() == charter.strip(), "Claude auditor body differs from the shared charter")
+require(body.strip() == charter.strip(), "Claude sparrer body differs from the shared charter")
 require({t.strip() for t in fields["tools"].split(",")} == {"Read", "Bash", "WebFetch", "WebSearch"},
-        "Claude auditor tools drifted: read, shell and web, never edit")
-require(fields.get("effort", "").strip() == "xhigh", "Claude auditor effort is not xhigh")
-auditor = opencode["agent"]["auditor"]
-require(auditor["description"] == fields.get("description", "").strip(), "auditor descriptions differ between the tools")
-# "all" lets spar-opencode run the auditor headless; a subagent would fall back to the build agent.
-require(auditor["mode"] == "all" and auditor["prompt"] == "{file:~/.agents/agents/auditor.md}", "OpenCode auditor charter drifted")
+        "Claude sparrer tools drifted: read, shell and web, never edit")
+require(fields.get("effort", "").strip() == "xhigh", "Claude sparrer effort is not xhigh")
+sparrer = opencode["agent"]["sparrer"]
+require(sparrer["description"] == fields.get("description", "").strip(), "sparrer descriptions differ between the tools")
+# "all" lets spar-opencode run the sparrer headless; a subagent would fall back to the build agent.
+require(sparrer["mode"] == "all" and sparrer["prompt"] == "{file:~/.agents/agents/sparrer.md}", "OpenCode sparrer charter drifted")
 for key in ("edit", "task"):
-    require(oc_last(oc_rules(opencode["permission"], key, auditor), "*") == "deny", f"OpenCode auditor can use {key}")
+    require(oc_last(oc_rules(opencode["permission"], key, sparrer), "*") == "deny", f"OpenCode sparrer can use {key}")
 for key in ("webfetch", "websearch"):
-    require(oc_last(oc_rules(opencode["permission"], key, auditor), "*") == "allow", f"OpenCode auditor lacks {key}")
-require(oc_last(oc_rules(opencode["permission"], "bash", auditor), "git log -1") == "allow" and
-        oc_last(oc_rules(opencode["permission"], "bash", auditor), "git push") == "ask", "OpenCode auditor shell does not follow the primary rules")
-require(oc_file("read", expand("{w}/src/app.py"), auditor) == "allow", "OpenCode auditor cannot read the repository")
-require(oc_file("read", expand("~/.ssh/id_rsa"), auditor) == "deny", "OpenCode auditor reads secrets")
+    require(oc_last(oc_rules(opencode["permission"], key, sparrer), "*") == "allow", f"OpenCode sparrer lacks {key}")
+require(oc_last(oc_rules(opencode["permission"], "bash", sparrer), "git log -1") == "allow" and
+        oc_last(oc_rules(opencode["permission"], "bash", sparrer), "git push") == "ask", "OpenCode sparrer shell does not follow the primary rules")
+require(oc_file("read", expand("{w}/src/app.py"), sparrer) == "allow", "OpenCode sparrer cannot read the repository")
+require(oc_file("read", expand("~/.ssh/id_rsa"), sparrer) == "deny", "OpenCode sparrer reads secrets")
 
 # --- Loading and skills ----------------------------------------------------------------------
 guidance = ROOT / "opencode/.config/opencode/AGENTS.md"
@@ -417,4 +417,4 @@ require(references == {"claude-code": "github:R_kgDON91aYw", "opencode": "github
         "reference identities differ from the reviewed set")
 
 print(f"ok: {len(COMMANDS)} commands and {len(PROTECTED) + len(PERSONAL) + len(READABLE) + len(TRANSCRIPTS)} paths decide alike in both tools; "
-      "auditors share one charter without edit tools; configuration contracts hold (modeled matching, not live dispatch)")
+      "sparrers share one charter without edit tools; configuration contracts hold (modeled matching, not live dispatch)")

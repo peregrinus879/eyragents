@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The spar bridges against fake claude and opencode clients: arguments, working
-# directory, auditor agent, project-auditor refusal, OpenCode agent preflight, reply and session relay, resume,
+# directory, sparrer agent, project-sparrer refusal, OpenCode agent preflight, reply and session relay, resume,
 # process-group cleanup and every failure exit.
 set -euo pipefail
 
@@ -66,11 +66,11 @@ if [[ "$*" == 'agent list' ]]; then
   pwd >"$FAKE_TRACE/agent-pwd"
   case ${FAKE_AGENT:-ok} in
     ok) printf '%s\n' 'build (primary)' '  [' '  {"permission":"edit","pattern":"*","action":"allow"}' ']' \
-      'auditor (all)' '  [' '  {"permission":"edit","pattern":"*","action":"allow"},' \
+      'sparrer (all)' '  [' '  {"permission":"edit","pattern":"*","action":"allow"},' \
       '  {"permission":"edit","pattern":"*","action":"deny"}' ']' 'plan (primary)' '  []' ;;
     missing) printf '%s\n' 'build (primary)' '  []' ;;
-    subagent) printf '%s\n' 'auditor (subagent)' '  [{"permission":"edit","pattern":"*","action":"deny"}]' ;;
-    edits) printf '%s\n' 'auditor (all)' '  [{"permission":"edit","pattern":"*","action":"deny"},' \
+    subagent) printf '%s\n' 'sparrer (subagent)' '  [{"permission":"edit","pattern":"*","action":"deny"}]' ;;
+    edits) printf '%s\n' 'sparrer (all)' '  [{"permission":"edit","pattern":"*","action":"deny"},' \
       '  {"permission":"edit","pattern":"*","action":"allow"}]' ;;
     hang) FAKE_MODE=hang source "$(dirname -- "$0")/fake-common" ;;
   esac
@@ -89,7 +89,7 @@ case $FAKE_MODE in
   ok|orphan|detached) ok ;;
   noisy) printf 'API error 429; retrying\n' >&2; ok ;;
   failverdict) ok; exit 1 ;;
-  fallback) printf '! agent "auditor" is a subagent, not a primary agent. Falling back to default agent\n' >&2; ok ;;
+  fallback) printf '! agent "sparrer" is a subagent, not a primary agent. Falling back to default agent\n' >&2; ok ;;
   error) printf '%s\n' '{"type":"error","sessionID":"ses_1","error":{"name":"APIError"}}'; exit 1 ;;
   limit) printf '%s\n' '{"type":"error","sessionID":"ses_1","error":{"name":"APIError","data":{"message":"rate limit exceeded"}}}' ;;
   quoted) ok; exit 1 ;;
@@ -177,15 +177,15 @@ run ok spar-claude review 'Review the diff. Already ran make check.'
 [[ $(<"$WORK/trace/stdin") == 'Review the diff. Already ran make check.' ]] || fail 'spar-claude did not send the request'
 { grep -qx 'SPAR-BRIDGE ID: c-123' "$WORK/err" && grep -qx 'SPAR-BRIDGE MODEL: claude-fable-5-1' "$WORK/err"; } ||
   fail 'spar-claude did not report session and model'
-expected=$(printf '%s\n' -p --permission-mode auto --agent auditor --disallowedTools 'mcp__*' --strict-mcp-config \
+expected=$(printf '%s\n' -p --permission-mode auto --agent sparrer --disallowedTools 'mcp__*' --strict-mcp-config \
   --output-format json)
 [[ $(argv) == "$expected" ]] || fail "spar-claude flags drifted: $(argv)"
-# A project agent named auditor would take precedence over the user auditor: refused before any call.
+# A project agent named sparrer would take precedence over the user sparrer: refused before any call.
 mkdir -p "$repo/.claude/agents/nested"
-for name in '"auditor"' "auditor # project reviewer" "'auditor'"; do
+for name in '"sparrer"' "sparrer # project reviewer" "'sparrer'"; do
   printf -- '---\nname: %s\ntools: Read, Edit\n---\nShadow.\n' "$name" >"$repo/.claude/agents/nested/shadow.md"
   run ok spar-claude review 'Review.'
-  [[ $RC == 5 && ! -e $WORK/trace/argv ]] || fail "spar-claude ran with a project-defined auditor (name: $name)"
+  [[ $RC == 5 && ! -e $WORK/trace/argv ]] || fail "spar-claude ran with a project-defined sparrer (name: $name)"
 done
 rm -rf -- "$repo/.claude"
 run ok spar-claude review --resume c-123 'Round two.'
@@ -195,9 +195,9 @@ run ok spar-opencode review 'Review the plan.'
 [[ $RC == 0 && $(<"$WORK/out") == $'opencode findings\nVERDICT: CONVERGED' ]] || fail 'spar-opencode did not relay the final text'
 grep -qx 'SPAR-BRIDGE ID: ses_1' "$WORK/err" || fail 'spar-opencode did not report the session'
 [[ $(<"$WORK/trace/agent-pwd") == "$repo" ]] || fail 'spar-opencode listed agents outside the repository root'
-[[ $(argv) == $'run\n--agent\nauditor\n--format\njson\n--\nReview the plan.' ]] || fail "spar-opencode flags drifted: $(argv)"
+[[ $(argv) == $'run\n--agent\nsparrer\n--format\njson\n--\nReview the plan.' ]] || fail "spar-opencode flags drifted: $(argv)"
 run ok spar-opencode review --resume ses_1 'Round two.'
-[[ $(argv) == $'run\n--agent\nauditor\n--format\njson\n--session\nses_1\n--\nRound two.' ]] || fail 'spar-opencode did not resume'
+[[ $(argv) == $'run\n--agent\nsparrer\n--format\njson\n--session\nses_1\n--\nRound two.' ]] || fail 'spar-opencode did not resume'
 run fallback spar-opencode review 'Review.'
 [[ $RC == 5 && ! -s $WORK/out ]] || fail 'spar-opencode relayed a default-agent fallback'
 # An interrupt during the agent preflight stops it and its descendants; no review is sent.
@@ -205,7 +205,7 @@ FAKE_AGENT=hang FAKE_MODE=ok interrupt 'spar-opencode preflight' "$SCRIPTS/spar-
 [[ ! -e $WORK/trace/argv ]] || fail 'spar-opencode sent the review after an interrupted preflight'
 for agent in missing subagent edits; do
   FAKE_AGENT=$agent run ok spar-opencode review 'Review.'
-  [[ $RC == 5 && ! -e $WORK/trace/argv ]] || fail "spar-opencode sent a review to an unsafe auditor ($agent)"
+  [[ $RC == 5 && ! -e $WORK/trace/argv ]] || fail "spar-opencode sent a review to an unsafe sparrer ($agent)"
 done
 
-printf 'ok: spar bridges run each tool'\''s auditor agent from the repository root and fail closed\n'
+printf 'ok: spar bridges run each tool'\''s sparrer agent from the repository root and fail closed\n'

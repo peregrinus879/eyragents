@@ -66,7 +66,7 @@ After the 2.1.272 upgrade, use owned non-secret fixtures and the existing contro
 
 - Confirm global guidance and skill discovery in a fresh session using safe native listings and observed skill reads.
 - Exercise Bash file operands following unrecognized options, wildcard expansion inside pattern/option values, and declaration-flag handling under an approved synthetic path policy, with an ordinary allowed-read control. Record native permission decisions. The optional external-read fence needs its own authorized fixture if tested; it is not enabled in the managed baseline.
-- When reviewer execution is authorized, confirm the read-only auditor can return through the classifier-reviewed hand-back path under auto mode while retaining its guidance and tool caps.
+- When reviewer execution is authorized, confirm the read-only sparrer can return through the classifier-reviewed hand-back path under auto mode while retaining its guidance and tool caps.
 - Switch between explicitly owned fixture conversations and check the resumed conversation's read-before-edit behavior. A successful reread alone does not prove stale tracking was rejected; record a native decision witness where the client exposes one.
 
 Keep unavailable native evidence marked unverified and retain pending checks in the ledger. A model's refusal or assurance is not independent dispatch proof; do not force prohibited calls to manufacture evidence. Inline skill-shell permission handling needs a separate check if a managed skill later adopts it. These checks require no feature adoption, new service or wider permissions.

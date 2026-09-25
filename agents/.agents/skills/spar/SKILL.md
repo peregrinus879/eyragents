@@ -1,11 +1,11 @@
 ---
 name: spar
-description: Independent review of a plan, diff or decision, from concepts to details, by the in-tool auditor or a cross-vendor reviewer. Use at your discretion when a second opinion could change a consequential decision.
+description: Independent review of a plan, diff or decision, from concepts to details, by the in-tool sparrer or a cross-vendor reviewer. Use at your discretion when a second opinion could change a consequential decision.
 ---
 
 # Spar
 
-The session's model drafts; an independent reviewer challenges the work from a fresh context. Every reviewer follows the shared charter in `~/.agents/agents/auditor.md`: full context, read-only, global guidance as the standard. H rules on what stays open.
+The session's model drafts; an independent reviewer challenges the work from a fresh context. Every reviewer follows the shared charter in `~/.agents/agents/sparrer.md`: full context, read-only, global guidance as the standard. H rules on what stays open.
 
 ## When
 
@@ -13,8 +13,8 @@ At your discretion, when a second opinion could change a consequential decision;
 
 ## Reviewer
 
-- **In-tool** (default): the `auditor` agent, the same model family as the drafter. Call it only through this skill. In Claude Code, continue it for a follow-up round by messaging the same agent; in OpenCode, pass its `task_id` to the task tool.
-- **Cross-vendor**, when a view from another model family is worth its extra time, such as for a consequential or security-relevant decision: from Claude Code, `~/.agents/skills/spar/scripts/spar-opencode`; from OpenCode, `~/.agents/skills/spar/scripts/spar-claude`. Each bridge runs the other tool's `auditor` agent.
+- **In-tool** (default): the `sparrer` agent, the same model family as the drafter. Call it only through this skill. In Claude Code, continue it for a follow-up round by messaging the same agent; in OpenCode, pass its `task_id` to the task tool.
+- **Cross-vendor**, when a view from another model family is worth its extra time, such as for a consequential or security-relevant decision: from Claude Code, `~/.agents/skills/spar/scripts/spar-opencode`; from OpenCode, `~/.agents/skills/spar/scripts/spar-claude`. Each bridge runs the other tool's `sparrer` agent.
 
 H's named reviewer overrides this choice. Report which reviewer ran; an in-tool audit is never cross-vendor review.
 
@@ -30,7 +30,7 @@ Withhold your conclusions, the alternatives you weighed and your findings until 
 
 ## Run
 
-Bridges run the other client under H's normal settings, which load project configuration, so use them only in trusted checkouts; in an untrusted checkout, use the in-tool auditor of the restricted session. Run `<bridge> review "<request>"` from inside the repository, plainly, with a shell timeout of at least the bridge's 1800 seconds. The reply arrives on stdout. Stderr carries `SPAR-BRIDGE ID:`; a follow-up round uses `<bridge> review --resume <id> "<request>"`. Exit 3 is a usage limit, 124 a timeout and 5 a reviewer failure; report them to H.
+Bridges run the other client under H's normal settings, which load project configuration, so use them only in trusted checkouts; in an untrusted checkout, use the in-tool sparrer of the restricted session. Run `<bridge> review "<request>"` from inside the repository, plainly, with a shell timeout of at least the bridge's 1800 seconds. The reply arrives on stdout. Stderr carries `SPAR-BRIDGE ID:`; a follow-up round uses `<bridge> review --resume <id> "<request>"`. Exit 3 is a usage limit, 124 a timeout and 5 a reviewer failure; report them to H.
 
 ## Findings
 

@@ -3,13 +3,13 @@
 #
 # Usage: spar-opencode review [--resume SESSION] "<request>"
 #
-# Runs `opencode run --agent auditor` from the repository root under H's normal
-# OpenCode configuration; the auditor agent carries the auditor charter
+# Runs `opencode run --agent sparrer` from the repository root under H's normal
+# OpenCode configuration; the sparrer agent carries the sparrer charter
 # and denies edits, and a headless run rejects anything that would prompt.
 # Normal configuration loads project settings, so use it only in trusted
 # checkouts. OpenCode silently substitutes its default agent when the named one
 # is missing or cannot run as a primary, so a preflight through `opencode agent
-# list` (no model call) must show the auditor as primary-capable with edits
+# list` (no model call) must show the sparrer as primary-capable with edits
 # denied before the request is sent. A review needs a clean client exit and a
 # reply ending with the charter's VERDICT line. The reply goes to stdout; the
 # session ID goes to stderr as "SPAR-BRIDGE ID:".
@@ -54,13 +54,13 @@ supervise() { # seconds stdin stdout stderr command... ; sets rc
 # Preflight: the agent listing prints "name (mode)" and then its merged rules.
 supervise 60 /dev/null "$work/agents" "$work/err" opencode agent list
 ((rc == 0)) || fail "cannot list OpenCode agents (exit $rc)" "$(<"$work/err")"
-rules=$(awk '/^auditor \((primary|all)\)$/ { found = 1; next } found && /^[^ \t]/ && /\((primary|subagent|all)\)$/ { exit } found' \
+rules=$(awk '/^sparrer \((primary|all)\)$/ { found = 1; next } found && /^[^ \t]/ && /\((primary|subagent|all)\)$/ { exit } found' \
   "$work/agents")
-[[ -n $rules ]] || fail "the auditor agent is missing or cannot run as a primary agent"
+[[ -n $rules ]] || fail "the sparrer agent is missing or cannot run as a primary agent"
 jq -e 'map(select(.permission == "edit")) | last | .pattern == "*" and .action == "deny"' <<<"$rules" >/dev/null 2>&1 ||
-  fail "the auditor agent does not deny edits"
+  fail "the sparrer agent does not deny edits"
 
-supervise "$TIMEOUT" /dev/null "$work/out" "$work/err" opencode run --agent auditor --format json "${resume[@]}" -- "$1"
+supervise "$TIMEOUT" /dev/null "$work/out" "$work/err" opencode run --agent sparrer --format json "${resume[@]}" -- "$1"
 
 ((rc != 125)) || fail "the reviewer's processes could not all be stopped" "$(<"$work/err")"
 if ((rc == 124)); then
@@ -68,7 +68,7 @@ if ((rc == 124)); then
   exit 124
 fi
 if fallback=$(grep -m 1 'Falling back to default agent' "$work/err"); then
-  fail "OpenCode could not run the auditor agent: $fallback"
+  fail "OpenCode could not run the sparrer agent: $fallback"
 fi
 # Stdout events can quote any text a reviewed file holds; judge limits and
 # errors only from stderr and error events.
