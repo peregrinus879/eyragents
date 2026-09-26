@@ -13,13 +13,11 @@ Open work only. Each item states what is open, why, and what closes it; when an 
 
 ## Host Follow-ups
 
-- **WSL ship prompt acceptance.** Commits, pushes and GitHub posts carry their full content in the command the prompt shows; Omarchy passed. On WSL:
-  1. In the EyrAgents clone, pull, run `make restow verify`, restart OpenCode and start a fresh Claude Code session.
-  2. `make canary`: every check reports `ok`, including each tool's `gate`, which sends ship's inline-message commit.
-  3. In OpenCode, ship a real change, such as step 2's result recorded in this item. One commit prompt shows the full message, its paths and the `Co-Authored-By: OpenAI <model> <noreply@openai.com>` trailer (ctrl+f expands the box), then one push prompt names the commit and branch; nothing else prompts.
-  4. In Claude Code, ship the commit that closes this item the same way: it removes the item and adds WSL's versions (`mise ls --current`) to the [access policy](access.md#evidence-and-refresh).
+- **WSL ship prompt acceptance.** Commits, pushes and GitHub posts carry their full content in the command the prompt shows. Omarchy passed; on WSL, `make verify` and the canary's 16 checks passed on Claude Code 2.1.283 and OpenCode 1.18.32. Remaining on WSL:
+  1. Restart OpenCode, then ship a real change in it, such as this record of the canary. One commit prompt shows the full message, its paths and the `Co-Authored-By: OpenAI <model> <noreply@openai.com>` trailer (ctrl+f expands the box), then one push prompt names the commit and branch; nothing else prompts.
+  2. In Claude Code, ship the commit that closes this item the same way: it removes the item and adds WSL's versions (`mise ls --current`) to the [access policy](access.md#evidence-and-refresh).
 
-  Closes with step 4.
+  Closes with step 2.
 
 - **WSL status line.** Limits from the usage endpoint are live on Omarchy. On WSL, after H pulls: confirm `command -v curl flock setsid` finds all three and `curl --version` is 7.84.0 or newer, start a fresh Claude Code session, and check that within a minute `sess:` and `week:` (all models/Fable) match `/usage` and the effort segment shows `xhigh`. Closes when it does.
 
