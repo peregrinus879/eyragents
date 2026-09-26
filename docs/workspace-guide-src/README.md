@@ -57,4 +57,4 @@ Action IDs and the `eyragents-guide-v1` browser-storage namespace are stable com
 
 The guide accepts both `hdw-guide-saved-v1` and `eyragents-guide-saved-v1` exports and exports the latter. Before discarding an old local guide copy, export its saved keys, then import that file here. File-URL storage can differ after a move or rename; existing browser profiles are never inspected or migrated automatically. With storage restricted, the interface and in-tab favorites still work.
 
-In automated tests (Chromium 152.0.7977.82 with Playwright 1.63.0, 2026-09-15), exports and restored favorites work after a full browser restart, but a download after a relaunch intermittently ends Chromium; a minimal page that downloads a Blob reproduces it, so no guide-specific cause is established. Interactive browsers are unverified.
+In automated tests (Chromium 152.0.7977.82 with Playwright 1.63.0), exports and restored favorites work after a full browser restart, but a download after a relaunch intermittently ends Chromium; a minimal page that downloads a Blob reproduces it, so no guide-specific cause is established. Interactive browsers are unverified.
