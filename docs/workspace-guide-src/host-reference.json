@@ -4815,6 +4815,26 @@
       "kind": "command"
     },
     {
+      "id": "s-wsl-update",
+      "app": "shell",
+      "category": "Files & tools",
+      "title": "Update system, mise tools and Herdr",
+      "keys": [
+        "wsl-update"
+      ],
+      "source": "shell",
+      "detail": "EyrWSL's one-pass update: sudo pacman -Syu, then mise up with the release cooldown kept, then herdr update through its installer channel, stopping at the first failure. Omarchy's counterpart is omarchy-update.",
+      "mode": "Bash prompt",
+      "essential": false,
+      "warning": "",
+      "tags": "",
+      "extra": [],
+      "hosts": [
+        "eyrwsl"
+      ],
+      "kind": "command"
+    },
+    {
       "id": "s-help",
       "app": "shell",
       "category": "Files & tools",
@@ -5401,7 +5421,7 @@
       "open": "explorer.exe \"$(wslpath -w \"$PWD/docs/workspace-guide.html\")\"",
       "notes": [
         "Open herdr from a normal-user Arch shell in Windows Terminal. This guide follows the Omarchy-style Herdr map documented by EyrWSL operations, not an inspected WSL session.",
-        "Herdr configuration/keymap is retained host state, outside Stow. Check Ctrl+Space then ? on the actual host. A clean upstream Herdr instead defaults to Ctrl+B and different close/detach keys; do not assume the maps are interchangeable.",
+        "EyrWSL stows Omarchy's Herdr keymap from its herdr/ package, so Prefix is Ctrl+Space on both hosts; Prefix then ? lists the running application's bindings. A clean upstream Herdr instead defaults to Ctrl+B and different close/detach keys; do not assume the maps are interchangeable.",
         "Windows Terminal defaults intercept Alt+arrows, Alt+Shift+arrows and Ctrl+Alt+Left for outer panes. Prefix Tab, prefix p/n and prefix Shift+P/N are clearer Herdr targets.",
         "Alt+Enter passes through Windows Terminal but Herdr consumes it to split below. Tracked settings add no Shift+Enter mapping. Use the client’s own multiline/editor controls.",
         "Ctrl+C copies when an outer selection exists; otherwise it reaches the application. Ctrl+V pastes at the terminal layer. Ctrl+Shift+C/V is the shared clipboard pair.",

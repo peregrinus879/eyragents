@@ -63,7 +63,7 @@ The canary also creates one uniquely named child in persistent scratch, to prove
 
 ## Records
 
-Durable decisions live in the repository, open work in the [maintenance ledger](maintenance.md), and provenance in Git history. Work that spans sessions keeps one live plan file outside the repositories, deleted when the work is done; steps pending on another host live in the ledger's host pass, or in a handoff file where a repository keeps one, as EyrWSL does. Native memory is a revisable local cache, never authority.
+Durable decisions live in the repository, open work in the [maintenance ledger](maintenance.md), and provenance in Git history. Work that spans sessions keeps one live plan file outside the repositories, deleted when the work is done; steps pending on another host live in the ledger's host pass, or in a handoff file where a repository keeps one. Native memory is a revisable local cache, never authority.
 
 ## Models and Effort
 

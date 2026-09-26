@@ -4,18 +4,6 @@
 
 Open work only. Each item states what is open, why, and what closes it; when an item closes, any lasting rule moves to its owner and the item is removed.
 
-## WSL Host Pass
-
-Every change since the last WSL deployment is waiting for this pass: the retirement of Codex and Hermes, the persistent-scratch relocation, the lean harness and its permission model, the `sparrer` rename and the standalone mise startup. Run it on the WSL host, stop at the first mismatch, and never inspect credentials or print host configuration values; if a read-only diagnostic is blocked, give H the exact command instead of changing permissions.
-
-1. **EyrWSL first.** Complete sections 1 to 6 of EyrWSL's [WSL host handoff](https://github.com/peregrinus879/eyrwsl/blob/main/docs/handoff.md), which moves persistent scratch to `~/Projects/eyrie/scrape` and retires Codex and Hermes; it owns those steps and checks.
-2. **Clone and tools.** After H pulls, check that `uname -r` identifies WSL 2, the worktree is clean, and `make require-clone` passes; preserve any local work for H. Complete [setup](setup.md) on the normal user account and confirm Claude Code is 2.1.277 or newer (`mise ls --current`).
-3. **Deploy.** Run `make dry-run`, `make check-skills`, `make restow` and `make verify`, stopping on refusals. Confirm that `~/.agents/skills/{ship,spar}` and `~/.claude/skills/{ship,spar}` are directory links, that `~/.claude/agents` and `~/.agents/agents` hold `sparrer.md` and no `auditor.md`, and that the retired `commit`, `publish` and `develop` skill directories are gone. Delete the retired `~/.agents/hooks/commit-gate` and its emptied directory. Confirm GitHub access, which the EyrWSL handoff completes: `git ls-remote` over HTTPS succeeds without a prompt.
-4. **Load.** Restart OpenCode and start fresh sessions. Confirm that both tools load global guidance once, Claude Code reads the project `AGENTS.md` natively, the skills include `ship`, `spar` and the local `eyrsync`, `opencode agent list` shows `sparrer (all)`, and a fresh mise shell supplies `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1` and `OPENCODE_ENABLE_EXA=1` without host exports.
-5. **Behavior.** Run [permission acceptance](operations.md#permission-acceptance), one live review through each bridge, `bash scripts/update-references.sh --dry-run` (expect identity checks and no writes), and `make canary`. Record client versions, the tested revision and each result.
-
-Closes when every step succeeds, or each remaining limitation is recorded here with its reason.
-
 ## Open Decisions
 
 - **Personal and shareable guidance.** The harness is to become a common harness for other users, but global guidance opens with H's profile and addresses H throughout. Decide how a user supplies their own profile and name without editing the shared files. Closes with H's decision and its implementation.
@@ -37,6 +25,7 @@ Each is documented at its owner and rechecked when its trigger fires.
 | A renamed file under `~/.claude/agents` may need a new session before it registers (observed 2.1.260) | this ledger | a scoped check on a current release |
 | The workspace guide's saved-key export after a browser relaunch intermittently ends Chromium in automated tests (152.0.7977.82, Playwright 1.63.0); a minimal Blob download reproduces it, so no guide-specific cause is established, and interactive browsers are unverified | [guide notes](workspace-guide-src/README.md#saved-keys) | Chromium or Playwright changes, or an upstream fix |
 | OpenCode model IDs are pinned by hand | [design](design.md#models-and-effort) | `opencode models` lists a newer generation |
+| `opencode agent list` output is cut short when stdout is a pipe: the CLI exits before its buffered output drains, so a piped `grep` lost the last agents on WSL (1.18.32, 2026-09-26) while a file redirect showed all eight; the spar bridge reads the listing from a file | [spar-opencode](../agents/.agents/skills/spar/scripts/spar-opencode) | the CLI's listing or exit path changes |
 | Remote verification over custom SSH expressions can be unobservable | [ship](../agents/.agents/skills/ship/SKILL.md#publish) | the transport changes |
 
 ## Deferred Work
