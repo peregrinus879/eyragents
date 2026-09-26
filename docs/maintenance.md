@@ -13,7 +13,7 @@ Open work only. Each item states what is open, why, and what closes it; when an 
 
 ## Host Follow-ups
 
-- **Ship prompt acceptance.** Commits, pushes and GitHub posts carry their full content in the command the prompt shows, and reviewers run nothing that prompts. Claude Code on Omarchy passed [permission acceptance](operations.md#permission-acceptance) step 5: each commit message in full at one prompt, then one push prompt. Remaining: `make canary` in both tools on each host (on WSL after H pulls); step 5 in OpenCode on Omarchy and in both tools on WSL, with ctrl+f expanding OpenCode's prompt; one live review per bridge for the changed charter. Closes when all pass and the [access policy](access.md#evidence-and-refresh) names the versions they passed on.
+- **Ship prompt acceptance.** Commits, pushes and GitHub posts carry their full content in the command the prompt shows. Claude Code on Omarchy passed [permission acceptance](operations.md#permission-acceptance) step 5: each commit message in full at one prompt, then one push prompt. Remaining: `make canary` in both tools on each host (on WSL after H pulls); step 5 in OpenCode on Omarchy and in both tools on WSL, with ctrl+f expanding OpenCode's prompt. Closes when all pass and the [access policy](access.md#evidence-and-refresh) names the versions they passed on.
 
 - **WSL status line.** Limits from the usage endpoint are live on Omarchy. On WSL, after H pulls: confirm `command -v curl flock setsid` finds all three and `curl --version` is 7.84.0 or newer, start a fresh Claude Code session, and check that within a minute `sess:` and `week:` (all models/Fable) match `/usage` and the effort segment shows `xhigh`. Closes when it does.
 
@@ -34,6 +34,7 @@ Each is documented at its owner and rechecked when its trigger fires.
 | Claude Code keeps effort per model: a new Claude model starts at its default (Opus 5.5: `medium`) until `/effort xhigh` saves its `modelSettings` entry | [operations](operations.md#model-effort) | a new Claude model ships |
 | OpenCode model IDs are pinned by hand | [design](design.md#models-and-effort) | `opencode models` lists a newer generation |
 | `opencode agent list` output is cut short when stdout is a pipe, because the CLI exits before its buffered output drains (1.18.32); the spar bridge reads the listing from a file | [spar-opencode](../agents/.agents/skills/spar/scripts/spar-opencode) | the CLI's listing or exit path changes |
+| Reviewers running nothing that needs H's approval is an instruction in the charter, not a native block; headless bridge runs reject prompts on their own, so only an in-tool review shows whether a reviewer would prompt | [sparrer charter](../agents/.agents/agents/sparrer.md) | an in-tool review raises a prompt |
 | Remote verification over custom SSH expressions can be unobservable | [ship](../agents/.agents/skills/ship/SKILL.md#publish) | the transport changes |
 
 ## Deferred Work
