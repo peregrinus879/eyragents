@@ -1295,7 +1295,7 @@
       "$defaults",
       "Deleting files this task did not create requires H's explicit instruction naming them.",
       "Editing shell startup files, systemd user units, autostart entries or mise configuration requires H's explicit instruction naming the file.",
-      "Changing the agents' own permission settings, hooks, plugins or skills (Claude Code or OpenCode configuration, ~/.agents) requires H's explicit instruction naming the file; deploying a reviewed change with make restow is not this rule."
+      "From a session working outside the EyrAgents repository (~/Projects/eyrie/eyragents), changing the agents' own permission settings, hooks, plugins, skills or guidance (Claude Code or OpenCode configuration, ~/.agents) requires H's explicit instruction naming the file. In a session working in that repository, editing them on H's request is its ordinary work; deploying a reviewed change with make restow is not this rule."
     ],
     "hard_deny": [
       "$defaults",
@@ -1307,6 +1307,7 @@
       "$defaults",
       "Source control: github.com/peregrinus879 is H's own GitHub account. Its repositories eyragents, eyrarchy and eyrwsl are public, so their commits and messages are public content.",
       "Host: H's personal workstation (Omarchy, or Arch Linux on WSL), not a sandbox; actions change H's real files.",
+      "Agent configuration: the EyrAgents repository (~/Projects/eyrie/eyragents) is the source of the live Claude Code and OpenCode configuration; its package files are deployed by symlink, so an edit there changes the running agents' guidance, skills and permissions.",
       "Sensitive data: H's personal folders (~/Desktop, ~/Documents, ~/Downloads, ~/Music, ~/Pictures, ~/Sync, ~/Videos and their Windows counterparts), credential stores and sign-in sessions such as ~/.claude.json."
     ]
   },
