@@ -13,7 +13,7 @@ Open work only. Each item states what is open, why, and what closes it; when an 
 
 ## Host Follow-ups
 
-- **Ship prompt acceptance.** Commits, pushes and GitHub posts carry their full content in the command the prompt shows. In both tools on each host (on WSL after H pulls), run `make canary` and [permission acceptance](operations.md#permission-acceptance) step 5, and check that the prompt shows every message and path; in OpenCode, ctrl+f expands it. Claude Code on Omarchy starts with the commit that introduced this flow. Closes when all four pass and the [access policy](access.md#evidence-and-refresh) names the versions they passed on.
+- **Ship prompt acceptance.** Commits, pushes and GitHub posts carry their full content in the command the prompt shows, and reviewers run nothing that prompts. Claude Code on Omarchy passed [permission acceptance](operations.md#permission-acceptance) step 5: each commit message in full at one prompt, then one push prompt. Remaining: `make canary` in both tools on each host (on WSL after H pulls); step 5 in OpenCode on Omarchy and in both tools on WSL, with ctrl+f expanding OpenCode's prompt; one live review per bridge for the changed charter. Closes when all pass and the [access policy](access.md#evidence-and-refresh) names the versions they passed on.
 
 - **WSL status line.** Limits from the usage endpoint are live on Omarchy. On WSL, after H pulls: confirm `command -v curl flock setsid` finds all three and `curl --version` is 7.84.0 or newer, start a fresh Claude Code session, and check that within a minute `sess:` and `week:` (all models/Fable) match `/usage` and the effort segment shows `xhigh`. Closes when it does.
 
