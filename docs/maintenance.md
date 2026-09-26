@@ -35,6 +35,7 @@ Each is documented at its owner and rechecked when its trigger fires.
 | OpenCode model IDs are pinned by hand | [design](design.md#models-and-effort) | `opencode models` lists a newer generation |
 | `opencode agent list` output is cut short when stdout is a pipe, because the CLI exits before its buffered output drains (1.18.32); the spar bridge reads the listing from a file | [spar-opencode](../agents/.agents/skills/spar/scripts/spar-opencode) | the CLI's listing or exit path changes |
 | Reviewers running nothing that needs H's approval is an instruction in the charter, not a native block; headless bridge runs reject prompts on their own, so only an in-tool review shows whether a reviewer would prompt | [sparrer charter](../agents/.agents/agents/sparrer.md) | an in-tool review raises a prompt |
+| CI runs on `ubuntu-latest`, which GitHub moves to Ubuntu 26 from 2026-10-19 ([runner-images#14748](https://github.com/actions/runner-images/issues/14748)) | [CI workflow](../.github/workflows/test.yml) | the first CI run after the move |
 | Remote verification over custom SSH expressions can be unobservable | [ship](../agents/.agents/skills/ship/SKILL.md#publish) | the transport changes |
 
 ## Deferred Work
