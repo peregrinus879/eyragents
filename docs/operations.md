@@ -24,8 +24,8 @@ Every project inherits the global skills; OpenCode also offers each as a slash c
 
 ## Model Effort
 
-- **Claude Code:** the `effortLevel` setting is `xhigh`; `/effort` changes it for a session. The sparrer's frontmatter sets its own `xhigh`.
-- **OpenCode:** the primary model's configured effort is `xhigh`. In `/variants`, `Default` keeps that configured value, and a named variant overrides it. OpenCode remembers a choice per model, separately for a model and its Fast variant, and may skip the dialog when one exists. The effort badge shows the selection, not the request actually sent.
+- **Claude Code:** effort is `xhigh` for every model that supports it. Claude Code saves effort per model under `modelSettings` in user settings, which holds Fable 5.1, Opus 5.5 and Sonnet 5; Opus 5.5 and later models read only their entry, and the top-level user `effortLevel` covers earlier ones ([resolution order](https://code.claude.com/docs/en/model-config#adjust-effort-level)). A new model starts at its own default until `/effort xhigh` saves its entry. `/effort` with a typed level saves it as the default; `s` in the `/effort` slider applies it to the session only. The sparrer's frontmatter sets its own `xhigh`.
+- **OpenCode:** effort is `xhigh` for every GPT model: the `build`, `plan`, `general`, `explore` and `sparrer` agents set `reasoningEffort`, which [passes through](https://opencode.ai/docs/agents/#additional) to whichever model the agent runs, and the primary model's options set it for the hidden agents on that model. In `/variants`, `Default` keeps that configured value, and a named variant overrides it. OpenCode remembers a choice per model, separately for a model and its Fast variant, and may skip the dialog when one exists. The effort badge shows the selection, not the request actually sent.
 
 ## Verify
 

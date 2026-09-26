@@ -13,10 +13,23 @@
     ]
   },
   "agent": {
+    "build": {
+      "reasoningEffort": "xhigh"
+    },
+    "plan": {
+      "reasoningEffort": "xhigh"
+    },
+    "general": {
+      "reasoningEffort": "xhigh"
+    },
+    "explore": {
+      "reasoningEffort": "xhigh"
+    },
     "sparrer": {
       "description": "The read-only reviewer the spar skill runs, in this tool or through the other tool's bridge, reviewing from concepts to details. Use spar rather than calling it directly, so a review keeps its rounds.",
       "mode": "all",
       "prompt": "{file:~/.agents/agents/sparrer.md}",
+      "reasoningEffort": "xhigh",
       "permission": {
         "edit": "deny",
         "task": "deny",

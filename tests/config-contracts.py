@@ -353,7 +353,11 @@ for section in ("allow", "soft_deny", "hard_deny"):
     require(claude["autoMode"][section][0] == "$defaults", f"Claude auto mode dropped built-in {section} rules")
 require("personal folders" in " ".join(claude["autoMode"]["hard_deny"]), "Claude classifier lacks the personal-folder rule")
 require(claude.get("attribution", {}).get("sessionUrl") is False, "Claude would add a session URL to commits")
+# In user settings the top-level key covers models before Opus 5.5; Opus 5.5 and later read only their modelSettings entry.
 require(claude.get("effortLevel") == "xhigh", "Claude Code effort is not xhigh")
+for model in ("claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5"):
+    require(claude.get("modelSettings", {}).get(model, {}).get("effortLevel") == "xhigh",
+            f"Claude Code effort for {model} is not xhigh")
 require("CLAUDE_CODE_EFFORT_LEVEL" not in claude.get("env", {}), "the effort env var would override /effort and per-agent effort")
 require(claude["autoMode"].get("environment", [None])[0] == "$defaults", "Claude auto mode lacks its environment entries")
 # Uploads of conversation content and error reports stay off; metrics stay on for feature flags (docs/access.md).
@@ -366,6 +370,10 @@ require(opencode["share"] == "disabled" and opencode["autoupdate"] is False, "Op
 primary = opencode["model"].split("/", 1)[1]
 require(opencode["provider"]["openai"]["models"][primary]["options"]["reasoningEffort"] == "xhigh",
         "OpenCode primary model is not configured at xhigh")
+# Agent options pass through to whichever model the agent runs, so every GPT model defaults to xhigh.
+for agent in ("build", "plan", "general", "explore", "sparrer"):
+    require(opencode["agent"].get(agent, {}).get("reasoningEffort") == "xhigh",
+            f"OpenCode agent {agent} does not default to xhigh")
 require(not opencode.get("instructions"), "OpenCode duplicates native guidance")
 # Native discovery finds ~/.agents/skills; the explicit path keeps them in the restricted untrusted-checkout launch.
 require(opencode.get("skills") == {"paths": ["~/.agents/skills"]}, "OpenCode shared skill path drifted")

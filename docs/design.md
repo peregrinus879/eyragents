@@ -67,4 +67,4 @@ Durable decisions live in the repository, open work in the [maintenance ledger](
 
 ## Models and Effort
 
-Each tool's configuration owns its model choices, so a model change edits one file: Claude Code's settings name the primary model and the sparrer's frontmatter its reviewer model, both as moving aliases; OpenCode's configuration names its primary and small models by concrete ID, bumped by hand when a newer generation appears. Claude Code defines no `fallbackModel`: a silent downgrade would override the chosen primary. Effort is set once per tool and can be changed per session.
+Each tool's configuration owns its model choices, so a model change edits one file: Claude Code's settings name the primary model and the sparrer's frontmatter its reviewer model, both as moving aliases; OpenCode's configuration names its primary and small models by concrete ID, bumped by hand when a newer generation appears. Claude Code defines no `fallbackModel`: a silent downgrade would override the chosen primary. Effort is `xhigh` in each tool's configuration, per model where the tool keys it that way, and can be changed per session.
