@@ -42,6 +42,8 @@ One inventory, in both configurations:
 
 Conversation transcripts (Claude Code's `projects/**/*.jsonl`, OpenCode's storage and database, Codex sessions) are readable and never editable; a credential found in one is still a secret. `example.env`, `credentials-policy.md`, public host keys and ordinary configuration stay readable. A finite inventory cannot recognize a renamed secret; global guidance still governs it.
 
+The [status line](../claude-code/.claude/statusline.sh), a command Claude Code runs rather than an agent tool, reads Claude Code's own access token to query its usage endpoint; its header states how the token stays out of arguments, output and cache.
+
 ### Personal Folders
 
 `~/Desktop`, `~/Documents`, `~/Downloads`, `~/Music`, `~/Pictures`, `~/Sync` and `~/Videos`, their `/mnt/*/Users/*` counterparts under WSL, and OneDrive are denied for read and edit. OpenCode carries them in its read and edit rules as well as its external-directory rules, because a session launched from a directory above them skips the external-directory check. Claude Code's classifier also prohibits reaching them through the shell. Rules for folders a host lacks have no effect.

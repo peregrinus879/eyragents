@@ -4,14 +4,14 @@
 
 ## Prerequisites
 
-- Git, GNU Make, GNU Stow, jq, Python 3, mise, and GNU coreutils and util-linux (`setsid`).
+- Git, GNU Make, GNU Stow, jq, Python 3, mise, GNU coreutils, util-linux (`setsid`, `flock`), and curl 7.84.0 or newer (the status line's usage fetch).
 - ShellCheck 0.11.0 or newer, for `make lint`.
 - Claude Code 2.1.277 or newer and OpenCode, installed through [mise](https://mise.jdx.dev).
 
 On Arch Linux:
 
 ```bash
-sudo pacman -Syu --needed git make stow jq python shellcheck util-linux mise
+sudo pacman -Syu --needed git make stow jq python shellcheck util-linux curl mise
 mise use --global claude@latest opencode@latest gh@latest
 ```
 

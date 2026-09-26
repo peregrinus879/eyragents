@@ -8,7 +8,12 @@ Open work only. Each item states what is open, why, and what closes it; when an 
 
 - **Personal and shareable guidance.** The harness is to become a common harness for other users, but global guidance opens with H's profile and addresses H throughout. Decide how a user supplies their own profile and name without editing the shared files. Closes with H's decision and its implementation.
 - **Prompt-audit flags** (2026-09-25). Five low-confidence findings from the Opus 5.5 prompt audit (the root-cause rule, the evidence standard, the sparrer's review areas, AGENTS.md version pins, delegation limits) were kept. Closes when H revisits them after a few sessions on the current harness.
+- **Status line under the soft deny.** The [status line](../claude-code/.claude/statusline.sh) reads Claude Code's access token and runs outside the permission system, yet `autoMode` soft-denies changes to permission settings, hooks, plugins and skills but not to it. Adding it would require H's instruction naming the file before an agent edits it, which H's own requests already give; the access policy's tool table would also record that OpenCode relies on global guidance for that rule. Closes with H's decision.
 - **Claude Code sandbox.** An untracked Omarchy trial denies `~/.ssh`, `~/.aws` and `~/.gnupg` and asks before `dangerouslyDisableSandbox`. Its localhost-only network default would block research fetches and reference refreshes unless `sandbox.network.allowedDomains` lists each host. Closes when a session of ordinary work with a tracked allowlist shows whether it is worth promoting, and WSL behavior is checked.
+
+## Host Follow-ups
+
+- **WSL status line.** Limits from the usage endpoint are live on Omarchy. On WSL, after H pulls: confirm `command -v curl flock setsid` finds all three and `curl --version` is 7.84.0 or newer, start a fresh Claude Code session, and check that within a minute `sess:` and `week:` (all models/Fable) match `/usage` and the effort segment shows `xhigh`. Closes when it does.
 
 ## Limitations Under Watch
 
@@ -21,7 +26,7 @@ Each is documented at its owner and rechecked when its trigger fires.
 | OpenCode WebFetch has no SSRF boundary (source-checked 1.18.18) | [access](access.md#enforcement-limits) | `tool/webfetch.ts` changes |
 | OpenCode subagents cannot launch subagents (`subagent_depth` 1; the sparrer denies `task`) | [access](access.md#the-sparrer) | `tool/task.ts` changes |
 | OpenCode's effort badge shows the selection, not the request sent ([#25126](https://github.com/anomalyco/opencode/issues/25126)) | [operations](operations.md#model-effort) | variant persistence or request precedence changes |
-| Claude Code's status line cannot show the weekly Fable window, which only the usage API exposes | [status line](../claude-code/.claude/statusline.sh) | a release adds that window to `rate_limits` |
+| The status line reads its limits from the undocumented usage endpoint behind `/usage`, because `rate_limits` lags it and omits model windows (Fable); it shows every weekly model window, while `/usage` also applies a server-side allowlist it cannot read | [status line](../claude-code/.claude/statusline.sh) | the endpoint's shape changes, `/usage` lists a window the status line does not or the reverse, or `rate_limits` matches `/usage` including model windows (then drop the endpoint call) |
 | A renamed file under `~/.claude/agents` may need a new session before it registers (observed 2.1.260) | this ledger | a scoped check on a current release |
 | The workspace guide's saved-key export after a browser relaunch intermittently ends Chromium in automated tests (152.0.7977.82, Playwright 1.63.0); a minimal Blob download reproduces it, so no guide-specific cause is established, and interactive browsers are unverified | [guide notes](workspace-guide-src/README.md#saved-keys) | Chromium or Playwright changes, or an upstream fix |
 | OpenCode model IDs are pinned by hand | [design](design.md#models-and-effort) | `opencode models` lists a newer generation |
