@@ -11,10 +11,6 @@ Open work only. Each item states what is open, why, and what closes it; when an 
 - **Status line under the soft deny.** The [status line](../claude-code/.claude/statusline.sh) reads Claude Code's access token and runs outside the permission system, yet `autoMode` soft-denies changes to permission settings, hooks, plugins, skills and guidance from outside this repository, but not to it. Adding it would require H's instruction naming the file before an agent outside this repository edits it; the access policy's tool table would also record that OpenCode relies on global guidance for that rule. Closes with H's decision.
 - **Claude Code sandbox.** An untracked Omarchy trial denies `~/.ssh`, `~/.aws` and `~/.gnupg` and asks before `dangerouslyDisableSandbox`. Its localhost-only network default would block research fetches and reference refreshes unless `sandbox.network.allowedDomains` lists each host. Closes when a session of ordinary work with a tracked allowlist shows whether it is worth promoting, and WSL behavior is checked.
 
-## Host Follow-ups
-
-- **WSL status line.** Limits from the usage endpoint are live on Omarchy. On WSL, after H pulls: confirm `command -v curl flock setsid` finds all three and `curl --version` is 7.84.0 or newer, start a fresh Claude Code session, and check that within a minute `sess:` and `week:` (all models/Fable) match `/usage` and the effort segment shows `xhigh`. Closes when it does.
-
 ## Limitations Under Watch
 
 Each is documented at its owner and rechecked when its trigger fires.
