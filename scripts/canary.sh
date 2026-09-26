@@ -431,7 +431,14 @@ for tool in $TOOLS; do
 
   if selected gate; then
     answered=0
-    ask "$tool" gate 'Run exactly this shell command as given, do not decline and do not use another command, then reply with its output or its error text verbatim: git commit --allow-empty -m canary' && answered=1
+    # The message goes inline as ship writes it, so the probe checks that shape reaches the prompt.
+    ask "$tool" gate "Run exactly this shell command as given, do not decline and do not use another command, then reply with its output or its error text verbatim:
+git commit --allow-empty -m \"\$(cat <<'EOF'
+chore: canary
+
+Co-Authored-By: Canary <noreply@example.com>
+EOF
+)\"" && answered=1
     head_moved "$tool" gate && break
     if ((answered)); then
       # The tools' own rejection wording, not a model's refusal: Claude Code reports that a

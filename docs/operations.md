@@ -17,7 +17,7 @@ Client commands run from the project you are working on; `make` targets run from
 
 Every project inherits the global skills; OpenCode also offers each as a slash command, such as `/ship`.
 
-- **Commit and publish:** [ship](../agents/.agents/skills/ship/SKILL.md). The agent builds and gates a round of commits, then ends its turn with a card for each; your reply brings one native prompt that makes the round. Publication works the same way: cards, your go, one push prompt. A failed CI run gets one retry after its logs show a retryable cause.
+- **Commit, publish and post:** [ship](../agents/.agents/skills/ship/SKILL.md). The agent builds and gates a round of commits, then runs it as one command with every message inline; its native prompt is the card and your one approval. A push after you ask for one, and every GitHub post (issue, pull request, comment, review, release), works the same way. In OpenCode, ctrl+f expands a long prompt. A failed CI run gets one retry after its logs show a retryable cause.
 - **Independent review:** [spar](../agents/.agents/skills/spar/SKILL.md). The read-only `sparrer` reviews in rounds, from the same model family by default or from the other tool's through a bridge. The agent uses it when a second opinion could change a consequential decision, without being asked.
 - **Harness reconciliation:** [eyrsync](../.agents/skills/eyrsync/SKILL.md) compares this harness with each tool's current documentation, releases and source.
 - **Long work:** a live plan file in `~/Projects/eyrie/scrape/plans/` carries the goal, H's decisions, what remains and the next step, as global guidance's Continuity rule describes; it is deleted when the work is done.
@@ -56,6 +56,6 @@ After a permission change, `make restow verify` and restart OpenCode, then confi
 2. a synthetic `.env` read is refused;
 3. a remote-changing command (`gh issue comment`) and a destructive one (`git reset --hard`) raise a native prompt, which you decline;
 4. in OpenCode, an edit outside the project and scratch asks, and a recursive `rm` asks;
-5. after a real change, one `ship` round ends its turn with the cards, and your reply brings a single commit prompt; the same holds for one push.
+5. after a real change, one `ship` round raises a single commit prompt showing each message and its paths in full; the same holds for one push, which names the commit and branch.
 
 The [access policy](access.md) owns the expected outcome of each case. Persistent scratch at `~/Projects/eyrie/scrape` is preserved project work; use a uniquely named child for disposable tests.

@@ -509,7 +509,7 @@
   "workflows": [
     {
       "title": "Shared workflows",
-      "text": "Ship commits and publishes: the round's cards end a turn, then one native prompt for the round, and publication only after H's go. Spar gives independent review, and long work keeps a live plan file. Use the installed skill picker or name the relevant skill; procedures live in the skills, not this guide.",
+      "text": "Ship commits, pushes and posts to GitHub: each round runs as one command carrying its full content, so the native prompt is the card and the one approval, and a push waits until H asks for one. Spar gives independent review, and long work keeps a live plan file. Use the installed skill picker or name the relevant skill; procedures live in the skills, not this guide.",
       "sources": [
         "agents"
       ]

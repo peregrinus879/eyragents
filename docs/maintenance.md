@@ -13,6 +13,8 @@ Open work only. Each item states what is open, why, and what closes it; when an 
 
 ## Host Follow-ups
 
+- **Ship prompt acceptance.** Commits, pushes and GitHub posts carry their full content in the command the prompt shows. In both tools on each host (on WSL after H pulls), run `make canary` and [permission acceptance](operations.md#permission-acceptance) step 5, and check that the prompt shows every message and path; in OpenCode, ctrl+f expands it. Claude Code on Omarchy starts with the commit that introduced this flow. Closes when all four pass and the [access policy](access.md#evidence-and-refresh) names the versions they passed on.
+
 - **WSL status line.** Limits from the usage endpoint are live on Omarchy. On WSL, after H pulls: confirm `command -v curl flock setsid` finds all three and `curl --version` is 7.84.0 or newer, start a fresh Claude Code session, and check that within a minute `sess:` and `week:` (all models/Fable) match `/usage` and the effort segment shows `xhigh`. Closes when it does.
 
 ## Limitations Under Watch
@@ -36,7 +38,7 @@ Each is documented at its owner and rechecked when its trigger fires.
 
 ## Deferred Work
 
-- **Skill behavior evaluations.** `claude plugin eval` scenarios: free text never commits, a commit runs only after its cards, or H's exact command, and at the native prompt, a push waits for H's go. Closes when evaluation beyond the canary is adopted.
+- **Skill behavior evaluations.** `claude plugin eval` scenarios: free text never commits, a commit or GitHub post runs only at the native prompt with its full content inline, and a push only after H asks for one. Closes when evaluation beyond the canary is adopted.
 - **Permission prompt review.** Run `/fewer-permission-prompts` on accumulated sessions and promote only durable read-only rules, keeping `gh api` gated.
 - **Reproducible test images** for local and hosted checks of exact staged states, if environment-driven CI failures recur; container infrastructure needs its own approval.
 - **omasecboot gates.** Give omasecboot a `check` target that runs its tests, once H's current work there is done.

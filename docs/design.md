@@ -18,7 +18,7 @@ Both tools carry the same policy, but enforce it to different depths. Claude Cod
 
 ## Approvals That Reach You
 
-A commit or push needs your explicit choice, made after the agent has shown what it does, or after your own message gives the exact command. Text an agent writes in the same message as a tool call can remain in its hidden reasoning and never reach you, while a reply that ends the turn always does. So `ship` ends a turn with every card of a round, and your reply brings one native prompt that makes the round. Git history is the record; no receipt, token or shell gate stands between the card and the prompt.
+A commit, push or GitHub post needs your explicit choice, made after the agent has shown what it does, or after your own message gives the exact command. Text an agent writes in the same message as a tool call can remain in its hidden reasoning and never reach you, while the tool call itself always does. So `ship` runs each round as one command that carries its full content, commit messages and post bodies inline, and the native prompt is both the card and your one approval. Checks run first; a failure, or a question for you, ends the turn with a report instead of a prompt. Git history is the record; the prompt needs no receipt, token or shell gate beside it.
 
 Authentication belongs to the host: GitHub over HTTPS with the standard `gh` credential helper, managed by you. Holding credentials gives the agent capability, never approval.
 
@@ -56,7 +56,7 @@ A file lives where its lifetime belongs:
 | Tier | Where | Lifetime | Holds |
 | --- | --- | --- | --- |
 | Records | `~/Projects/eyrie/scrape` (persistent scratch) | Survives crashes and reboots | H's scratch projects; plan files in `plans/`, including review findings and their dispositions |
-| Session scratch | Claude Code's scratchpad under `/tmp/claude-*`; OpenCode's `/tmp/opencode` | Ends with the session or at reboot | One session's working files, such as commit message files |
+| Session scratch | Claude Code's scratchpad under `/tmp/claude-*`; OpenCode's `/tmp/opencode` | Ends with the session or at reboot | One session's working files, such as test fixtures and logs |
 | Script temp | `mktemp` under `/tmp` | Deleted when the script exits | The bridges' request, reply and error files; the canary's fixture repository |
 
 The canary also creates one uniquely named child in persistent scratch, to prove the scratch permission, and removes it.

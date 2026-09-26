@@ -178,6 +178,14 @@ COMMANDS = {
     "git replace abc def": "ask", "git filter-branch --all": "ask", "git notes add -m x": "ask", "git fast-import": "ask",
     "git -C/x commit -m x": "ask", "git -cuser.name=x commit -m x": "ask", "git -C/x push": "ask",
     "git notes --ref=x add -m y": "ask", "git notes remove HEAD": "ask", "git notes prune": "ask",
+    # Ship's commands carry messages and bodies inline, spanning lines. These exercise the
+    # whole-string matcher models, not either tool's shell parser; the canary checks live dispatch.
+    "git commit -m \"$(cat <<'EOF'\nfix: x\n\nCo-Authored-By: M <n@x>\nEOF\n)\" -- a b &&\n"
+    "git -C /x commit -m \"$(cat <<'EOF'\ndocs: y\nEOF\n)\" -- c": "ask",
+    "git -C /x push origin 0123abc:refs/heads/main": "ask",
+    "gh pr create --title x --body \"$(cat <<'EOF'\nbody\n\nCo-Authored-By: M\nEOF\n)\"": "ask",
+    "gh issue comment 1 --body \"$(cat <<'EOF'\nbody\nEOF\n)\"": "ask",
+    "gh release create v1 --notes \"$(cat <<'EOF'\nnotes\nEOF\n)\"": "ask",
     # Every form of another agent client is gated: launches, exports, auth, uninstall.
     "opencode": "deny", "opencode .": "deny", "opencode run x": "deny", "opencode serve": "deny",
     "opencode export ses_1": "deny", "opencode auth login": "deny", "opencode uninstall --force": "deny",
@@ -353,6 +361,8 @@ for section in ("allow", "soft_deny", "hard_deny"):
     require(claude["autoMode"][section][0] == "$defaults", f"Claude auto mode dropped built-in {section} rules")
 require("personal folders" in " ".join(claude["autoMode"]["hard_deny"]), "Claude classifier lacks the personal-folder rule")
 require(claude.get("attribution", {}).get("sessionUrl") is False, "Claude would add a session URL to commits")
+# Ship owns attribution; Claude Code's default guidance yields to it, but an empty value forbids attribution lines.
+require(not {"commit", "pr"} & claude.get("attribution", {}).keys(), "Claude attribution text overrides the ship rule")
 # In user settings the top-level key covers models before Opus 5.5; Opus 5.5 and later read only their modelSettings entry.
 require(claude.get("effortLevel") == "xhigh", "Claude Code effort is not xhigh")
 for model in ("claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5"):

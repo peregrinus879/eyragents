@@ -9,7 +9,7 @@ The governing idea: an agent works at full capability and prompts only where a r
 | Part | What it does |
 | --- | --- |
 | [Global guidance](agents/.agents/global-agents.md) | One instruction file both tools load: approach, style, safety and workflow rules. |
-| [`ship`](agents/.agents/skills/ship/SKILL.md) | Commits and publishes verified work. The agent ends a turn with a card for each commit; your reply brings one native approval prompt for the round. |
+| [`ship`](agents/.agents/skills/ship/SKILL.md) | Commits, pushes and posts to GitHub. Each round runs as one command carrying its full content, so the native approval prompt shows everything you approve. |
 | [`spar`](agents/.agents/skills/spar/SKILL.md) | Independent review in rounds by a read-only reviewer, the `sparrer`, from the same model family or, through a bridge, from the other tool's. |
 | [Access policy](docs/access.md) | The permission model, what each tool enforces, and where the tools differ. |
 | Tests | A parity test that holds both tools' permissions to the same decisions, bridge and deployment tests, and an opt-in live canary. |
