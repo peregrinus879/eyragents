@@ -12,7 +12,7 @@ Open work only. Each item states what is open, why, and what closes it; when an 
 
 ## Host Acceptance
 
-- **Spar simplification on WSL.** After this revision is available on WSL, run `make lint check`, then `make restow verify`, restart both clients, and exercise the [spar acceptance scenarios](../tests/spar-behavior.md) through each bridge from a Git workspace and an ordinary folder, including a same-workspace resume. Check original-file preservation in Explore/Sparrer, ordinary Build edits and native approval behavior with owned, non-sensitive fixtures. Native Plan is optional; do not enable a plan-file feature merely to satisfy an acceptance check. Closes with observed WSL results and any differences recorded in the access policy.
+- **Spar simplification and shared guidance on WSL.** After this revision is available on WSL, run `make lint check`, then `make restow verify`, restart both clients, and exercise the [spar acceptance scenarios](../tests/spar-behavior.md) through each bridge from a Git workspace and an ordinary folder, including a same-workspace resume. Confirm both clients load the shared [commit-message guidance](../agents/.agents/skills/ship/SKILL.md#commit). Check original-file preservation in Explore/Sparrer, ordinary Build edits and native approval behavior with owned, non-sensitive fixtures. Native Plan is optional; do not enable a plan-file feature merely to satisfy an acceptance check. Closes with observed WSL results and any differences recorded in the access policy.
 
 ## Limitations Under Watch
 

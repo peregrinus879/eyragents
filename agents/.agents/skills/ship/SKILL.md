@@ -36,7 +36,9 @@ In Claude Code, the command's description adds a one-line summary under it, such
    The description summarizes the round: repository and branch, gate results, files and size, and any review verdict.
 5. Confirm that each commit's tree (`git rev-parse <commit>^{tree}`) equals its recorded tree and that `git log --format='%an <%ae> | %cn <%ce>'` shows the no-reply address for each. On any difference, stop and report it; never amend or reset to repair it.
 
-Message: `<type>[(scope)]: <subject>`, with type `feat`, `fix`, `docs`, `refactor`, `style`, `test` or `chore`, an imperative lowercase subject of at most 50 characters, an optional body saying what changed and why, and the commit trailer from [Attribution](#attribution).
+Message: `<type>[(scope)]: <subject>`, with type `feat`, `fix`, `docs`, `refactor`, `style`, `test` or `chore`, an imperative lowercase subject of at most 50 characters, and the commit trailer from [Attribution](#attribution).
+
+Add a body when a future reader needs more than the subject: explain the reason for the change, the material change and any consequential trade-off or remaining limit as relevant. Self-explanatory changes may use the subject alone. Both clients follow this information standard; choose wording, structure and depth to suit the change.
 
 ## Publish
 
