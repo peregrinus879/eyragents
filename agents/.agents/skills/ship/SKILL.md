@@ -61,5 +61,3 @@ Everything the agent writes for Git or GitHub ends with one line naming the acti
 - a GitHub post: the last line `Co-Authored-By: <model>`.
 
 `<model>` comes from the exact model ID the client states, without its provider prefix, bracketed suffix or date: Anthropic IDs read `Claude <Family> <version>` with the version's hyphens as dots (`claude-opus-5-5` is `Claude Opus 5.5`), with `noreply@anthropic.com`; OpenAI IDs read `OpenAI GPT-<version>` followed by the remaining words capitalized (`gpt-6-astra` is `OpenAI GPT-6 Astra`), with `noreply@openai.com`. Any other ID takes the provider's published model name. OpenCode adds no attribution of its own. Claude Code's default attribution yields to this rule, so its settings leave `attribution.commit` and `attribution.pr` unset: an empty value makes Claude Code forbid attribution lines even where guidance asks for them.
-
-When the work has shipped, delete its plan file.

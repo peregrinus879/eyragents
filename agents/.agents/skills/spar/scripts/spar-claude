@@ -1,51 +1,58 @@
 #!/usr/bin/env bash
 # spar-claude - cross-vendor review: Claude Code reviews work drafted in another tool.
 #
-# Usage: spar-claude review [--resume SESSION] "<request>"
+# Usage: spar-claude review [--resume HANDLE] "<request>"
 #
 # Runs Claude Code's `sparrer` agent (~/.claude/agents/sparrer.md: the sparrer
 # charter, read, shell and web tools, the moving `fable` alias) as the whole
-# session, from the repository root under H's normal settings in auto mode, with
+# session, from the Git root or ordinary working directory under normal settings, with
 # no MCP tools. An unknown agent name makes Claude Code exit with an error; a
 # project agent named `sparrer` would take precedence, so such a project is
 # refused. Normal settings load project configuration, so use it only in
-# trusted checkouts. A review needs a clean client exit and a reply
+# trusted workspaces. A review needs a clean client exit and a reply
 # ending with the charter's VERDICT line. The reply goes to stdout; the session
-# ID and observed model go to stderr as "SPAR-BRIDGE ID:" and "SPAR-BRIDGE MODEL:".
-# Exit codes: 0 reply, 3 usage limit, 5 reviewer failure, 64 usage,
+# workspace-bound handle and observed model go to stderr as "SPAR-BRIDGE ID:" and "SPAR-BRIDGE MODEL:".
+# Exit codes: 0 valid reply (not approval), 3 usage limit, 5 reviewer failure, 64 usage,
 # 124 timeout (SPAR_BRIDGE_TIMEOUT seconds, default 1800), 130 interrupted.
 set -euo pipefail
 
 TIMEOUT=${SPAR_BRIDGE_TIMEOUT:-1800}
 LIMIT_RE="usage limit|rate limit|hit your [a-z' ]*limit|limiting requests|quota|too many requests|overloaded|429|529"
-VERDICT_RE='^VERDICT: (CONVERGED|OPEN [0-9]+ BLOCKING / [0-9]+ NON-BLOCKING)$'
+SCRIPTS=$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")
+# shellcheck source=agents/.agents/skills/spar/scripts/spar-common.sh
+source "$SCRIPTS/spar-common.sh"
 
-usage() { printf 'usage: spar-claude review [--resume SESSION] "<request>"\n' >&2; exit 64; }
+usage() { printf 'usage: spar-claude review [--resume HANDLE] "<request>"\n' >&2; exit 64; }
 fail() { printf 'SPAR-BRIDGE ERROR: %s\n' "$1" >&2; [[ -z ${2:-} ]] || tail -c 2000 <<<"$2" >&2; exit 5; }
 [[ ${1:-} == review ]] || usage
 shift
-resume=()
+resume_handle=""
 if [[ ${1:-} == --resume ]]; then
   [[ -n ${2:-} ]] || usage
-  resume=(--resume "$2")
+  resume_handle=$2
   shift 2
 fi
 [[ $# == 1 && -n $1 ]] || usage
 [[ $TIMEOUT =~ ^[1-9][0-9]*$ ]] || usage
-repo=$(git rev-parse --show-toplevel 2>/dev/null) || { printf 'SPAR-BRIDGE ERROR: run from inside a Git worktree\n' >&2; exit 64; }
-! grep -rqsE '^name:[[:space:]]*["'\'']?sparrer["'\'']?[[:space:]]*(#.*)?$' -- "$repo/.claude/agents" ||
-  fail "the project defines its own sparrer agent, which would replace the user sparrer"
 
 # Every client call runs under spar-supervise.py: a hard timeout, and every descendant
 # stopped when the call ends, times out or the bridge is interrupted, including
 # processes that started their own session.
-SUPERVISE="$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")/spar-supervise.py"
+SUPERVISE="$SCRIPTS/spar-supervise.py"
 work=$(mktemp -d)
 pid=""
 trap 'rm -rf -- "$work"' EXIT
 trap '[[ -z $pid ]] || { kill -TERM -- "$pid" 2>/dev/null; wait "$pid" 2>/dev/null || true; }; exit 130' INT TERM HUP
+spar_workspace "$work"
+spar_claude_shadow_check "$work"
+resume=()
+if [[ -n $resume_handle ]]; then
+  session=$(spar_resume claude "$workspace" "$resume_handle") || fail "resume handle does not match this tool and workspace"
+  resume=(--resume "$session")
+fi
+printf 'SPAR-BRIDGE WORKSPACE: %s\n' "$workspace" >&2
 supervise() { # seconds stdin stdout stderr command... ; sets rc
-  "$SUPERVISE" "$1" "$repo" -- "${@:5}" <"$2" >"$3" 2>"$4" &
+  PWD="$workspace" "$SUPERVISE" "$1" "$workspace" -- "${@:5}" <"$2" >"$3" 2>"$4" &
   pid=$!
   rc=0
   wait "$pid" || rc=$?
@@ -69,8 +76,9 @@ if ((rc != 0)) || [[ -z $reply ]] &&
 fi
 ((rc == 0)) || fail "the reviewer exited $rc" "$(<"$work/err")"
 [[ -n $reply ]] || fail "the reviewer ended without a reply" "$(<"$work/err")"
-printf 'SPAR-BRIDGE ID: %s\n' "$(jq -r '.session_id // "unknown"' <<<"$result")" >&2
+handle=$(spar_handle claude "$workspace" "$(jq -r '.session_id // empty' <<<"$result")") || fail "review result lacks a session ID"
+printf 'SPAR-BRIDGE ID: %s\n' "$handle" >&2
 printf 'SPAR-BRIDGE MODEL: %s\n' "$(jq -r '.modelUsage // {} | keys | join(",") | if . == "" then "unknown" else . end' <<<"$result")" >&2
-grep -v '^[[:space:]]*$' <<<"$reply" | tail -n 1 | grep -qE "$VERDICT_RE" ||
+spar_valid_reply <<<"$reply" ||
   fail "the reply does not end with a VERDICT line; not a review" "$reply"
 printf '%s\n' "$reply"

@@ -17,10 +17,12 @@ Client commands run from the project you are working on; `make` targets run from
 
 Every project inherits the global skills; OpenCode also offers each as a slash command, such as `/ship`.
 
+The primary normally works in OpenCode Build or Claude Code auto mode. Planning and audit-only requests define the authorized task; they do not require a client-mode switch. Native Plan is optional for a deliberate restricted pause. Independent review uses `spar`, whose reviewer can investigate and run appropriate scratch checks without editing the originals.
+
 - **Commit, publish and post:** [ship](../agents/.agents/skills/ship/SKILL.md). The agent builds and gates a round of commits, then runs it as one command with every message inline; its native prompt is the card and your one approval. A push after you ask for one, and every GitHub post (issue, pull request, comment, review, release), works the same way. In OpenCode, ctrl+f expands a long prompt. A failed CI run gets one retry after its logs show a retryable cause.
-- **Independent review:** [spar](../agents/.agents/skills/spar/SKILL.md). The read-only `sparrer` reviews in rounds, from the same model family by default or from the other tool's through a bridge. The agent uses it when a second opinion could change a consequential decision, without being asked.
+- **Independent review:** [spar](../agents/.agents/skills/spar/SKILL.md). The `sparrer` investigates code, decisions and professional deliverables without editing the originals. The primary uses it when a second opinion could change a consequential judgment; the skill owns briefing, reviewer choice, progress-based follow-up and bridge use in trusted Git or ordinary workspaces.
 - **Harness reconciliation:** [eyrsync](../.agents/skills/eyrsync/SKILL.md) compares this harness with each tool's current documentation, releases and source.
-- **Long work:** a live plan file in `~/Projects/eyrie/scrape/plans/` carries the goal, H's decisions, what remains and the next step, as global guidance's Continuity rule describes; it is deleted when the work is done.
+- **Continuity:** [global guidance](../agents/.agents/global-agents.md#workflow) owns selective checkpoints for work that needs restart or compaction continuity. An existing native plan can serve; ordinary questions need no plan-file updates.
 
 ## Model Effort
 
@@ -35,6 +37,8 @@ make restow verify   # deploy, then check the deployment
 ```
 
 GitHub Actions runs `make lint check` on every push to `main` and every pull request, in an `archlinux:base` container as an unprivileged user. It does not deploy to or attest a host.
+
+[Spar acceptance scenarios](../tests/spar-behavior.md) exercise review judgment, coverage and continuity through the real clients. Bridge fixtures check the launch and result protocol, not the quality of a review.
 
 ### Canary
 

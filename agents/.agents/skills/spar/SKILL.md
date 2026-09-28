@@ -1,37 +1,38 @@
 ---
 name: spar
-description: Independent review of a plan, diff or decision, from concepts to details, by the in-tool sparrer or a cross-vendor reviewer. Use at your discretion when a second opinion could change a consequential decision.
+description: Independent review of code, plans, decisions and professional deliverables by the sparrer, in-tool or cross-vendor. Use when a second opinion could change a consequential judgment.
 ---
 
 # Spar
 
-The session's model drafts; an independent reviewer challenges the work from a fresh context. Every reviewer follows the shared charter in `~/.agents/agents/sparrer.md`: full context, read-only, global guidance as the standard. H rules on what stays open.
-
-## When
-
-At your discretion, when a second opinion could change a consequential decision; it is never mandatory. A review is a first pass and one follow-up round; a second follow-up is for a blocking finding still in dispute, and whatever remains open then goes to H.
+The primary owns the work and its integration; the sparrer independently investigates and challenges it under the [shared charter](../../agents/sparrer.md). Use review where it can change a consequential judgment, including before committing to an approach. It is discretionary, not a gate on every task.
 
 ## Reviewer
 
-- **In-tool** (default): the `sparrer` agent, the same model family as the drafter. Call it only through this skill. In Claude Code, continue it for a follow-up round by messaging the same agent; in OpenCode, pass its `task_id` to the task tool.
+- **In-tool** (default): invoke `sparrer` through this skill. Resume the same reviewer for follow-up: message its agent in Claude Code or pass its `task_id` in OpenCode.
 - **Cross-vendor**, when a view from another model family is worth its extra time, such as for a consequential or security-relevant decision: from Claude Code, `~/.agents/skills/spar/scripts/spar-opencode`; from OpenCode, `~/.agents/skills/spar/scripts/spar-claude`. Each bridge runs the other tool's `sparrer` agent.
 
-H's named reviewer overrides this choice. Report which reviewer ran; an in-tool audit is never cross-vendor review.
+H's named reviewer overrides this choice. Report which reviewer ran. Model-family diversity can help; it does not replace independent evidence and methods.
 
-## Request
+## Brief
 
-Write the request so the reviewer starts where you stopped:
+Put the brief in the request, using existing records rather than creating another form:
 
-- what to review: paths, a diff range, a plan file or a decision;
-- the goal, the constraints and where the decision record lives;
-- what you already did: commands run with their results and sources checked.
+- intended outcome, audience and acceptance conditions;
+- H's settled decisions, constraints and material assumptions, distinguished from proposed technical choices;
+- the exact artifacts and revisions to review, governing sources and where to find the evidence;
+- checks already performed, their results and known limits.
 
-Withhold your conclusions, the alternatives you weighed and your findings until the reviewer's first pass, so it judges the work on its own terms; share them in a follow-up round when useful. The reviewer reuses your evidence where it suffices and gathers everything else itself. Never narrow the scope to make a round pass.
+Preserve H's meaning. Withhold your preferred conclusion, advocacy and findings on the first pass, not the factual context or settled decisions. The reviewer can gather its own evidence and challenge the whole system the work touches. Use [review methods](references/review-methods.md) where helpful. Each tool's private scratch is inaccessible to the other; pass needed evidence inline or through an authorized shared location.
 
 ## Run
 
-Bridges run the other client under H's normal settings, which load project configuration, so use them only in trusted checkouts; in an untrusted checkout, use the in-tool sparrer of the restricted session. Run `<bridge> review "<request>"` from inside the repository, plainly, with a shell timeout of at least the bridge's 1800 seconds. The reply arrives on stdout. Stderr carries `SPAR-BRIDGE ID:`; a follow-up round uses `<bridge> review --resume <id> "<request>"`. Exit 3 is a usage limit, 124 a timeout and 5 a reviewer failure; report them to H.
+Bridges load the other client's normal settings and project configuration. Use them only in trusted workspaces; for untrusted material use the in-tool sparrer in a restricted session. Run `<bridge> review "<request>"` from the repository or ordinary working directory. The bridge uses the Git root when present, otherwise the physical working directory. Its configurable `SPAR_BRIDGE_TIMEOUT` defaults to 1800 seconds; the calling tool's timeout must allow at least that long.
 
-## Findings
+The reply is on stdout; stderr reports the workspace and `SPAR-BRIDGE ID:`. Pass that whole handle to `<bridge> review --resume <handle> "<request>"` from the same workspace. It binds the native session to the tool and workspace, not to an artifact revision; name changed artifacts in the follow-up. Exit 0 means a valid review arrived, including BLOCKED or INCOMPLETE, not approval. Exit 3 is a usage limit, 124 a timeout and 5 a reviewer failure. Report failures without substituting a different reviewer silently.
 
-Verify each blocking finding's ground, including how it fails. Fix confirmed issues, rebut disputed ones with evidence, and ask for the ground when one is missing. Relay objections in substance; never soften or drop them. Record each blocking finding with its disposition in the plan file: implemented, declined with the rationale shown to H, or open for H's ruling. Non-blocking findings are optional suggestions: present them as one list, which H closes with one disposition. For each open item, present the decision, both positions with evidence, and your recommendation labeled as judgment. A review authorizes nothing by itself.
+## Resolve
+
+Verify consequential findings and proposed corrections. Integrate justified changes, rebut unsupported objections with evidence and resolve ordinary technical suggestions yourself. Preserve material disagreements and dispositions in the existing task record; global guidance owns whether a checkpoint is needed. Bring H only unresolved choices that need H's priorities, authority or judgment, with the evidence and your recommendation. A primary's decision to proceed does not rewrite the reviewer's result or authorize issue, publication or other external action.
+
+After the independent pass, exchange rationale, alternatives and evidence freely. Resume when a material amendment, new evidence or a resolvable question warrants another pass; identify what changed and recheck affected conclusions. Stop when resolved, when necessary evidence is unavailable or when further discussion repeats positions. Do not review-shop for agreement or narrow the scope to obtain CLEAR. If the reviewer helped shape the solution, later rounds are continuing scrutiny; use a fresh targeted check only when the consequences justify it. Arrange focused specialist checks through the primary when useful.

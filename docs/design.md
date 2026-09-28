@@ -24,9 +24,9 @@ Authentication belongs to the host: GitHub over HTTPS with the standard `gh` cre
 
 ## Independent Review
 
-A second opinion is worth most from a fresh context, and more from a different model family. `spar` is the single entry point for review. Its reviewer, the `sparrer`, is read-only, follows one [charter](../agents/.agents/agents/sparrer.md) in both tools, and has shell and web access under the primary's rules, so it checks claims itself rather than trusting a curated brief. The drafter passes what it ran and checked but withholds its conclusions until the first pass, so the reviewer uses the evidence without inheriting the judgment. Findings that block carry how they fail; the rest are optional suggestions.
+A fresh context lets the sparrer challenge the primary's judgment; another model family can add perspective, not proof. The [spar skill](../agents/.agents/skills/spar/SKILL.md) keeps the acceptance brief and original evidence available without the primary's first-pass advocacy. Later exchange resolves material uncertainty instead of obeying a round count. The primary integrates and checks the reviewer's proposed corrections, while the [charter](../agents/.agents/agents/sparrer.md) keeps investigation independent of authority to edit or issue the work.
 
-The in-tool sparrer is the default. A bridge runs the other tool's sparrer when another model family's view is worth the time; the bridge supervises the reviewer's processes and fails unless the reply ends with the charter's verdict line. Review is never mandatory.
+The bridges supervise the other client's processes and reject failed or malformed responses. CLEAR, BLOCKED and INCOMPLETE describe a scoped review; a successful bridge exit only establishes delivery of that result. Workspace-bound resume handles prevent accidentally continuing in another folder or tool without a separate session registry. They are routing metadata, not authentication or artifact-version evidence. Review remains discretionary.
 
 ## One Neutral Source
 
@@ -55,7 +55,7 @@ A file lives where its lifetime belongs:
 
 | Tier | Where | Lifetime | Holds |
 | --- | --- | --- | --- |
-| Records | `~/Projects/eyrie/scrape` (persistent scratch) | Survives crashes and reboots | H's scratch projects; plan files in `plans/`, including review findings and their dispositions |
+| Records | `~/Projects/eyrie/scrape` (persistent scratch) | Survives crashes and reboots | H's scratch projects; task-owned checkpoints in `plans/` when an existing task or native plan is not suitable |
 | Session scratch | Claude Code's scratchpad under `/tmp/claude-*`; OpenCode's `/tmp/opencode` | Ends with the session or at reboot | One session's working files, such as test fixtures and logs |
 | Script temp | `mktemp` under `/tmp` | Deleted when the script exits | The bridges' request, reply and error files; the canary's fixture repository |
 
@@ -63,7 +63,7 @@ The canary also creates one uniquely named child in persistent scratch, to prove
 
 ## Records
 
-Durable decisions live in the repository, open work in the [maintenance ledger](maintenance.md), and provenance in Git history. Work that spans sessions keeps one live plan file outside the repositories, deleted when the work is done; steps pending on another host live in the ledger's host pass, or in a handoff file where a repository keeps one. Native memory is a revisable local cache, never authority.
+Durable decisions live in the repository, persistent open work in the [maintenance ledger](maintenance.md), and provenance in Git history. Global guidance's [Continuity rule](../agents/.agents/global-agents.md#workflow) owns checkpoint creation, updates and retirement. Checkpoints preserve the state needed to resume; transcripts retain the conversation. Native plans can carry that state without a duplicate scratch plan. Native memory is a revisable local cache, never authority.
 
 ## Models and Effort
 

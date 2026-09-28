@@ -38,7 +38,7 @@
       }
     },
     "sparrer": {
-      "description": "The read-only reviewer the spar skill runs, in this tool or through the other tool's bridge, reviewing from concepts to details. Use spar rather than calling it directly, so a review keeps its rounds.",
+      "description": "The independent reviewer run through the spar skill for code, plans, decisions and professional deliverables. Investigates directly and reports evidence, coverage and a verdict.",
       "mode": "all",
       "prompt": "{file:~/.agents/agents/sparrer.md}",
       "reasoningEffort": "xhigh",

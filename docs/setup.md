@@ -64,7 +64,7 @@ Set your commit identity to your GitHub no-reply address in your ordinary Git co
 The structure transfers as it is; a few facts are personal:
 
 - **The addressee and profile.** Global guidance speaks to `H` and describes H's background. Replace the opening profile, and the name throughout global guidance, the skills and the sparrer charter.
-- **Paths.** Persistent scratch is `~/Projects/eyrie/scrape`, with plan files in its `plans/` directory, and references live under `~/Projects/quarry`. They appear in guidance, both configurations, scripts, tests and docs; find every use with `git grep -n 'eyrie/scrape\|Projects/quarry'` and change them as one set.
+- **Paths.** Persistent scratch is `~/Projects/eyrie/scrape`, with task-owned checkpoints in `plans/`, and references live under `~/Projects/quarry`. Native plan files keep their client-selected locations. Paths appear in guidance, both configurations, scripts, tests and docs; find every use with `git grep -n 'eyrie/scrape\|Projects/quarry'` and change them as one set.
 - **Personal folders.** The denied folders are listed in global guidance, both configurations and the test.
 - **Identity.** The ship skill expects a GitHub no-reply commit identity.
 - **Models.** Claude Code's settings and the sparrer's frontmatter name Claude models; OpenCode's configuration names its primary and small models, with concrete IDs.

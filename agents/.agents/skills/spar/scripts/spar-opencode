@@ -1,50 +1,58 @@
 #!/usr/bin/env bash
 # spar-opencode - cross-vendor review: OpenCode reviews work drafted in another tool.
 #
-# Usage: spar-opencode review [--resume SESSION] "<request>"
+# Usage: spar-opencode review [--resume HANDLE] "<request>"
 #
-# Runs `opencode run --agent sparrer` from the repository root under H's normal
+# Runs `opencode run --agent sparrer` from the Git root or ordinary working directory under normal
 # OpenCode configuration; the sparrer agent carries the sparrer charter
 # and denies edits, and a headless run rejects anything that would prompt.
 # Normal configuration loads project settings, so use it only in trusted
-# checkouts. OpenCode silently substitutes its default agent when the named one
+# workspaces. OpenCode silently substitutes its default agent when the named one
 # is missing or cannot run as a primary, so a preflight through `opencode agent
 # list` (no model call) must show the sparrer as primary-capable with edits
 # denied before the request is sent. A review needs a clean client exit and a
 # reply ending with the charter's VERDICT line. The reply goes to stdout; the
-# session ID goes to stderr as "SPAR-BRIDGE ID:".
-# Exit codes: 0 reply, 3 usage limit, 5 reviewer failure, 64 usage,
+# workspace-bound session handle goes to stderr as "SPAR-BRIDGE ID:".
+# Exit codes: 0 valid reply (not approval), 3 usage limit, 5 reviewer failure, 64 usage,
 # 124 timeout (SPAR_BRIDGE_TIMEOUT seconds, default 1800), 130 interrupted.
 set -euo pipefail
 
 TIMEOUT=${SPAR_BRIDGE_TIMEOUT:-1800}
 LIMIT_RE="usage limit|rate limit|hit your [a-z' ]*limit|limiting requests|quota|too many requests|overloaded|429|529"
-VERDICT_RE='^VERDICT: (CONVERGED|OPEN [0-9]+ BLOCKING / [0-9]+ NON-BLOCKING)$'
+SCRIPTS=$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")
+# shellcheck source=agents/.agents/skills/spar/scripts/spar-common.sh
+source "$SCRIPTS/spar-common.sh"
 
-usage() { printf 'usage: spar-opencode review [--resume SESSION] "<request>"\n' >&2; exit 64; }
+usage() { printf 'usage: spar-opencode review [--resume HANDLE] "<request>"\n' >&2; exit 64; }
 fail() { printf 'SPAR-BRIDGE ERROR: %s\n' "$1" >&2; [[ -z ${2:-} ]] || tail -c 2000 <<<"$2" >&2; exit 5; }
 [[ ${1:-} == review ]] || usage
 shift
-resume=()
+resume_handle=""
 if [[ ${1:-} == --resume ]]; then
   [[ -n ${2:-} ]] || usage
-  resume=(--session "$2")
+  resume_handle=$2
   shift 2
 fi
 [[ $# == 1 && -n $1 ]] || usage
 [[ $TIMEOUT =~ ^[1-9][0-9]*$ ]] || usage
-repo=$(git rev-parse --show-toplevel 2>/dev/null) || { printf 'SPAR-BRIDGE ERROR: run from inside a Git worktree\n' >&2; exit 64; }
 
 # Every client call runs under spar-supervise.py: a hard timeout, and every descendant
 # stopped when the call ends, times out or the bridge is interrupted, including
 # processes that started their own session.
-SUPERVISE="$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")/spar-supervise.py"
+SUPERVISE="$SCRIPTS/spar-supervise.py"
 work=$(mktemp -d)
 pid=""
 trap 'rm -rf -- "$work"' EXIT
 trap '[[ -z $pid ]] || { kill -TERM -- "$pid" 2>/dev/null; wait "$pid" 2>/dev/null || true; }; exit 130' INT TERM HUP
+spar_workspace "$work"
+resume=()
+if [[ -n $resume_handle ]]; then
+  session=$(spar_resume opencode "$workspace" "$resume_handle") || fail "resume handle does not match this tool and workspace"
+  resume=(--session "$session")
+fi
+printf 'SPAR-BRIDGE WORKSPACE: %s\n' "$workspace" >&2
 supervise() { # seconds stdin stdout stderr command... ; sets rc
-  "$SUPERVISE" "$1" "$repo" -- "${@:5}" <"$2" >"$3" 2>"$4" &
+  PWD="$workspace" "$SUPERVISE" "$1" "$workspace" -- "${@:5}" <"$2" >"$3" 2>"$4" &
   pid=$!
   rc=0
   wait "$pid" || rc=$?
@@ -82,7 +90,8 @@ fi
 ((rc == 0)) || fail "the reviewer exited $rc" "$(<"$work/err")"
 [[ -z $errors ]] || fail "the reviewer reported an error" "$errors"
 [[ -n $reply ]] || fail "the reviewer ended without a reply" "$(<"$work/err")"
-printf 'SPAR-BRIDGE ID: %s\n' "$(jq -rs 'map(.sessionID // empty) | first // "unknown"' "$work/out")" >&2
-grep -v '^[[:space:]]*$' <<<"$reply" | tail -n 1 | grep -qE "$VERDICT_RE" ||
+handle=$(spar_handle opencode "$workspace" "$(jq -rs 'map(.sessionID // empty) | first // empty' "$work/out")") || fail "review result lacks a session ID"
+printf 'SPAR-BRIDGE ID: %s\n' "$handle" >&2
+spar_valid_reply <<<"$reply" ||
   fail "the reply does not end with a VERDICT line; not a review" "$reply"
 printf '%s\n' "$reply"

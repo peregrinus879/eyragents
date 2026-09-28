@@ -236,13 +236,13 @@
       "id": "ai-opencode-plan",
       "app": "opencode",
       "category": "OpenCode",
-      "title": "Choose Build, Plan or a subagent",
+      "title": "Choose an agent or request a review",
       "keys": [
         "/agents",
-        "@sparrer"
+        "/spar"
       ],
-      "source": "opencode-tui",
-      "detail": "Tab cycles primary agents, including the read-only sparrer; @sparrer invokes it as a subagent. Agent mode and permissions are distinct settings.",
+      "source": "agents",
+      "detail": "Work normally in Build and use /spar for independent review. Native Plan is optional restricted exploration; its active instructions govern any plan-file exception. Explore and Sparrer deny native edits. Shell behavior still follows the role instructions and access policy.",
       "mode": "OpenCode prompt",
       "essential": false,
       "warning": "",
@@ -458,13 +458,13 @@
       "title": "EyrAgents operations",
       "label": "EyrAgents operations",
       "url": "https://github.com/peregrinus879/eyragents/blob/main/docs/operations.md",
-      "scope": "Managed workflows reviewed 2026-09-24. Native client controls retain their own evidence baselines; current session status wins over a resumed model preference."
+      "scope": "Managed workflows reviewed 2026-09-28. Native client controls retain their own evidence baselines; current session status wins over a resumed model preference."
     },
     "agents-access": {
       "title": "EyrAgents access policy",
       "label": "EyrAgents access policy",
       "url": "https://github.com/peregrinus879/eyragents/blob/main/docs/access.md",
-      "scope": "Base policy reconciled 2026-09-24; agent inheritance and live control-file rules rechecked 2026-09-28 against Claude Code 2.1.283 documentation and OpenCode 1.18.32 source. The access policy distinguishes modeled rules from observed and pending native checks."
+      "scope": "Base policy reconciled 2026-09-24; spar, agent inheritance and live control-file rules rechecked 2026-09-28 against Claude Code 2.1.283 documentation and OpenCode 1.18.32 source. The access policy distinguishes fixture and native bridge evidence from pending live checks."
     },
     "claude": {
       "title": "Claude Code controls",
@@ -509,7 +509,7 @@
   "workflows": [
     {
       "title": "Shared workflows",
-      "text": "Ship commits, pushes and posts to GitHub: each round runs as one command carrying its full content, so the native prompt is the card and the one approval, and a push waits until H asks for one. Spar gives independent review, and long work keeps a live plan file. Use the installed skill picker or name the relevant skill; procedures live in the skills, not this guide.",
+      "text": "Ship owns approval-backed commits, pushes and GitHub posts. Spar provides independent review of code, decisions and professional deliverables, with coverage and CLEAR, BLOCKED or INCOMPLETE results. Global guidance owns selective checkpoints for continuity through restarts and compaction. Use the skill picker or name the relevant skill; procedures live at their owners.",
       "sources": [
         "agents"
       ]
