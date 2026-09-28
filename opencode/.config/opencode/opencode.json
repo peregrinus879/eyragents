@@ -17,13 +17,25 @@
       "reasoningEffort": "xhigh"
     },
     "plan": {
-      "reasoningEffort": "xhigh"
+      "reasoningEffort": "xhigh",
+      "permission": {
+        "edit": {
+          "../*": "deny",
+          "**/eyrie/scrape/**": "deny",
+          "**/tmp/opencode/**": "deny",
+          ".claude/statusline.sh": "deny",
+          "home/*/.claude/statusline.sh": "deny"
+        }
+      }
     },
     "general": {
       "reasoningEffort": "xhigh"
     },
     "explore": {
-      "reasoningEffort": "xhigh"
+      "reasoningEffort": "xhigh",
+      "permission": {
+        "edit": "deny"
+      }
     },
     "sparrer": {
       "description": "The read-only reviewer the spar skill runs, in this tool or through the other tool's bridge, reviewing from concepts to details. Use spar rather than calling it directly, so a review keeps its rounds.",
@@ -32,8 +44,7 @@
       "reasoningEffort": "xhigh",
       "permission": {
         "edit": "deny",
-        "task": "deny",
-        "todowrite": "deny"
+        "task": "deny"
       }
     }
   },
@@ -1138,11 +1149,12 @@
       "rm * -*": "ask"
     },
     "edit": {
-      "*": "allow",
       "../*": "ask",
       "../scrape/**": "allow",
       "**/eyrie/scrape/**": "allow",
       "**/tmp/opencode/**": "allow",
+      ".claude/statusline.sh": "ask",
+      "home/*/.claude/statusline.sh": "ask",
       "**/.ssh/**": "deny",
       ".ssh/**": "deny",
       "**/.aws/**": "deny",
@@ -1268,8 +1280,13 @@
       "auth.json": "deny",
       "**/.claude/projects/**/*.jsonl": "deny",
       "**/proc/*/environ": "deny",
+      "proc/*/environ": "deny",
       "**/var/lib/systemd/coredump/**": "deny",
+      "var/lib/systemd/coredump/**": "deny",
       "**/var/crash/**": "deny",
+      "var/crash/**": "deny",
+      "**/tmp/claude-*/**": "deny",
+      "tmp/claude-*/**": "deny",
       "**/.git/**": "deny",
       ".git/**": "deny",
       "**/.git": "deny",
@@ -1477,8 +1494,13 @@
       "**/auth.json": "deny",
       "auth.json": "deny",
       "**/proc/*/environ": "deny",
+      "proc/*/environ": "deny",
       "**/var/lib/systemd/coredump/**": "deny",
+      "var/lib/systemd/coredump/**": "deny",
       "**/var/crash/**": "deny",
+      "var/crash/**": "deny",
+      "**/tmp/claude-*/**": "deny",
+      "tmp/claude-*/**": "deny",
       "**/.claude.json*": "deny",
       ".claude.json*": "deny",
       "**/.claude/backups/**": "deny",

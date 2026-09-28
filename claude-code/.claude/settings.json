@@ -1295,7 +1295,7 @@
       "$defaults",
       "Deleting files this task did not create requires H's explicit instruction naming them.",
       "Editing shell startup files, systemd user units, autostart entries or mise configuration requires H's explicit instruction naming the file.",
-      "From a session working outside the EyrAgents repository (~/Projects/eyrie/eyragents), changing the agents' own permission settings, hooks, plugins, skills or guidance (Claude Code or OpenCode configuration, ~/.agents) requires H's explicit instruction naming the file. In a session working in that repository, editing them on H's request is its ordinary work; deploying a reviewed change with make restow is not this rule."
+      "From a session working outside the EyrAgents repository (~/Projects/eyrie/eyragents), changing the agents' own permission settings, hooks, plugins, skills, guidance or status-line commands (including ~/.claude/statusline.sh) requires H's explicit instruction naming the file. In a session working in that repository, editing them on H's request is its ordinary work; deploying a reviewed change with make restow is not this rule."
     ],
     "hard_deny": [
       "$defaults",

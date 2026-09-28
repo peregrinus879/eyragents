@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(os.environ.get("CONFIG_CONTRACT_ROOT", Path(__file__).resolve().parent.parent))
-HOME = "/fixture-home"
+HOME = "/home/fixture"
 WORKTREE = HOME + "/Projects/eyrie/repo"
 
 
@@ -94,14 +94,26 @@ def oc_match(subject: str, pattern: str) -> bool:
     return re.fullmatch(escaped, subject, re.S) is not None
 
 
-def oc_rules(permission: dict, key: str, agent: dict | None = None):
+def oc_rules(permission: dict, key: str, agent: dict | None = None, worktree: str = WORKTREE):
+    # Installed 1.18.32 agent.ts: defaults -> built-in agent -> user -> configured agent.
+    # Model the edit-sensitive built-ins explicitly, including native plan-file exceptions.
+    builtin = {}
+    if agent is not None and agent is opencode["agent"].get("plan"):
+        builtin = {"edit": {
+            "*": "deny", ".opencode/plans/*.md": "allow",
+            posixpath.relpath(HOME + "/.local/share/opencode/plans/*.md", worktree): "allow",
+        }}
+    elif agent is not None and agent is opencode["agent"].get("explore"):
+        builtin = {"*": "deny", **{k: "allow" for k in ("read", "bash", "grep", "glob", "list", "webfetch", "websearch")}}
     rules = []
-    for source in (permission, (agent or {}).get("permission", {})):
-        value = source.get(key)
-        if isinstance(value, str):
-            rules.append(("*", value))
-        elif isinstance(value, dict):
-            rules += list(value.items())
+    for source in (builtin, permission, (agent or {}).get("permission", {})):
+        for name, value in source.items():
+            if name not in ("*", key):
+                continue
+            if isinstance(value, str):
+                rules.append(("*", value))
+            elif isinstance(value, dict):
+                rules += list(value.items())
     return rules
 
 
@@ -116,14 +128,16 @@ def oc_last(rules, subject: str) -> str:
 def oc_file(key: str, path: str, agent: dict | None = None, worktree: str = WORKTREE, launch: str | None = None) -> str:
     """Decision for a native read or edit of an absolute path; subjects are worktree-relative.
 
-    OpenCode skips the external-directory check for paths under the worktree or the launch directory."""
+    The '/' non-Git worktree is excluded from containment; the launch directory still applies."""
     def under(base: str) -> bool:
         return base == "/" or path == base or path.startswith(base + "/")
-    if not (under(worktree) or under(launch or worktree)):
-        external = oc_last(oc_rules(opencode["permission"], "external_directory", agent), posixpath.dirname(path) + "/*")
+    external = "allow"
+    if not ((worktree != "/" and under(worktree)) or under(launch or worktree)):
+        external = oc_last(oc_rules(opencode["permission"], "external_directory", agent, worktree), posixpath.dirname(path) + "/*")
         if external == "deny":
             return "deny"
-    return oc_last(oc_rules(opencode["permission"], key, agent), posixpath.relpath(path, worktree))
+    result = oc_last(oc_rules(opencode["permission"], key, agent, worktree), posixpath.relpath(path, worktree))
+    return "ask" if external == "ask" and result == "allow" else result
 
 
 # --- Commands: the same decision in both tools --------------------------------------------
@@ -319,6 +333,10 @@ for path in TRANSCRIPTS:
 for path in ("/home/h/Documents/tax.pdf", "/home/h/Sync/n.md", "/mnt/c/Users/h/Documents/a.docx", "/mnt/c/Users/h/Sync/a.md"):
     for key in ("read", "edit"):
         require(oc_file(key, path, worktree="/", launch="/home/h") == "deny", f"OpenCode {key} reaches {path} from a home launch")
+for path in PROTECTED + PERSONAL + ["/tmp/claude-1000/session/reply.md"]:
+    for key in ("read", "edit"):
+        require(oc_file(key, expand(path), worktree="/", launch="/") == "deny",
+                f"root-relative {key} rule misses protected {path}")
 
 # Writes: the repository and persistent scratch run freely; elsewhere needs H.
 for path in ("{w}/src/app.py", "~/Projects/eyrie/scrape/work/x.md"):
@@ -352,6 +370,49 @@ require(oc_file("edit", eyrwsl + "/git/.config/git/config", worktree=eyrwsl) == 
 require(claude_decision("Read", "/tmp/opencode/s/x") == "deny", "Claude reads OpenCode's session root")
 require(oc_file("read", "/tmp/claude-1000/s/x") == "deny", "OpenCode reads Claude Code's session root")
 
+# The status-line script executes outside agent permissions and reads the client's
+# credential itself. Editing its deployed endpoint needs approval, including non-Git/home launches.
+for worktree, launch in ((WORKTREE, WORKTREE), (HOME, HOME), ("/", HOME + "/Work/reports")):
+    require(oc_file("edit", HOME + "/.claude/statusline.sh", worktree=worktree, launch=launch) == "ask",
+            "OpenCode pre-approves editing the live status-line script")
+require(oc_file("edit", WORKTREE + "/claude-code/.claude/statusline.sh") == "allow",
+        "the owning repository cannot maintain its status-line source")
+require(oc_file("edit", HOME + "/secrets/a/.claude/statusline.sh", worktree="/", launch="/") == "deny",
+        "the status-line ask rule weakens a protected-path denial")
+
+# Plan/Explore must not inherit implementation grants. Native plan exceptions precede
+# the shared protected-path inventory; agent-specific Plan rules may only narrow it.
+plan = opencode["agent"]["plan"]
+explore = opencode["agent"]["explore"]
+require("*" not in opencode["permission"]["edit"], "a global edit wildcard overrides built-in read-only modes")
+require(set(plan["permission"]["edit"].values()) == {"deny"}, "Plan exceptions would override protected-path denies")
+for worktree, launch in ((WORKTREE, WORKTREE), (HOME + "/Projects/eyrie/scrape/case", HOME + "/Projects/eyrie/scrape/case"),
+                         ("/", HOME + "/Work/reports")):
+    native_dir = worktree + "/.opencode/plans" if worktree != "/" else HOME + "/.local/share/opencode/plans"
+    require(oc_file("edit", native_dir + "/review.md", plan, worktree, launch) == "allow", "Plan cannot write its native plan")
+    for original in (launch + "/report.md", HOME + "/.claude/statusline.sh", HOME + "/Projects/other/app.py", HOME + "/Projects/eyrie/scrape/work.md",
+                     HOME + "/Projects/eyrie/scrape/plans/checkpoint.md", "/tmp/opencode/probe.md"):
+        for agent in (plan, explore, opencode["agent"]["sparrer"]):
+            require(oc_file("edit", original, agent, worktree, launch) == "deny", f"read-only agent can edit {original}")
+    for protected in (".env.md", "credentials.md", ".ssh/key.md", "secrets/notes.md"):
+        require(oc_file("edit", native_dir + "/" + protected, plan, worktree, launch) == "deny",
+                f"Plan exception reaches protected {protected}")
+    for protected in PROTECTED + PERSONAL:
+        full = expand(protected)
+        require(oc_file("read", full, opencode["agent"]["sparrer"], worktree, launch) == "deny",
+                f"sparrer can read protected {protected} from {launch}")
+    for name in ("build", "general"):
+        require(oc_file("edit", launch + "/app.py", opencode["agent"][name], worktree, launch) == "allow", "implementation edit denied")
+        scratch_expected = "ask" if worktree == HOME + "/Projects/eyrie/scrape/case" else "allow"
+        require(oc_file("edit", HOME + "/Projects/eyrie/scrape/work.md", opencode["agent"][name], worktree, launch) == scratch_expected,
+                "implementation scratch edit denied")
+for worktree, subject in ((WORKTREE, "../scrape/plans/checkpoint.md"), ("/", "home/h/Projects/eyrie/scrape/x.md"),
+                          ("/", "tmp/opencode/probe.md")):
+    require(oc_last(oc_rules(opencode["permission"], "edit", plan, worktree), subject) == "deny", "Plan retains a global scratch grant")
+# Outside-directory checks still run for non-Git launches, rather than treating '/' as all inside.
+probe = {"permission": {"external_directory": "ask"}}
+require(oc_file("read", "/etc/os-release", probe, "/", HOME + "/Work/reports") == "ask", "non-Git external check skipped")
+
 # --- Tool settings ---------------------------------------------------------------------------
 permissions = claude["permissions"]
 require(permissions["defaultMode"] == "auto" and permissions["disableBypassPermissionsMode"] == "disable",
@@ -360,6 +421,7 @@ require("sandbox" not in claude, "Claude tracked settings enable sandboxing")
 for section in ("allow", "soft_deny", "hard_deny"):
     require(claude["autoMode"][section][0] == "$defaults", f"Claude auto mode dropped built-in {section} rules")
 require("personal folders" in " ".join(claude["autoMode"]["hard_deny"]), "Claude classifier lacks the personal-folder rule")
+require("~/.claude/statusline.sh" in " ".join(claude["autoMode"]["soft_deny"]), "Claude self-configuration rule omits the status line")
 require(claude.get("attribution", {}).get("sessionUrl") is False, "Claude would add a session URL to commits")
 # Ship owns attribution; Claude Code's default guidance yields to it, but an empty value forbids attribution lines.
 require(not {"commit", "pr"} & claude.get("attribution", {}).keys(), "Claude attribution text overrides the ship rule")
@@ -407,6 +469,7 @@ for key in ("edit", "task"):
     require(oc_last(oc_rules(opencode["permission"], key, sparrer), "*") == "deny", f"OpenCode sparrer can use {key}")
 for key in ("webfetch", "websearch"):
     require(oc_last(oc_rules(opencode["permission"], key, sparrer), "*") == "allow", f"OpenCode sparrer lacks {key}")
+require(oc_last(oc_rules(opencode["permission"], "todowrite", sparrer), "*") == "allow", "sparrer task tracking is unnecessarily denied")
 require(oc_last(oc_rules(opencode["permission"], "bash", sparrer), "git log -1") == "allow" and
         oc_last(oc_rules(opencode["permission"], "bash", sparrer), "git push") == "ask", "OpenCode sparrer shell does not follow the primary rules")
 require(oc_file("read", expand("{w}/src/app.py"), sparrer) == "allow", "OpenCode sparrer cannot read the repository")
