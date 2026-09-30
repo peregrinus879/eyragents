@@ -67,7 +67,7 @@ check-skills: require-clone
 lint:
 	shellcheck -s bash $(SHELLCHECK_FILES)
 	python3 -I -c 'import sys; [compile(open(p, "rb").read(), p, "exec") for p in sys.argv[1:]]' \
-	  scripts/update-references.py tests/reference-migration.py tests/config-contracts.py tests/doc-links.py docs/workspace-guide-src/build.py \
+	  scripts/update-references.py tests/reference-migration.py tests/config-contracts.py tests/doc-links.py tests/spar-software.py docs/workspace-guide-src/build.py \
 	  agents/.agents/skills/spar/scripts/spar-supervise.py
 	@echo "ok:   lint"
 
@@ -80,6 +80,7 @@ test:
 	bash tests/statusline.sh
 	bash tests/prepare-stow.sh
 	bash tests/spar-bridges.sh
+	python3 tests/spar-software.py
 	bash tests/canary.sh
 	@echo "ok:   test"
 
