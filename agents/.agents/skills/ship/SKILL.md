@@ -35,6 +35,7 @@ In Claude Code, the command's description adds a one-line summary under it, such
 
    The description summarizes the round: repository and branch, gate results, files and size, and any review verdict.
 5. Confirm that each commit's tree (`git rev-parse <commit>^{tree}`) equals its recorded tree and that `git log --format='%an <%ae> | %cn <%ce>'` shows the no-reply address for each. On any difference, stop and report it; never amend or reset to repair it.
+6. After all requested commit rounds are complete and verified, continue to [Publish](#publish) without waiting for another chat message, unless H requested local-only commits or placed publication on hold.
 
 Message: `<type>[(scope)]: <subject>`, with type `feat`, `fix`, `docs`, `refactor`, `style`, `test` or `chore`, an imperative lowercase subject of at most 50 characters, and the commit trailer from [Attribution](#attribution).
 
@@ -42,10 +43,10 @@ Add a body when a future reader needs more than the subject: explain the reason 
 
 ## Publish
 
-Push only when H has asked to push, publish or ship.
+A commit approval does not approve a push. Whether continuing from Commit or responding to a push, publish or ship request, run the checks below before presenting the exact push at its separate native permission prompt. If H declines, leave the commits local and stop publication.
 
-1. `git fetch`, then resolve where the push goes: every push URL (`git remote get-url --push --all <remote>`) and the destination branch. Stop if the remote has more than one push URL, or if its push URL differs from its fetch URL (`git remote get-url <remote>`), since the review below would then describe another repository.
-2. Review everything that would leave: `git log --stat --format=fuller <remote>/<branch>..HEAD`, every commit rather than the tip, so a file added and later removed is still seen. A first publication covers the whole history. Stop on credential-shaped paths without reading them, or on anything a public audience should not see.
+1. Resolve the established remote and destination branch from repository state or H's instructions; ask H if either is missing or ambiguous. Run `git fetch <remote>`, then check every push URL (`git remote get-url --push --all <remote>`). Stop if the remote has more than one push URL, or if its push URL differs from its fetch URL (`git remote get-url <remote>`), since the review below would then describe another repository.
+2. Review everything that would leave: `git log --stat --format=fuller <remote>/<branch>..HEAD`, every commit rather than the tip, so a file added and later removed is still seen. A first publication covers the whole history. Stop on credential-shaped paths without reading them, or on anything a public audience should not see. If there is nothing to publish, report that and stop.
 3. Push in one command, `git push <remote> <sha>:refs/heads/<branch>` for each repository, chained with `&&`, naming the exact commit and destination. The description gives the commit range and the push URL.
 4. Confirm with `git ls-remote <push URL> refs/heads/<branch>` that the destination holds the pushed commit, then find its CI run with `gh run list --commit <sha>` and watch it with `gh run watch`. Report the push, the remote check and CI separately; a custom SSH transport can make the remote check unobservable, which is an unknown result, not a failure. After an uncertain push, observe before proposing anything else.
 
