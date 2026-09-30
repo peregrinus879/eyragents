@@ -1275,7 +1275,7 @@
     "defaultMode": "auto",
     "disableBypassPermissionsMode": "disable"
   },
-  "model": "opus[1m]",
+  "model": "fable",
   "disableWorkflows": false,
   "workflowSizeGuideline": "large",
   "statusLine": {
@@ -1284,6 +1284,17 @@
     "refreshInterval": 60
   },
   "effortLevel": "xhigh",
+  "modelSettings": {
+    "claude-fable-5-1": {
+      "effortLevel": "xhigh"
+    },
+    "claude-opus-5-5": {
+      "effortLevel": "xhigh"
+    },
+    "claude-sonnet-5": {
+      "effortLevel": "xhigh"
+    }
+  },
   "tui": "fullscreen",
   "skipWorkflowUsageWarning": true,
   "autoMode": {
@@ -1310,16 +1321,5 @@
       "Agent configuration: the EyrAgents repository (~/Projects/eyrie/eyragents) is the source of the live Claude Code and OpenCode configuration; its package files are deployed by symlink, so an edit there changes the running agents' guidance, skills and permissions.",
       "Sensitive data: H's personal folders (~/Desktop, ~/Documents, ~/Downloads, ~/Music, ~/Pictures, ~/Sync, ~/Videos and their Windows counterparts), credential stores and sign-in sessions such as ~/.claude.json."
     ]
-  },
-  "modelSettings": {
-    "claude-fable-5-1": {
-      "effortLevel": "xhigh"
-    },
-    "claude-opus-5-5": {
-      "effortLevel": "xhigh"
-    },
-    "claude-sonnet-5": {
-      "effortLevel": "xhigh"
-    }
   }
 }
